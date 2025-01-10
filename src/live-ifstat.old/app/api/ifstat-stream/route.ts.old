@@ -1,0 +1,69 @@
+import { NextRequest } from 'next/server'
+import { spawn } from 'child_process'
+
+export const runtime = 'nodejs' // Ensure server runtime
+
+export async function GET(req: NextRequest) {
+  // Use TransformStream to create a web stream from SSE
+  const { readable, writable } = new TransformStream()
+
+  const writer = writable.getWriter()
+
+  // We send headers as SSE events at start
+  const encoder = new TextEncoder()
+
+  // Start ifstat
+  const ifstat = spawn('ifstat', ['-i', 'enp3s0', '-t', '-b', '-n', '1'])
+
+  let headerLinesToSkip = 2
+
+  ifstat.stdout.on('data', (data: Buffer) => {
+    const lines = data.toString().split('\n')
+    for (let line of lines) {
+      line = line.trim()
+      if (!line) continue
+      if (headerLinesToSkip > 0) {
+        headerLinesToSkip--
+        continue
+      }
+
+      // Expected format:
+      // HH:MM:SS   KB/s in   KB/s out
+      // 12:34:56   10.00     5.50
+      const parts = line.split(/\s+/)
+      if (parts.length >= 3) {
+        const timestamp = parts[0]
+        const kbIn = parseFloat(parts[1])
+        const kbOut = parseFloat(parts[2])
+        if (!isNaN(kbIn) && !isNaN(kbOut)) {
+          const payload = JSON.stringify({ timestamp, kbIn, kbOut })
+          const sseEvent = `data: ${payload}\n\n`
+          writer.write(encoder.encode(sseEvent))
+        }
+      }
+    }
+  })
+
+  ifstat.stderr.on('data', (data: Buffer) => {
+    console.error('ifstat stderr:', data.toString())
+  })
+
+  ifstat.on('close', (code) => {
+    console.log(`ifstat exited with code ${code}`)
+    writer.close()
+  })
+
+  // If the client disconnects, kill the ifstat process
+  // Unfortunately, we can't directly detect that easily here.
+  // But the writable stream will close eventually if client disconnects.
+
+  // Return the Response as an SSE stream
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  })
+}
+
