@@ -1,0 +1,18 @@
+{
+  "/api/leases/route": "app/api/leases/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/devices/route": "app/api/devices/route.js",
+  "/api/ping-status/route": "app/api/ping-status/route.js",
+  "/api/reservations/route": "app/api/reservations/route.js",
+  "/api/speedtest/route": "app/api/speedtest/route.js",
+  "/api/status/route": "app/api/status/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/sys-stats/route": "app/api/sys-stats/route.js",
+  "/api/ifstat-stream/route": "app/api/ifstat-stream/route.js",
+  "/api/server-info/route": "app/api/server-info/route.js",
+  "/bar-chart/page": "app/bar-chart/page.js",
+  "/bars/page": "app/bars/page.js",
+  "/reservations/page": "app/reservations/page.js",
+  "/page": "app/page.js",
+  "/leases/page": "app/leases/page.js"
+}
