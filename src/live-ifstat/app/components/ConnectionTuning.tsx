@@ -168,31 +168,31 @@ export default function ConnectionTuning() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-4">
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Connection Tuning</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+      <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Connection Tuning</h2>
       
       <div className="grid grid-cols-2 gap-6">
         {/* Primary Connection */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-medium text-gray-900">Primary</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Primary</h3>
             {activeConnection === 'PRIMARY' && (
-              <span className="text-sm font-medium text-green-600">active</span>
+              <span className="text-sm font-medium text-green-600 dark:text-green-400">active</span>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-900">Incoming Bandwidth</label>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Incoming Bandwidth</label>
             <div className="flex gap-2">
               <input
                 type="number"
                 value={(config.PRIMARY_INGRESS_BANDWIDTH as BandwidthValue).value}
                 onChange={(e) => handleBandwidthChange('PRIMARY_INGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               />
               <select
                 value={(config.PRIMARY_INGRESS_BANDWIDTH as BandwidthValue).unit}
                 onChange={(e) => handleUnitChange('PRIMARY_INGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-24 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               >
                 <option value="mbit">Mbit</option>
                 <option value="gbit">Gbit</option>
@@ -200,18 +200,18 @@ export default function ConnectionTuning() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-900">Outgoing Bandwidth</label>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Outgoing Bandwidth</label>
             <div className="flex gap-2">
               <input
                 type="number"
                 value={(config.PRIMARY_EGRESS_BANDWIDTH as BandwidthValue).value}
                 onChange={(e) => handleBandwidthChange('PRIMARY_EGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               />
               <select
                 value={(config.PRIMARY_EGRESS_BANDWIDTH as BandwidthValue).unit}
                 onChange={(e) => handleUnitChange('PRIMARY_EGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-24 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               >
                 <option value="mbit">Mbit</option>
                 <option value="gbit">Gbit</option>
@@ -221,7 +221,7 @@ export default function ConnectionTuning() {
           <button
             onClick={() => switchGateway('PRIMARY')}
             disabled={loading}
-            className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 disabled:opacity-50"
+            className="w-full bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded hover:bg-green-600 dark:hover:bg-green-700 disabled:opacity-50"
           >
             Switch to Primary
           </button>
@@ -230,24 +230,24 @@ export default function ConnectionTuning() {
         {/* Secondary Connection */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-medium text-gray-900">Secondary</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Secondary</h3>
             {activeConnection === 'SECONDARY' && (
-              <span className="text-sm font-medium text-green-600">active</span>
+              <span className="text-sm font-medium text-green-600 dark:text-green-400">active</span>
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-900">Incoming Bandwidth</label>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Incoming Bandwidth</label>
             <div className="flex gap-2">
               <input
                 type="number"
                 value={(config.SECONDARY_INGRESS_BANDWIDTH as BandwidthValue).value}
                 onChange={(e) => handleBandwidthChange('SECONDARY_INGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               />
               <select
                 value={(config.SECONDARY_INGRESS_BANDWIDTH as BandwidthValue).unit}
                 onChange={(e) => handleUnitChange('SECONDARY_INGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-24 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               >
                 <option value="mbit">Mbit</option>
                 <option value="gbit">Gbit</option>
@@ -255,18 +255,18 @@ export default function ConnectionTuning() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-900">Outgoing Bandwidth</label>
+            <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">Outgoing Bandwidth</label>
             <div className="flex gap-2">
               <input
                 type="number"
                 value={(config.SECONDARY_EGRESS_BANDWIDTH as BandwidthValue).value}
                 onChange={(e) => handleBandwidthChange('SECONDARY_EGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               />
               <select
                 value={(config.SECONDARY_EGRESS_BANDWIDTH as BandwidthValue).unit}
                 onChange={(e) => handleUnitChange('SECONDARY_EGRESS_BANDWIDTH', e.target.value)}
-                className="mt-1 block w-24 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900"
+                className="mt-1 block w-24 rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
               >
                 <option value="mbit">Mbit</option>
                 <option value="gbit">Gbit</option>
@@ -276,47 +276,27 @@ export default function ConnectionTuning() {
           <button
             onClick={() => switchGateway('SECONDARY')}
             disabled={loading}
-            className="w-full bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 disabled:opacity-50"
+            className="w-full bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded hover:bg-green-600 dark:hover:bg-green-700 disabled:opacity-50"
           >
             Switch to Secondary
           </button>
         </div>
       </div>
 
-      <div className="mt-6">
-        <div className="flex justify-center items-center gap-4">
-          {loading && (
-            <span className="text-sm text-gray-600">
-              Applying changes...
-            </span>
-          )}
-          <button
-            onClick={handleApply}
-            disabled={loading}
-            className="w-64 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
-          >
-            {loading ? 'Applying...' : 'Apply Changes'}
-          </button>
+      {error && (
+        <div className="mt-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 rounded">
+          {error}
         </div>
-        {error && (
-          <div className="mt-2 text-sm text-red-600 text-center">
-            Error: {error}
-          </div>
-        )}
-      </div>
+      )}
 
-      <div className="mt-4 text-sm text-gray-900">
-        <p>Note: Please run a speed test at{' '}
-          <a 
-            href="https://www.waveform.com/tools/bufferbloat" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-blue-500 hover:underline"
-          >
-            Waveform Bufferbloat Test
-          </a>
-          {' '}and set bandwidth to 85% of results.
-        </p>
+      <div className="mt-6 flex justify-end">
+        <button
+          onClick={handleApply}
+          disabled={loading}
+          className="bg-blue-500 dark:bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? 'Applying...' : 'Apply Changes'}
+        </button>
       </div>
     </div>
   )

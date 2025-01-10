@@ -44,38 +44,38 @@ export default function PingStats() {
   }, [])
 
   if (error) {
-    return <div className="text-red-600">Error: {error}</div>
+    return <div className="text-red-600 dark:text-red-400 p-4">Error: {error}</div>
   }
 
   if (!pingData) {
-    return <div className="text-gray-700">Loading ping data...</div>
+    return <div className="text-gray-700 dark:text-gray-300 p-4">Loading ping data...</div>
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
       {Object.entries(pingData.servers).map(([server, data]) => (
-        <div key={server} className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2 text-gray-900">{server} Connection Status</h3>
+        <div key={server} className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">{server} Connection Status</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-800">Current Ping</p>
-              <p className="text-xl font-bold text-gray-900">{data.ping_delay_ms}ms</p>
+              <p className="text-sm text-gray-800 dark:text-gray-300">Current Ping</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{data.ping_delay_ms}ms</p>
             </div>
             <div>
-              <p className="text-sm text-gray-800">Rolling Average</p>
-              <p className="text-xl font-bold text-gray-900">{data.rolling_avg_ms}ms</p>
+              <p className="text-sm text-gray-800 dark:text-gray-300">Rolling Average</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{data.rolling_avg_ms}ms</p>
             </div>
             <div>
-              <p className="text-sm text-gray-800">Highest Ping</p>
-              <p className="text-xl font-bold text-gray-900">{data.highest_ping}ms</p>
+              <p className="text-sm text-gray-800 dark:text-gray-300">Highest Ping</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{data.highest_ping}ms</p>
             </div>
             <div>
-              <p className="text-sm text-gray-800">Lowest Ping</p>
-              <p className="text-xl font-bold text-gray-900">{data.lowest_ping}ms</p>
+              <p className="text-sm text-gray-800 dark:text-gray-300">Lowest Ping</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{data.lowest_ping}ms</p>
             </div>
             <div className="col-span-2">
-              <p className="text-sm text-gray-800">Packet Loss</p>
-              <p className={`font-bold ${data.packet_loss ? 'text-red-600' : 'text-green-600'}`}>
+              <p className="text-sm text-gray-800 dark:text-gray-300">Packet Loss</p>
+              <p className={`font-bold ${data.packet_loss ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                 {data.packet_loss ? 'Yes' : 'No'}
               </p>
             </div>

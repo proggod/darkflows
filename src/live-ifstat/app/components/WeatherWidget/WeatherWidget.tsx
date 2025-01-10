@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, CloudRain, Sun, CloudSun } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface WeatherData {
   current_weather: {
@@ -42,6 +43,7 @@ const WeatherWidget = () => {
   const [showZipInput, setShowZipInput] = useState(false);
   const [zipCode, setZipCode] = useState('');
   const [error, setError] = useState('');
+  const { isDarkMode } = useTheme();
 
   const getWeatherIcon = (code: number) => {
     switch (code) {
@@ -141,7 +143,7 @@ const WeatherWidget = () => {
 
   if (loading) {
     return (
-      <div className="p-6 bg-gray-900 text-white rounded-lg">
+      <div className={`p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-lg`}>
         <div className="animate-pulse">Loading weather data...</div>
       </div>
     );
@@ -149,11 +151,11 @@ const WeatherWidget = () => {
 
   if (error) {
     return (
-      <div className="p-6 bg-gray-900 text-white rounded-lg">
-        <div className="text-red-400">{error}</div>
+      <div className={`p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-lg`}>
+        <div className={isDarkMode ? 'text-red-400' : 'text-red-600'}>{error}</div>
         <button 
           onClick={() => window.location.reload()} 
-          className="mt-2 text-blue-400 hover:text-blue-300"
+          className={`mt-2 ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
         >
           Retry
         </button>
@@ -163,8 +165,8 @@ const WeatherWidget = () => {
 
   if (!weatherData || !location) {
     return (
-      <div className="p-6 bg-gray-900 text-white rounded-lg">
-        <div className="text-yellow-400">Waiting for location data...</div>
+      <div className={`p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-lg`}>
+        <div className={isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}>Waiting for location data...</div>
       </div>
     );
   }
@@ -177,10 +179,10 @@ const WeatherWidget = () => {
   }));
 
   return (
-    <div className="p-6 bg-gray-900 text-white rounded-lg max-w-3xl mx-auto">
+    <div className={`p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-lg max-w-3xl mx-auto`}>
       {/* Location and Update */}
       <div className="flex justify-between items-center mb-2">
-        <span className="text-blue-400">Results for {location.cityName}</span>
+        <span className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}>{location.cityName}</span>
         <div className="flex gap-2">
           {showZipInput ? (
             <form onSubmit={handleZipSubmit} className="flex gap-2">
@@ -189,37 +191,37 @@ const WeatherWidget = () => {
                 value={zipCode}
                 onChange={(e) => setZipCode(e.target.value)}
                 placeholder="Enter ZIP code"
-                className="bg-gray-800 text-white px-2 py-1 rounded w-24"
+                className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'} px-2 py-1 rounded w-24`}
                 maxLength={5}
               />
-              <button type="submit" className="text-blue-400">Update</button>
+              <button type="submit" className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}>Update</button>
             </form>
           ) : (
-            <button onClick={() => setShowZipInput(true)} className="text-blue-400">
+            <button onClick={() => setShowZipInput(true)} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}>
               Change ZIP Code
             </button>
           )}
         </div>
       </div>
-      {error && <div className="text-red-400 text-sm mb-2">{error}</div>}
+      {error && <div className={`${isDarkMode ? 'text-red-400' : 'text-red-600'} text-sm mb-2`}>{error}</div>}
 
       {/* Current Weather */}
       <div className="flex items-center gap-4 mb-2">
         <div className="flex items-center gap-2">
           {getWeatherIcon(current_weather.weathercode)}
           <span className="text-4xl">{Math.round(celsiusToFahrenheit(current_weather.temperature))}°</span>
-          <span className="text-sm text-gray-400">F</span>
+          <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>F</span>
         </div>
         
         <div className="ml-auto text-right">
           <div className="text-xl">Weather</div>
-          <div className="text-gray-400">Friday 12:00 PM</div>
-          <div className="text-gray-400">Cloudy</div>
+          <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Friday 12:00 PM</div>
+          <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Cloudy</div>
         </div>
       </div>
 
       {/* Weather Details */}
-      <div className="flex justify-between px-4 mb-2 text-sm text-gray-400">
+      <div className={`flex justify-between px-4 mb-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
         <div>Precipitation: {hourly.precipitation[0]}%</div>
         <div>Humidity: 57%</div>
         <div>Wind: {Math.round(current_weather.windspeed)} mph</div>
@@ -227,7 +229,7 @@ const WeatherWidget = () => {
 
       {/* Temperature Graph */}
       <div className="mb-2">
-        <div className="h-48 bg-gray-800 rounded relative p-2">
+        <div className={`h-48 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} rounded relative p-2`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={hourlyData}
@@ -235,8 +237,8 @@ const WeatherWidget = () => {
             >
               <XAxis 
                 dataKey="time" 
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                stroke={isDarkMode ? '#9CA3AF' : '#4B5563'}
+                tick={{ fill: isDarkMode ? '#9CA3AF' : '#4B5563', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
                 interval={0}
@@ -244,24 +246,18 @@ const WeatherWidget = () => {
                 padding={{ left: 30, right: 30 }}
               />
               <YAxis 
-                stroke="#9CA3AF"
-                tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                stroke={isDarkMode ? '#9CA3AF' : '#4B5563'}
+                tick={{ fill: isDarkMode ? '#9CA3AF' : '#4B5563', fontSize: 12 }}
                 domain={['dataMin - 2', 'dataMax + 2']}
                 axisLine={false}
                 tickLine={false}
               />
-              <Line 
-                type="monotone" 
-                dataKey="temp" 
-                stroke="#EAB308"
+              <Line
+                type="monotone"
+                dataKey="temp"
+                stroke={isDarkMode ? '#60A5FA' : '#2563EB'}
                 strokeWidth={2}
-                dot={{ fill: '#EAB308', r: 4 }}
-                label={{ 
-                  position: 'top', 
-                  fill: '#9CA3AF',
-                  fontSize: 12,
-                  offset: 10
-                }}
+                dot={false}
               />
             </LineChart>
           </ResponsiveContainer>

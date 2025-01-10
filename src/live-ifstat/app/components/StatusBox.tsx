@@ -78,11 +78,11 @@ export default function StatusBox() {
   }, [])
 
   if (error) {
-    return <div className="text-red-600">Error: {error}</div>
+    return <div className="text-red-600 dark:text-red-400 p-4">Error: {error}</div>
   }
 
   if (!status) {
-    return <div className="text-gray-700">Loading status...</div>
+    return <div className="text-gray-700 dark:text-gray-300 p-4">Loading status...</div>
   }
 
   const formatMemory = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2)
@@ -90,8 +90,8 @@ export default function StatusBox() {
   return (
     <div className="p-4 pt-2">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-sm font-semibold text-gray-900">CAKE Statistics</h2>
-        <div className="text-xs text-gray-600">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">CAKE Statistics</h2>
+        <div className="text-xs text-gray-600 dark:text-gray-400">
           {new Date(status.timestamp).toLocaleTimeString()}
         </div>
       </div>
@@ -99,22 +99,22 @@ export default function StatusBox() {
       <div className="space-y-2">
         {Object.entries(status.interfaces).map(([iface, stats]) => (
           <div key={iface} >
-            <div className="text-xs font-medium text-gray-800">
+            <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
               {deviceLabels[iface] || iface}
             </div>
-            <div className="grid grid-cols-3  mt-0.5 text-s">
+            <div className="grid grid-cols-3 mt-0.5 text-s">
               <div>
-                <span className={`${stats.new_drops > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                <span className={`${stats.new_drops > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'}`}>
                   {stats.new_drops.toLocaleString()} drops
                 </span>
               </div>
               <div>
-                <span className={`${stats.backlog > 0 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                <span className={`${stats.backlog > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-gray-100'}`}>
                   {stats.backlog.toLocaleString()} backlog
                 </span>
               </div>
               <div>
-                <span className="text-gray-900">{formatMemory(stats.memory)}MB</span>
+                <span className="text-gray-900 dark:text-gray-100">{formatMemory(stats.memory)}MB</span>
               </div>
             </div>
           </div>

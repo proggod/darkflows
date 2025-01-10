@@ -12,6 +12,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
+import { useTheme } from '../contexts/ThemeContext'
 
 ChartJS.register(
   CategoryScale,
@@ -41,6 +42,7 @@ interface PingStatus {
 
 export default function PingChart() {
   const [pingData, setPingData] = useState<PingStatus | null>(null)
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,13 +62,20 @@ export default function PingChart() {
 
   if (!pingData) return null
 
+  const textColor = isDarkMode ? '#e5e7eb' : '#111827';
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
   const chartData = {
     labels: Array.from({ length: 22 }, (_, i) => i + 1),
     datasets: Object.entries(pingData.servers).map(([server, data]) => ({
       label: server,
       data: JSON.parse(data.samples),
-      borderColor: server === 'PRIMARY' ? 'rgb(75, 192, 192)' : 'rgb(255, 99, 132)',
-      backgroundColor: server === 'PRIMARY' ? 'rgba(75, 192, 192, 0.5)' : 'rgba(255, 99, 132, 0.5)',
+      borderColor: server === 'PRIMARY' 
+        ? isDarkMode ? 'rgba(75, 192, 192, 0.8)' : 'rgb(75, 192, 192)'
+        : isDarkMode ? 'rgba(255, 99, 132, 0.8)' : 'rgb(255, 99, 132)',
+      backgroundColor: server === 'PRIMARY'
+        ? isDarkMode ? 'rgba(75, 192, 192, 0.3)' : 'rgba(75, 192, 192, 0.5)'
+        : isDarkMode ? 'rgba(255, 99, 132, 0.3)' : 'rgba(255, 99, 132, 0.5)',
       tension: 0.3,
     })),
   }
@@ -76,25 +85,34 @@ export default function PingChart() {
     plugins: {
       legend: {
         position: 'top' as const,
+        labels: { color: textColor }
       },
       title: {
         display: true,
         text: 'Connection Ping Times',
+        color: textColor
       },
     },
     scales: {
+      x: {
+        grid: { color: gridColor },
+        ticks: { color: textColor }
+      },
       y: {
         beginAtZero: true,
+        grid: { color: gridColor },
+        ticks: { color: textColor },
         title: {
           display: true,
           text: 'Ping (ms)',
+          color: textColor
         },
       },
     },
   }
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow">
+    <div className="p-4">
       <Line data={chartData} options={options} />
     </div>
   )
