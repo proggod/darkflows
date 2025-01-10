@@ -15,6 +15,7 @@ import {
 } from 'chart.js'
 import { useNetworkData } from '../contexts/NetworkDataContext'
 import Modal from './Modal'
+import { useTheme } from '../contexts/ThemeContext'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend)
 
@@ -28,19 +29,19 @@ interface DeviceChartProps {
   isModal?: boolean
 }
 
-const maxDataPoints = 60
-
 export default function DeviceChart({ device, label, className = '', isModal = false }: DeviceChartProps) {
   const chartTypeKey = `chartType_${device}`
   const dataTypeKey = `dataType_${device}`
+  const { isDarkMode } = useTheme();
   
   const initialChartType = (typeof window !== 'undefined' && localStorage.getItem(chartTypeKey)) || 'line'
   const initialDataType = (typeof window !== 'undefined' && localStorage.getItem(dataTypeKey)) || 'both'
   
   const [chartType, setChartType] = useState<'line' | 'bar'>(initialChartType as 'line' | 'bar')
   const [dataType, setDataType] = useState<'input' | 'output' | 'both'>(initialDataType as 'input' | 'output' | 'both')
+  const [showModal, setShowModal] = useState(false)
   
-  const { data: dataPoints, connectionStatus, lastError } = useNetworkData(device)
+  const { data, connectionStatus, lastError } = useNetworkData(device)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -49,18 +50,21 @@ export default function DeviceChart({ device, label, className = '', isModal = f
     }
   }, [chartType, dataType, chartTypeKey, dataTypeKey])
 
+  const textColor = isDarkMode ? '#e5e7eb' : '#111827'
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+
   // Convert KB/s to Mb/s
-  const mbInData = dataPoints.map((d) => d.kbIn * 0.008)
-  const mbOutData = dataPoints.map((d) => d.kbOut * 0.008)
-  const labels = dataPoints.map((d) => d.timestamp)
+  const mbInData = data.map((d) => d.kbIn * 0.008)
+  const mbOutData = data.map((d) => d.kbOut * 0.008)
+  const labels = data.map((d) => d.timestamp)
 
   const datasets = []
   if (dataType === 'input' || dataType === 'both') {
     datasets.push({
       label: 'Mb/s In',
       data: mbInData,
-      backgroundColor: 'rgba(54, 162, 235, 0.6)',
-      borderColor: 'rgba(54, 162, 235, 1)',
+      backgroundColor: isDarkMode ? 'rgba(54, 162, 235, 0.3)' : 'rgba(54, 162, 235, 0.6)',
+      borderColor: isDarkMode ? 'rgba(54, 162, 235, 0.8)' : 'rgba(54, 162, 235, 1)',
       fill: chartType === 'line',
       tension: chartType === 'line' ? 0.3 : 0,
     })
@@ -69,8 +73,8 @@ export default function DeviceChart({ device, label, className = '', isModal = f
     datasets.push({
       label: 'Mb/s Out',
       data: mbOutData,
-      backgroundColor: 'rgba(255, 99, 132, 0.6)',
-      borderColor: 'rgba(255, 99, 132, 1)',
+      backgroundColor: isDarkMode ? 'rgba(255, 99, 132, 0.3)' : 'rgba(255, 99, 132, 0.6)',
+      borderColor: isDarkMode ? 'rgba(255, 99, 132, 0.8)' : 'rgba(255, 99, 132, 1)',
       fill: chartType === 'line',
       tension: chartType === 'line' ? 0.3 : 0,
     })
@@ -87,16 +91,30 @@ export default function DeviceChart({ device, label, className = '', isModal = f
     responsive: true,
     animation: { duration: 0 },
     scales: {
-      x: { display: true },
-      y: { display: true, beginAtZero: true },
+      x: {
+        display: true,
+        grid: { color: gridColor },
+        ticks: { color: textColor }
+      },
+      y: {
+        display: true,
+        beginAtZero: true,
+        grid: { color: gridColor },
+        ticks: { color: textColor }
+      },
     },
     plugins: {
-      legend: { position: 'top' as const },
-      title: { display: true, text: `Live Data for ${displayName}` },
+      legend: {
+        position: 'top' as const,
+        labels: { color: textColor }
+      },
+      title: {
+        display: true,
+        text: `Live Data for ${displayName}`,
+        color: textColor
+      },
     },
   }
-
-  const [showModal, setShowModal] = useState(false)
 
   const chartContent = (
     <>
@@ -112,16 +130,18 @@ export default function DeviceChart({ device, label, className = '', isModal = f
     return chartContent
   }
 
+  const latestData = data[data.length - 1] || { kbIn: 0, kbOut: 0 }
+
   return (
     <>
       <div 
-        className={`bg-white p-4 border rounded shadow cursor-pointer hover:shadow-lg transition-shadow ${className}`}
+        className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow ${className}`}
         onClick={() => setShowModal(true)}
       >
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{displayName} Throughput</h2>
-            <div className="text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{displayName} Throughput</h2>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Status: {connectionStatus} {lastError && `(${lastError})`}
             </div>
           </div>
@@ -129,7 +149,8 @@ export default function DeviceChart({ device, label, className = '', isModal = f
             <select
               value={dataType}
               onChange={(e) => setDataType(e.target.value as 'input' | 'output' | 'both')}
-              className="border rounded p-1 text-sm text-gray-900"
+              className="border rounded p-1 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 dark:border-gray-600"
+              onClick={(e) => e.stopPropagation()}
             >
               <option value="both">Both</option>
               <option value="input">Input Only</option>
@@ -138,7 +159,8 @@ export default function DeviceChart({ device, label, className = '', isModal = f
             <select
               value={chartType}
               onChange={(e) => setChartType(e.target.value as 'line' | 'bar')}
-              className="border rounded p-1 text-sm text-gray-900"
+              className="border rounded p-1 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 dark:border-gray-600"
+              onClick={(e) => e.stopPropagation()}
             >
               <option value="line">Line</option>
               <option value="bar">Bar</option>
@@ -148,9 +170,9 @@ export default function DeviceChart({ device, label, className = '', isModal = f
 
         {chartContent}
 
-        <div className="text-sm mt-2 text-gray-800">
-          <p>Last {maxDataPoints} samples in Mb/s</p>
-          <p>Current data points: {dataPoints.length}</p>
+        <div className="text-sm mt-2 text-gray-800 dark:text-gray-300">
+          <p>Last {data.length} samples in Mb/s</p>
+          <p>Current: ↓ {(latestData.kbIn * 0.008).toFixed(1)} Mb/s ↑ {(latestData.kbOut * 0.008).toFixed(1)} Mb/s</p>
         </div>
       </div>
 

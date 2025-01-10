@@ -44,8 +44,8 @@ export default function HomePage() {
 
   return (
     <NetworkDataProvider>
-      <div className="min-h-screen bg-gray-100 p-8">
-        <h1 className="text-2xl font-bold mb-8 text-center text-gray-900">Network & System Metrics</h1>
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-8">
+        <h1 className="text-2xl font-bold mb-8 text-center text-gray-900 dark:text-gray-100">Network & System Metrics</h1>
         <SortableGrid devices={devices} isEditMode={isEditMode} />
       </div>
     </NetworkDataProvider>

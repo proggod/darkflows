@@ -13,6 +13,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
+import { useTheme } from '../contexts/ThemeContext';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend)
 
@@ -31,6 +32,7 @@ interface SysChartProps {
 const maxDataPoints = 60
 
 export default function SysChart({ metric }: SysChartProps) {
+  const { isDarkMode } = useTheme();
   const [dataPoints, setDataPoints] = useState<SysData[]>([])
 
   // Local storage for chart type preference
@@ -73,6 +75,9 @@ export default function SysChart({ metric }: SysChartProps) {
 
   const labels = dataPoints.map((d) => d.timestamp)
 
+  const textColor = isDarkMode ? '#e5e7eb' : '#111827';
+  const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
   if (metric === 'cpu') {
     // CPU chart
     const cpuData = dataPoints.map((d) => d.cpu)
@@ -83,8 +88,8 @@ export default function SysChart({ metric }: SysChartProps) {
         {
           label: 'CPU Load (%)',
           data: cpuData,
-          backgroundColor: 'rgba(75, 192, 192, 0.6)',
-          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: isDarkMode ? 'rgba(75, 192, 192, 0.3)' : 'rgba(75, 192, 192, 0.6)',
+          borderColor: isDarkMode ? 'rgba(75, 192, 192, 0.8)' : 'rgba(75, 192, 192, 1)',
           fill: chartType === 'line',
           tension: chartType === 'line' ? 0.3 : 0
         },
@@ -95,28 +100,41 @@ export default function SysChart({ metric }: SysChartProps) {
       responsive: true,
       animation: { duration: 0 },
       scales: {
-        x: { display: true },
-        y: { display: true, beginAtZero: true },
+        x: { 
+          display: true,
+          grid: { color: gridColor },
+          ticks: { color: textColor }
+        },
+        y: { 
+          display: true,
+          beginAtZero: true,
+          grid: { color: gridColor },
+          ticks: { color: textColor }
+        },
       },
       plugins: {
-        legend: { position: 'top' as const },
+        legend: { 
+          position: 'top' as const,
+          labels: { color: textColor }
+        },
         title: {
           display: true,
-          text: 'CPU Load'
+          text: 'CPU Load',
+          color: textColor
         },
       },
     }
 
     return (
-      <div className="bg-white p-4 border rounded shadow">
+      <div className="p-4 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             CPU Load: {latestCpu.toFixed(1)}%
           </h2>
           <select
             value={chartType}
             onChange={(e) => setChartType(e.target.value as 'line' | 'bar')}
-            className="border rounded p-1 text-sm text-gray-900"
+            className="border rounded p-1 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 dark:border-gray-600"
           >
             <option value="line">Line</option>
             <option value="bar">Bar</option>
@@ -127,7 +145,7 @@ export default function SysChart({ metric }: SysChartProps) {
         ) : (
           <Bar data={chartData} options={chartOptions} />
         )}
-        <p className="text-sm mt-2 text-gray-800">Last {maxDataPoints} samples</p>
+        <p className="text-sm mt-2 text-gray-800 dark:text-gray-300">Last {maxDataPoints} samples</p>
       </div>
     )
 
@@ -146,8 +164,8 @@ export default function SysChart({ metric }: SysChartProps) {
         {
           label: 'Free Memory (MB)',
           data: memFreeData,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: isDarkMode ? 'rgba(54, 162, 235, 0.3)' : 'rgba(54, 162, 235, 0.6)',
+          borderColor: isDarkMode ? 'rgba(54, 162, 235, 0.8)' : 'rgba(54, 162, 235, 1)',
           yAxisID: 'yMemory',
           fill: chartType === 'line',
           tension: chartType === 'line' ? 0.3 : 0
@@ -155,8 +173,8 @@ export default function SysChart({ metric }: SysChartProps) {
         {
           label: 'Percent Free (%)',
           data: percentFreeData,
-          backgroundColor: 'rgba(255, 206, 86, 0.6)',
-          borderColor: 'rgba(255, 206, 86, 1)',
+          backgroundColor: isDarkMode ? 'rgba(255, 206, 86, 0.3)' : 'rgba(255, 206, 86, 0.6)',
+          borderColor: isDarkMode ? 'rgba(255, 206, 86, 0.8)' : 'rgba(255, 206, 86, 1)',
           yAxisID: 'yPercent',
           fill: chartType === 'line',
           tension: chartType === 'line' ? 0.3 : 0
@@ -168,90 +186,124 @@ export default function SysChart({ metric }: SysChartProps) {
       responsive: true,
       animation: { duration: 0 },
       scales: {
-        x: { display: true },
+        x: { 
+          display: true,
+          grid: { color: gridColor },
+          ticks: { color: textColor }
+        },
         yMemory: { 
           display: true, 
           beginAtZero: true, 
-          type: 'linear', 
-          position: 'left' 
+          type: 'linear' as const, 
+          position: 'left',
+          grid: { color: gridColor },
+          ticks: { color: textColor }
         },
         yPercent: {
           display: true,
           beginAtZero: true,
-          type: 'linear',
+          type: 'linear' as const,
           position: 'right',
           grid: {
-            drawOnChartArea: false
-          }
+            drawOnChartArea: false,
+            color: gridColor
+          },
+          ticks: { color: textColor }
         },
       },
       plugins: {
-        legend: { position: 'top' as const },
+        legend: { 
+          position: 'top' as const,
+          labels: { color: textColor }
+        },
         title: {
           display: true,
-          text: `Free Memory / % Free (Total: ${totalMemMB} MB)`
+          text: `Free Memory / % Free (Total: ${totalMemMB} MB)`,
+          color: textColor
         },
       },
     }
 
     return (
-      <div className="bg-white p-4 border rounded shadow">
+      <div className="p-4 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Memory Usage</h2>
-            <div className="text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Memory Usage</h2>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Free: {latestMemFree.toFixed(0)} MB ({latestPercentFree.toFixed(1)}%)
             </div>
           </div>
           <select
             value={chartType}
             onChange={(e) => setChartType(e.target.value as 'line' | 'bar')}
-            className="border rounded p-1 text-sm text-gray-900"
+            className="border rounded p-1 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 dark:border-gray-600"
           >
             <option value="line">Line</option>
             <option value="bar">Bar</option>
           </select>
         </div>
         {chartType === 'line' ? (
-          <Line data={chartData} options={{...chartOptions, scales: {
-            x: { display: true },
-            y: { 
-              display: true, 
-              beginAtZero: true, 
-              type: 'linear' as const, 
-              position: 'left' 
-            },
-            y2: {
-              display: true,
-              beginAtZero: true,
-              type: 'linear' as const,
-              position: 'right',
-              grid: {
-                drawOnChartArea: false
+          <Line data={chartData} options={{
+            ...chartOptions,
+            scales: {
+              x: { 
+                display: true,
+                grid: { color: gridColor },
+                ticks: { color: textColor }
+              },
+              y: { 
+                display: true,
+                beginAtZero: true,
+                type: 'linear' as const,
+                position: 'left' as const,
+                grid: { color: gridColor },
+                ticks: { color: textColor }
+              },
+              y2: {
+                display: true,
+                beginAtZero: true,
+                type: 'linear' as const,
+                position: 'right' as const,
+                grid: {
+                  drawOnChartArea: false,
+                  color: gridColor
+                },
+                ticks: { color: textColor }
               }
-            },
-          }}} />
+            }
+          }} />
         ) : (
-          <Bar data={chartData} options={{...chartOptions, scales: {
-            x: { display: true },
-            y: { 
-              display: true, 
-              beginAtZero: true, 
-              type: 'linear' as const, 
-              position: 'left' 
-            },
-            y2: {
-              display: true,
-              beginAtZero: true,
-              type: 'linear' as const,
-              position: 'right',
-              grid: {
-                drawOnChartArea: false
+          <Bar data={chartData} options={{
+            ...chartOptions,
+            scales: {
+              x: { 
+                display: true,
+                grid: { color: gridColor },
+                ticks: { color: textColor }
+              },
+              y: { 
+                display: true,
+                beginAtZero: true,
+                type: 'linear' as const,
+                position: 'left' as const,
+                grid: { color: gridColor },
+                ticks: { color: textColor }
+              },
+              y2: {
+                display: true,
+                beginAtZero: true,
+                type: 'linear' as const,
+                position: 'right' as const,
+                grid: {
+                  drawOnChartArea: false,
+                  color: gridColor
+                },
+                ticks: { color: textColor }
               }
-            },
-          }}} />
+            }
+          }} />
         )}
-        <p className="text-sm mt-2 text-gray-800">
+        <p className="text-sm mt-2 text-gray-800 dark:text-gray-300">
           Last {maxDataPoints} samples
         </p>
       </div>
