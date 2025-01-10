@@ -88,7 +88,7 @@ export default function StatusBox() {
   const formatMemory = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2)
 
   return (
-    <div className="p-0 pt-2">
+    <div className="p-4 pt-2">
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-sm font-semibold text-gray-900">CAKE Statistics</h2>
         <div className="text-xs text-gray-600">

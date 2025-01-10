@@ -9,6 +9,8 @@ import StatusBox from './components/StatusBox'
 import PingChart from './components/PingChart'
 import PingStats from './components/PingStats'
 import SpeedTest from './components/SpeedTest'
+import ConnectionTuning from './components/ConnectionTuning'
+import WeatherWidget from './components/WeatherWidget/WeatherWidget'
 
 
 interface NetworkDevice {
@@ -53,13 +55,13 @@ export default function HomePage() {
         <h1 className="text-2xl font-bold mb-8 text-center text-gray-900">Network & System Metrics</h1>
 
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-lg shadow-lg p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 gap-8">
+          <div className="bg-white rounded-lg shadow-lg">
             <ServerInfo />
             <StatusBox />
           </div>
 
-          <div className="bg-white rounded-lg shadow-lg p-4">
+          <div className="bg-white rounded-lg shadow-lg">
             <PingChart />
             <PingStats />
           </div>
@@ -67,7 +69,10 @@ export default function HomePage() {
 
           <SpeedTest />
           
- 
+          <ConnectionTuning />
+          
+          <WeatherWidget />
+          
           {devices.map((device) => (
             <DeviceChart 
               key={device.name} 

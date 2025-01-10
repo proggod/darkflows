@@ -1,0 +1,3 @@
+{
+  "/api/ifstat-stream/route": "app/api/ifstat-stream/route.js"
+}

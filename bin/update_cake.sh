@@ -17,6 +17,33 @@ validate_bandwidth() {
     return 0
 }
 
+# Function to get the current default gateway and interface
+get_current_gateway() {
+    ip route | grep '^default' | awk '{print $3, $5}'
+}
+
+# Function to determine the active connection (PRIMARY or SECONDARY)
+get_active_connection() {
+    # Extract gateways from lease files
+    PRIMARY_LEASE_FILE="/var/lib/dhcp/dhclient.${PRIMARY_INTERFACE}.leases"
+    SECONDARY_LEASE_FILE="/var/lib/dhcp/dhclient.${SECONDARY_INTERFACE}.leases"
+
+    PRIMARY_GATEWAY=$(grep 'option routers' "$PRIMARY_LEASE_FILE" | tail -1 | awk '{print $3}' | tr -d ';')
+    SECONDARY_GATEWAY=$(grep 'option routers' "$SECONDARY_LEASE_FILE" | tail -1 | awk '{print $3}' | tr -d ';')
+
+    # Get current default gateway and interface
+    read -r CURRENT_GATEWAY CURRENT_INTERFACE <<< "$(get_current_gateway)"
+
+    # Determine which connection is active
+    if [[ "$CURRENT_GATEWAY" == "$PRIMARY_GATEWAY" && "$CURRENT_INTERFACE" == "$PRIMARY_INTERFACE" ]]; then
+        echo "PRIMARY"
+    elif [[ "$CURRENT_GATEWAY" == "$SECONDARY_GATEWAY" && "$CURRENT_INTERFACE" == "$SECONDARY_INTERFACE" ]]; then
+        echo "SECONDARY"
+    else
+        echo "UNKNOWN"
+    fi
+}
+
 # Function to change CAKE bandwidth
 change_cake_bandwidth() {
     # Validate bandwidth values
@@ -32,9 +59,29 @@ change_cake_bandwidth() {
         echo "Failed to validate PRIMARY_INGRESS_BANDWIDTH."
         exit 1
     fi
+    if [ -n "$SECONDARY_INTERFACE" ] && ! validate_bandwidth "$SECONDARY_INGRESS_BANDWIDTH"; then
+        echo "Failed to validate SECONDARY_INGRESS_BANDWIDTH."
+        exit 1
+    fi
     if ! validate_bandwidth "$INTERNAL_EGRESS_BANDWIDTH"; then
         echo "Failed to validate INTERNAL_EGRESS_BANDWIDTH."
         exit 1
+    fi
+
+    # Determine the active connection
+    ACTIVE_CONNECTION=$(get_active_connection)
+    if [[ "$ACTIVE_CONNECTION" == "UNKNOWN" ]]; then
+        echo "Error: Unable to determine active connection."
+        exit 1
+    fi
+
+    echo "Active connection: $ACTIVE_CONNECTION"
+
+    # Set ingress bandwidth based on the active connection
+    if [[ "$ACTIVE_CONNECTION" == "PRIMARY" ]]; then
+        INGRESS_BANDWIDTH="$PRIMARY_INGRESS_BANDWIDTH"
+    else
+        INGRESS_BANDWIDTH="$SECONDARY_INGRESS_BANDWIDTH"
     fi
 
     # Change bandwidth for egress traffic on the primary interface
@@ -48,8 +95,8 @@ change_cake_bandwidth() {
     fi
 
     # Change bandwidth for ingress traffic on ifb0
-    echo "Changing CAKE bandwidth for ingress traffic on ifb0 to ${PRIMARY_INGRESS_BANDWIDTH}..."
-    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${PRIMARY_INGRESS_BANDWIDTH} memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter nowash split-gso || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
+    echo "Changing CAKE bandwidth for ingress traffic on ifb0 to ${INGRESS_BANDWIDTH}..."
+    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter nowash split-gso || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
 
     # Change bandwidth for local traffic on the internal interface
     echo "Changing CAKE bandwidth for local traffic on $INTERNAL_INTERFACE to ${INTERNAL_EGRESS_BANDWIDTH}..."

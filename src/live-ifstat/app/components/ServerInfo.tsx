@@ -42,7 +42,7 @@ export default function ServerInfo() {
   }
 
   return (
-    <div className="bg-white p-4 border rounded shadow text-gray-900">
+    <div className="bg-white p-4 text-gray-900">
       <h2 className="text-lg font-semibold mb-4">Server Information</h2>
       <div className="mb-2"><strong>OS:</strong> {info.osName} {info.osVersion}</div>
       <div className="mb-2"><strong>CPU:</strong> {info.cpuModel} ({info.cpus} cores)</div>

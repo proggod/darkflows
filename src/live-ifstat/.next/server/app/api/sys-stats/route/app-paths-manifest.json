@@ -1,0 +1,3 @@
+{
+  "/api/sys-stats/route": "app/api/sys-stats/route.js"
+}
