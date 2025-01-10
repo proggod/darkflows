@@ -1,17 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import DeviceChart from './components/DeviceChart'
-import SysChart from './components/SysChart'
-import ServerInfo from './components/ServerInfo'
 import { NetworkDataProvider } from './contexts/NetworkDataContext'
-import StatusBox from './components/StatusBox'
-import PingChart from './components/PingChart'
-import PingStats from './components/PingStats'
-import SpeedTest from './components/SpeedTest'
-import ConnectionTuning from './components/ConnectionTuning'
-import WeatherWidget from './components/WeatherWidget/WeatherWidget'
-
+import { useEditMode } from './contexts/EditModeContext'
+import SortableGrid from './components/SortableGrid'
 
 interface NetworkDevice {
   name: string
@@ -23,6 +15,7 @@ interface NetworkDevice {
 
 export default function HomePage() {
   const [devices, setDevices] = useState<NetworkDevice[]>([])
+  const { isEditMode } = useEditMode();
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -53,40 +46,7 @@ export default function HomePage() {
     <NetworkDataProvider>
       <div className="min-h-screen bg-gray-100 p-8">
         <h1 className="text-2xl font-bold mb-8 text-center text-gray-900">Network & System Metrics</h1>
-
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 3xl:grid-cols-3 gap-8">
-          <div className="bg-white rounded-lg shadow-lg">
-            <ServerInfo />
-            <StatusBox />
-          </div>
-
-          <div className="bg-white rounded-lg shadow-lg">
-            <PingChart />
-            <PingStats />
-          </div>
-
-
-          <SpeedTest />
-          
-          <ConnectionTuning />
-          
-          <WeatherWidget />
-          
-          {devices.map((device) => (
-            <DeviceChart 
-              key={device.name} 
-              device={device.name}
-              label={device.label}
-              type={device.type}
-              egressBandwidth={device.egressBandwidth}
-              ingressBandwidth={device.ingressBandwidth}
-            />
-          ))}
-
-          <SysChart metric="cpu" />
-          <SysChart metric="mem" />
-        </div>
+        <SortableGrid devices={devices} isEditMode={isEditMode} />
       </div>
     </NetworkDataProvider>
   )

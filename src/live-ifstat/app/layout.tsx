@@ -1,8 +1,10 @@
+'use client';
+
 import React from "react";
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from './components/Sidebar';
+import { EditModeProvider } from './contexts/EditModeContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,23 +16,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "DarkFlows Network Dashboard",
-  description: "DarkFlows Network Dashboard",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
+interface LayoutProps {
   children: React.ReactNode;
-}>) {
+}
+
+export default function RootLayout({ children }: LayoutProps) {
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Sidebar />
-        {children}
+        <EditModeProvider>
+          <Sidebar />
+          {children}
+        </EditModeProvider>
       </body>
     </html>
   );

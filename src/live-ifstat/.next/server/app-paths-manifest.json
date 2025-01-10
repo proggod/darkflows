@@ -1,11 +1,11 @@
 {
-  "/page": "app/page.js",
-  "/api/devices/route": "app/api/devices/route.js",
+  "/api/ifstat-stream/route": "app/api/ifstat-stream/route.js",
   "/api/ping-status/route": "app/api/ping-status/route.js",
-  "/api/server-info/route": "app/api/server-info/route.js",
-  "/api/network-config/route": "app/api/network-config/route.js",
   "/api/status/route": "app/api/status/route.js",
   "/api/connection-status/route": "app/api/connection-status/route.js",
-  "/api/sys-stats/route": "app/api/sys-stats/route.js",
-  "/api/ifstat-stream/route": "app/api/ifstat-stream/route.js"
+  "/page": "app/page.js",
+  "/api/devices/route": "app/api/devices/route.js",
+  "/api/server-info/route": "app/api/server-info/route.js",
+  "/api/network-config/route": "app/api/network-config/route.js",
+  "/api/sys-stats/route": "app/api/sys-stats/route.js"
 }

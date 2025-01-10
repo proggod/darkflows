@@ -177,7 +177,7 @@ const WeatherWidget = () => {
   }));
 
   return (
-    <div className="p-6 bg-gray-900 text-white rounded-lg w-full h-full">
+    <div className="p-6 bg-gray-900 text-white rounded-lg max-w-3xl mx-auto">
       {/* Location and Update */}
       <div className="flex justify-between items-center mb-2">
         <span className="text-blue-400">Results for {location.cityName}</span>
@@ -227,7 +227,7 @@ const WeatherWidget = () => {
 
       {/* Temperature Graph */}
       <div className="mb-2">
-        <div className="h-64 bg-gray-800 rounded relative p-2">
+        <div className="h-48 bg-gray-800 rounded relative p-2">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart 
               data={hourlyData}
