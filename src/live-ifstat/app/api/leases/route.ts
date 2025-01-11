@@ -30,7 +30,9 @@ export async function GET() {
 
     const leases = rows.map((row) => ({
       ip_address: row.ip_address,
-      mac_address: row.mac_address.match(/../g).join(':').toLowerCase(),
+      mac_address: row.mac_address && row.mac_address.trim()
+        ? row.mac_address.match(/../g).join(':').toLowerCase()
+        : 'N/A',
       device_name: row.device_name || 'N/A',
       expire: row.expire ? new Date(row.expire) : null,
       state_name: row.state_name
