@@ -8,6 +8,7 @@ interface WeatherData {
     temperature: number;
     weathercode: number;
     windspeed: number;
+    time: string;
   };
   hourly: {
     temperature_2m: number[];
@@ -18,6 +19,7 @@ interface WeatherData {
     temperature_2m_max: number[];
     temperature_2m_min: number[];
   };
+  timezone: string;
 }
 
 interface Location {
@@ -58,9 +60,18 @@ const WeatherWidget = () => {
     }
   };
 
-  const getDayName = (index: number) => {
-    const days = ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-    return days[index];
+  const getDayName = (index: number, timezone: string) => {
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      weekday: 'long'
+    });
+    const todayInTimezone = days.indexOf(formatter.format(now));
+    
+    const targetDay = (todayInTimezone + index) % 7;
+    return days[targetDay].slice(0, 3);
   };
 
   const celsiusToFahrenheit = (celsius: number) => {
@@ -96,6 +107,22 @@ const WeatherWidget = () => {
     }
   };
 
+  const getCurrentDateTime = (timezone: string) => {
+    console.log('Getting current date/time for timezone:', timezone);
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      weekday: 'long',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    const formatted = formatter.format(now);
+    console.log('Formatted datetime:', formatted);
+    return formatted;
+  };
+
   useEffect(() => {
     const savedLocation = localStorage.getItem('weatherLocation');
     if (savedLocation) {
@@ -118,7 +145,7 @@ const WeatherWidget = () => {
       console.log('Fetching weather for location:', location);
       
       try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&hourly=temperature_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weathercode&current_weather=true&timezone=America/New_York`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&hourly=temperature_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,weathercode&current_weather=true&timezone=${encodeURIComponent('auto')}`;
         console.log('Fetching weather from:', url);
         
         const response = await fetch(url);
@@ -126,7 +153,7 @@ const WeatherWidget = () => {
           throw new Error(`Weather API error: ${response.status}`);
         }
         const data = await response.json();
-        console.log('Weather data received:', data);
+        console.log('Weather data received with timezone:', data.timezone);
         setWeatherData(data);
         setLoading(false);
       } catch (error) {
@@ -182,7 +209,9 @@ const WeatherWidget = () => {
     <div className={`p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-lg max-w-3xl mx-auto`}>
       {/* Location and Update */}
       <div className="flex justify-between items-center mb-2">
-        <span className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}>{location.cityName}</span>
+        <span className={isDarkMode ? 'text-blue-400' : 'text-blue-600'}>
+          {location.cityName} ({weatherData.timezone})
+        </span>
         <div className="flex gap-2">
           {showZipInput ? (
             <form onSubmit={handleZipSubmit} className="flex gap-2">
@@ -215,7 +244,9 @@ const WeatherWidget = () => {
         
         <div className="ml-auto text-right">
           <div className="text-xl">Weather</div>
-          <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Friday 12:00 PM</div>
+          <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+            {getCurrentDateTime(weatherData.timezone)}
+          </div>
           <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Cloudy</div>
         </div>
       </div>
@@ -268,7 +299,7 @@ const WeatherWidget = () => {
       <div className="grid grid-cols-7 gap-2">
         {daily.temperature_2m_max.slice(0, 7).map((maxTemp: number, i: number) => (
           <div key={i} className="text-sm flex flex-col items-center">
-            <div className="text-gray-400">{getDayName(i)}</div>
+            <div className="text-gray-400">{getDayName(i, weatherData.timezone)}</div>
             <div className="my-2">
               {getWeatherIcon(i === 0 ? current_weather.weathercode : 0)}
             </div>
