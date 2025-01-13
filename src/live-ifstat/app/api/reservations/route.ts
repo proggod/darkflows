@@ -46,9 +46,9 @@ async function writeConfig(config: KeaConfig) {
   await fs.writeFile(KEA_CONFIG_PATH, JSON.stringify(config, null, 2));
   try {
     await new Promise((resolve, reject) => {
-      exec('sudo systemctl reload kea-dhcp4-server', (error: Error | null) => {
+      exec('systemctl restart kea-dhcp4-server', (error: Error | null) => {
         if (error) {
-          console.warn('Could not reload Kea configuration:', error);
+          console.warn('Could not restart Kea configuration:', error);
           reject(error);
         } else {
           resolve(true);
@@ -56,7 +56,7 @@ async function writeConfig(config: KeaConfig) {
       });
     });
   } catch (error) {
-    console.warn('Could not reload Kea configuration:', error);
+    console.warn('Could not restart Kea configuration:', error);
   }
 }
 

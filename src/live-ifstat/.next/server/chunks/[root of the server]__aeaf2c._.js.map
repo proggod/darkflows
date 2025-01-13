@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 63, "column": 0}, "map": {"version":3,"sources":["file:///usr/local/darkflows/src/live-ifstat/app/api/ping-status/route.ts"],"sourcesContent":["import { NextResponse } from 'next/server'\nimport { readFile } from 'fs/promises'\n\nexport async function GET() {\n  try {\n    const content = await readFile('/dev/shm/ping_status.json', 'utf-8')\n    const data = JSON.parse(content)\n    return NextResponse.json(data)\n  } catch {\n    return NextResponse.json({ error: 'Failed to read ping status' }, { status: 500 })\n  }\n} "],"names":[],"mappings":";;;AAAA;AACA;;;AAEO,eAAe;IACpB,IAAI;QACF,MAAM,UAAU,MAAM,CAAA,GAAA,qHAAA,CAAA,WAAQ,AAAD,EAAE,6BAA6B;QAC5D,MAAM,OAAO,KAAK,KAAK,CAAC;QACxB,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;IAC3B,EAAE,OAAM;QACN,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;YAAE,OAAO;QAA6B,GAAG;YAAE,QAAQ;QAAI;IAClF;AACF"}},
-    {"offset": {"line": 83, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
-}

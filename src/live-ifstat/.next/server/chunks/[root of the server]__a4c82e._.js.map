@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 71, "column": 0}, "map": {"version":3,"sources":["file:///usr/local/darkflows/src/live-ifstat/app/api/connection-status/route.ts"],"sourcesContent":["import { NextResponse } from 'next/server'\nimport { exec } from 'child_process'\nimport util from 'util'\n\nconst execAsync = util.promisify(exec)\nconst STATUS_SCRIPT = '/usr/local/darkflows/bin/connection_status.sh'\n\nexport async function GET() {\n  try {\n    const { stdout } = await execAsync(STATUS_SCRIPT)\n    const match = stdout.match(/Current connection: (\\w+)/)\n    const activeConnection = match ? match[1] : null\n    return NextResponse.json({ active: activeConnection })\n  } catch (error) {\n    console.error('Failed to get connection status:', error)\n    return NextResponse.json({ error: 'Failed to get connection status' }, { status: 500 })\n  }\n} "],"names":[],"mappings":";;;AAAA;AACA;AACA;;;;AAEA,MAAM,YAAY,iGAAA,CAAA,UAAI,CAAC,SAAS,CAAC,mHAAA,CAAA,OAAI;AACrC,MAAM,gBAAgB;AAEf,eAAe;IACpB,IAAI;QACF,MAAM,EAAE,MAAM,EAAE,GAAG,MAAM,UAAU;QACnC,MAAM,QAAQ,OAAO,KAAK,CAAC;QAC3B,MAAM,mBAAmB,QAAQ,KAAK,CAAC,EAAE,GAAG;QAC5C,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;YAAE,QAAQ;QAAiB;IACtD,EAAE,OAAO,OAAO;QACd,QAAQ,KAAK,CAAC,oCAAoC;QAClD,OAAO,gIAAA,CAAA,eAAY,CAAC,IAAI,CAAC;YAAE,OAAO;QAAkC,GAAG;YAAE,QAAQ;QAAI;IACvF;AACF"}},
-    {"offset": {"line": 99, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
-}
