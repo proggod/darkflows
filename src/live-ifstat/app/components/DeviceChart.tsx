@@ -32,23 +32,38 @@ interface DeviceChartProps {
 export default function DeviceChart({ device, label, className = '', isModal = false }: DeviceChartProps) {
   const chartTypeKey = `chartType_${device}`
   const dataTypeKey = `dataType_${device}`
-  const { isDarkMode } = useTheme();
+  const { isDarkMode } = useTheme()
   
-  const initialChartType = (typeof window !== 'undefined' && localStorage.getItem(chartTypeKey)) || 'line'
-  const initialDataType = (typeof window !== 'undefined' && localStorage.getItem(dataTypeKey)) || 'both'
-  
-  const [chartType, setChartType] = useState<'line' | 'bar'>(initialChartType as 'line' | 'bar')
-  const [dataType, setDataType] = useState<'input' | 'output' | 'both'>(initialDataType as 'input' | 'output' | 'both')
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line')
+  const [dataType, setDataType] = useState<'input' | 'output' | 'both'>('both')
   const [showModal, setShowModal] = useState(false)
   
   const { data, connectionStatus, lastError } = useNetworkData(device)
 
+  // Load preferences from localStorage on mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(chartTypeKey, chartType)
-      localStorage.setItem(dataTypeKey, dataType)
+    const savedChartType = localStorage.getItem(chartTypeKey)
+    const savedDataType = localStorage.getItem(dataTypeKey)
+    
+    if (savedChartType) {
+      setChartType(savedChartType as 'line' | 'bar')
     }
+    if (savedDataType) {
+      setDataType(savedDataType as 'input' | 'output' | 'both')
+    }
+  }, [chartTypeKey, dataTypeKey])
+
+  // Save preferences to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem(chartTypeKey, chartType)
+    localStorage.setItem(dataTypeKey, dataType)
   }, [chartType, dataType, chartTypeKey, dataTypeKey])
+
+  // Skip rendering if device name is empty
+  if (!device || device.trim() === '') {
+    console.warn('DeviceChart: Empty device name provided')
+    return null
+  }
 
   const textColor = isDarkMode ? '#e5e7eb' : '#111827'
   const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'

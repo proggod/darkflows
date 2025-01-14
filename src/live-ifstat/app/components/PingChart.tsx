@@ -67,7 +67,7 @@ export default function PingChart() {
 
   const chartData = {
     labels: Array.from({ length: 22 }, (_, i) => i + 1),
-    datasets: Object.entries(pingData.servers).map(([server, data]) => ({
+    datasets: pingData && pingData.servers ? Object.entries(pingData.servers).map(([server, data]) => ({
       label: server,
       data: JSON.parse(data.samples),
       borderColor: server === 'PRIMARY' 
@@ -77,9 +77,9 @@ export default function PingChart() {
         ? isDarkMode ? 'rgba(75, 192, 192, 0.3)' : 'rgba(75, 192, 192, 0.5)'
         : isDarkMode ? 'rgba(255, 99, 132, 0.3)' : 'rgba(255, 99, 132, 0.5)',
       tension: 0.3,
-    })),
+    })) : [],
   }
-
+  
   const options = {
     responsive: true,
     plugins: {

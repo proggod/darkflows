@@ -25,15 +25,20 @@ async function parseNetworkConfig(): Promise<Record<string, NetworkDevice>> {
       const deviceType = type.toLowerCase() as 'primary' | 'secondary' | 'internal'
 
       if (key === 'INTERFACE') {
+        if (value.trim() === '') continue
+        
         devices[value] = {
           type: deviceType
         }
       } else if (key === 'LABEL' && devices[getInterfaceForType(lines, deviceType)]) {
-        devices[getInterfaceForType(lines, deviceType)].label = value
+        const iface = getInterfaceForType(lines, deviceType)
+        if (iface && devices[iface]) {
+          devices[iface].label = value
+        }
       } else if (key.endsWith('BANDWIDTH')) {
         const direction = key.startsWith('EGRESS') ? 'egressBandwidth' : 'ingressBandwidth'
         const iface = getInterfaceForType(lines, deviceType)
-        if (devices[iface]) {
+        if (iface && devices[iface]) {
           devices[iface][direction] = value
         }
       }

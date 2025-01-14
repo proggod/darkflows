@@ -12,8 +12,7 @@ interface WeatherData {
   };
   hourly: {
     temperature_2m: number[];
-    precipitation: number[];
-    wind_speed_10m: number[];
+    precipitation: number[];    wind_speed_10m: number[];
   };
   daily: {
     temperature_2m_max: number[];

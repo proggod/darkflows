@@ -39,17 +39,17 @@ fi
 
 # Delete the current default route
 echo "Deleting existing default route..."
-sudo ip route del default || echo "No existing default route to delete."
+ip route del default || echo "No existing default route to delete."
 
 # Add the new default route for the primary interface
 echo "Setting new default route via $GATEWAY_PRIMARY on $PRIMARY_INTERFACE..."
-sudo ip route add default via "$GATEWAY_PRIMARY" dev "$PRIMARY_INTERFACE"
+ip route add default via "$GATEWAY_PRIMARY" dev "$PRIMARY_INTERFACE"
 
 # Set specific routes for monitoring IPs
 echo "Adding static routes for monitoring IPs..."
-sudo ip route add 8.8.4.4 via "$GATEWAY_PRIMARY" dev "$PRIMARY_INTERFACE"
+ip route add 8.8.4.4 via "$GATEWAY_PRIMARY" dev "$PRIMARY_INTERFACE"
 if [[ -n "$SECONDARY_INTERFACE" ]]; then
-    sudo ip route add 1.0.0.1 via "$GATEWAY_SECONDARY" dev "$SECONDARY_INTERFACE"
+    ip route add 1.0.0.1 via "$GATEWAY_SECONDARY" dev "$SECONDARY_INTERFACE"
 fi
 
 # Confirm the routing table

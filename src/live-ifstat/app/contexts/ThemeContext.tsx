@@ -10,16 +10,18 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('darkMode');
       if (saved !== null) {
-        return JSON.parse(saved);
+        setIsDarkMode(JSON.parse(saved));
+      } else {
+        setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
       }
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
-    return false;
-  });
+  }, []);
 
   useEffect(() => {
     if (isDarkMode) {
