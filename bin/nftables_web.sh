@@ -1,8 +1,9 @@
 #!/bin/bash
 
+# Disable IPv6 if desired
 sysctl -w net.ipv4.ip_forward=1
-sysctl -w net.ipv6.conf.all.disable_ipv6 = 1
-sysctl -w net.ipv6.conf.default.disable_ipv6 = 1
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
 # Source the network configuration file
 source /etc/darkflows/d_network.cfg || { echo "Failed to source network configuration"; exit 1; }
@@ -13,7 +14,6 @@ iptables -F
 iptables -t nat -F
 iptables -t mangle -F
 iptables -X
-
 
 # Flush existing nftables rules and delete user-defined chains
 echo "Flushing nftables rules..."
@@ -77,19 +77,22 @@ if [ -n "$SECONDARY_INTERFACE" ]; then
     tc -s qdisc show dev $SECONDARY_INTERFACE
 fi
 
-
-# Set default policies to DROP, blocking all traffic by default, allowing specific traffic afterward
+###############################################################################
+# TABLE: inet filter
+###############################################################################
+# Set default policies to DROP (blocking all traffic by default),
+# allowing specific traffic afterward.
 nft add table inet filter
-nft add chain inet filter input { type filter hook input priority 0 \; policy drop \; }
-nft add chain inet filter forward { type filter hook forward priority 0 \; policy drop \; }
-nft add chain inet filter output { type filter hook output priority 0 \; policy accept \; }
+nft add chain inet filter input "{ type filter hook input priority 0; policy drop; }"
+nft add chain inet filter forward "{ type filter hook forward priority 0; policy drop; }"
+nft add chain inet filter output "{ type filter hook output priority 0; policy accept; }"
 
 # Allow all traffic on the internal interface (local network)
 nft add rule inet filter input iif $INTERNAL_INTERFACE accept
 
 # Setting up nftables rules for routing and NAT
 nft add table ip nat
-nft add chain ip nat postrouting { type nat hook postrouting priority 100 \; }
+nft add chain ip nat postrouting "{ type nat hook postrouting priority 100; }"
 nft add rule ip nat postrouting oif $PRIMARY_INTERFACE masquerade
 
 # Add masquerade rule for secondary interface if it is set
@@ -125,8 +128,11 @@ if [ -n "$SECONDARY_INTERFACE" ]; then
 fi
 nft add rule inet filter output oif $PRIMARY_INTERFACE tcp sport 12222 ct state established accept
 
+###############################################################################
+# HAIRPIN NAT RULES
+###############################################################################
 # Redirect 3080 with Hairpin NAT
-nft add chain ip nat prerouting { type nat hook prerouting priority 100 \; }
+nft add chain ip nat prerouting "{ type nat hook prerouting priority 100; }"
 nft add rule ip nat prerouting tcp dport 3080 ip saddr != 192.168.1.110 dnat to 192.168.1.110:3080
 nft add rule ip nat postrouting ip saddr 192.168.0.0/23 ip daddr 192.168.1.110 tcp dport 3080 snat to 192.168.1.1
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp dport 3080 ct state new,established accept
@@ -150,7 +156,7 @@ if [ -n "$SECONDARY_INTERFACE" ]; then
     nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $SECONDARY_INTERFACE tcp sport 5080 ct state established accept
 fi
 
-# Redirect 5080 with Hairpin NAT
+# Redirect 3000 with Hairpin NAT
 nft add rule ip nat prerouting tcp dport 3000 ip saddr != 192.168.1.110 dnat to 192.168.1.110:3000
 nft add rule ip nat postrouting ip saddr 192.168.0.0/23 ip daddr 192.168.1.110 tcp dport 3000 snat to 192.168.1.1
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp dport 3000 ct state new,established accept
@@ -162,22 +168,32 @@ if [ -n "$SECONDARY_INTERFACE" ]; then
     nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $SECONDARY_INTERFACE tcp sport 3000 ct state established accept
 fi
 
-# Setting up nftables rules for DSCP marking (VoIP and gaming traffic)
+###############################################################################
+# TABLE: ip mangle (for DSCP marking + NEW prerouting chain)
+###############################################################################
 nft add table ip mangle
-nft add chain ip mangle postrouting { type filter hook postrouting priority 0 \; }
+
+# We already have a 'postrouting' chain for DSCP marking
+nft add chain ip mangle postrouting "{ type filter hook postrouting priority 0; }"
 
 # Mark VoIP traffic (SIP and RTP) with DSCP EF (46)
 nft add rule ip mangle postrouting udp dport 5060 ip dscp set ef  # SIP
 nft add rule ip mangle postrouting udp dport 10000-20000 ip dscp set ef  # RTP
 
 # Mark small packets (gaming traffic) with DSCP CS4 (32)
-nft add rule ip mangle postrouting ip length 0-128 ip dscp set cs4  # Small packets (e.g., gaming traffic)
+nft add rule ip mangle postrouting ip length 0-128 ip dscp set cs4  # Small packets
 
-#allow traffic incoming from tailscale
+# NEW: create a PREROUTING chain in 'ip mangle' for web marking
+nft add chain ip mangle prerouting "{ type filter hook prerouting priority -150; policy accept; }"
+# Mark inbound traffic on tcp/80 or tcp/443 with mark=0x1
+nft add rule ip mangle prerouting tcp dport 80 meta mark set 0x1
+nft add rule ip mangle prerouting tcp dport 443 meta mark set 0x1
+
+###############################################################################
+# ALLOW traffic incoming from tailscale
+###############################################################################
 nft add rule inet filter input iif "tailscale0" accept
 
-
-# Add filters to classify ingress traffic based on DSCP markings
 echo "Adding filters to classify ingress traffic..."
 tc filter add dev ifb0 parent 1: protocol ip u32 match ip tos 0x2e 0xfc action skbedit priority 3 || { echo "Failed to add filter for Voice (EF)"; exit 1; }
 tc filter add dev ifb0 parent 1: protocol ip u32 match ip tos 0x18 0xfc action skbedit priority 2 || { echo "Failed to add filter for Video (AF41)"; exit 1; }

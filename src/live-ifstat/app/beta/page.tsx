@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import SystemMonitor from '../components/SystemMonitor'
-import SpeedTestNew from '../components/SpeedTestNew'
-import PingStatsCard from '../components/PingStatsCard'
-import NetworkStatsCard from '../components/NetworkStatsCard'
-import ConnectionTuningNew from '../components/ConnectionTuningNew'
-import { useEditMode } from '../contexts/EditModeContext'
-import { useTheme } from '../contexts/ThemeContext'
+import SystemMonitor from '@/components/SystemMonitor'
+import SpeedTestNew from '@/components/SpeedTestNew'
+import PingStatsCard from '@/components/PingStatsCard'
+import NetworkStatsCard from '@/components/NetworkStatsCard'
+import ConnectionTuningNew from '@/components/ConnectionTuningNew'
+import { useEditMode } from '@/contexts/EditModeContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import {
   DndContext,
   closestCenter,
@@ -23,7 +23,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
-import { SortableItem } from '../components/SortableItem'
+import { SortableItem } from '@/components/SortableItem'
 
 interface NetworkInterface {
   name: string
@@ -72,10 +72,6 @@ export default function CombinedDashboard() {
   useEffect(() => {
     const loadSavedState = () => {
       try {
-        // Clear any saved state to start fresh
-        localStorage.removeItem('betaDashboardOrder')
-        localStorage.removeItem('betaDashboardHidden')
-        
         const savedOrder = localStorage.getItem('betaDashboardOrder')
         const savedHidden = localStorage.getItem('betaDashboardHidden')
         
@@ -193,8 +189,11 @@ export default function CombinedDashboard() {
           // Update items state to include network interfaces while preserving order of non-device items
           setItems(current => {
             const nonDeviceItems = current.filter(item => !item.startsWith('device_'))
-            const deviceItems = data.devices.map((device: NetworkInterface) => `device_${device.name}`)
-            return [...nonDeviceItems, ...deviceItems]
+            const existingDeviceItems = current.filter(item => item.startsWith('device_'))
+            const newDeviceItems = data.devices
+              .map((device: NetworkInterface) => `device_${device.name}`)
+              .filter((deviceId: string) => !existingDeviceItems.includes(deviceId))
+            return [...nonDeviceItems, ...existingDeviceItems, ...newDeviceItems]
           })
         }
       })
