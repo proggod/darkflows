@@ -42,7 +42,7 @@ export default function Sidebar() {
         onClick={toggleDrawer(true)}
         sx={{ position: 'fixed', top: 16, left: 16, zIndex: 1000 }}
       >
-        <MenuIcon />
+        <MenuIcon className="text-gray-900 dark:text-white" />
       </IconButton>
       <Drawer anchor="left" open={open} onClose={toggleDrawer(false)}>
         <Box sx={{ width: 250 }} role="presentation">

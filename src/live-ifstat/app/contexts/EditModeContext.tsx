@@ -14,7 +14,7 @@ export function EditModeButton() {
   return (
     <button
       onClick={() => setIsEditMode(!isEditMode)}
-      className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors"
+      className="px-3 py-0.5 bg-blue-600 dark:bg-blue-700 text-white rounded hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors"
     >
       {isEditMode ? 'Save Layout' : 'Edit Layout'}
     </button>

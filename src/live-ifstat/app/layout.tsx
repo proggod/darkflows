@@ -44,7 +44,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     <body
       className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100`}
     >
-      <div className="fixed top-4 right-4 z-50 flex items-center gap-4">
+      <div className="fixed top-2 right-4 z-50 flex items-center gap-2">
         <EditModeButton />
         <ThemeToggle />
       </div>

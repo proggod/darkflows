@@ -3,9 +3,27 @@
 import { useState, useEffect } from 'react'
 import SystemMonitor from '../components/SystemMonitor'
 import SpeedTestNew from '../components/SpeedTestNew'
-import ThemeToggle from '../components/ThemeToggle'
 import PingStatsCard from '../components/PingStatsCard'
 import NetworkStatsCard from '../components/NetworkStatsCard'
+import ConnectionTuningNew from '../components/ConnectionTuningNew'
+import { useEditMode } from '../contexts/EditModeContext'
+import { useTheme } from '../contexts/ThemeContext'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable'
+import { SortableItem } from '../components/SortableItem'
 
 interface NetworkInterface {
   name: string
@@ -39,14 +57,54 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
+const DEFAULT_ITEMS = ['systemMonitor', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning']
+
 export default function CombinedDashboard() {
-  const [isDark, setIsDark] = useState(true)
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
   const [networkStats, setNetworkStats] = useState<InterfaceStats>({})
+  const { isEditMode } = useEditMode()
+  const { isDarkMode } = useTheme()
   
+  const [items, setItems] = useState<string[]>(DEFAULT_ITEMS)
+  const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set())
+
+  // Load saved state from localStorage
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDark)
-  }, [isDark])
+    const loadSavedState = () => {
+      try {
+        // Clear any saved state to start fresh
+        localStorage.removeItem('betaDashboardOrder')
+        localStorage.removeItem('betaDashboardHidden')
+        
+        const savedOrder = localStorage.getItem('betaDashboardOrder')
+        const savedHidden = localStorage.getItem('betaDashboardHidden')
+        
+        if (savedOrder) {
+          setItems(JSON.parse(savedOrder))
+        } else {
+          setItems(DEFAULT_ITEMS)
+        }
+        
+        if (savedHidden) {
+          setHiddenItems(new Set(JSON.parse(savedHidden)))
+        }
+      } catch (e) {
+        console.error('Failed to load saved dashboard state:', e)
+      }
+    }
+
+    loadSavedState()
+  }, [])
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('betaDashboardOrder', JSON.stringify(items))
+    localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)))
+  }, [items, hiddenItems])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode)
+  }, [isDarkMode])
 
   useEffect(() => {
     const eventSource = new EventSource('/api/ifstat-stream')
@@ -132,44 +190,178 @@ export default function CombinedDashboard() {
       .then(data => {
         if (data.devices) {
           setInterfaces(data.devices)
+          // Update items state to include network interfaces while preserving order of non-device items
+          setItems(current => {
+            const nonDeviceItems = current.filter(item => !item.startsWith('device_'))
+            const deviceItems = data.devices.map((device: NetworkInterface) => `device_${device.name}`)
+            return [...nonDeviceItems, ...deviceItems]
+          })
         }
       })
       .catch(() => console.error('Failed to load devices'))
   }, [])
-
-  const toggleTheme = () => setIsDark(!isDark)
 
   const colors = [
     { light: '#10b981', dark: '#059669' }, // green
     { light: '#3b82f6', dark: '#2563eb' }, // blue
     { light: '#06b6d4', dark: '#0891b2' }, // cyan
     { light: '#8b5cf6', dark: '#7c3aed' }  // purple
-  ];
+  ]
 
-  return (
-    <div className="p-4">
-      <ThemeToggle isDark={isDark} toggleTheme={toggleTheme} />
-      <div className="space-y-8 mx-auto">
-        <div className="grid gap-3 px-4 dashboard-grid">
-          <SystemMonitor />
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    if (!isEditMode) return
+    const { active, over } = event
+    
+    if (over && active.id !== over.id) {
+      setItems((items) => {
+        const oldIndex = items.indexOf(active.id.toString())
+        const newIndex = items.indexOf(over.id.toString())
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
+
+  const toggleVisibility = (id: string) => {
+    setHiddenItems(current => {
+      const newHidden = new Set(current)
+      if (newHidden.has(id)) {
+        newHidden.delete(id)
+      } else {
+        newHidden.add(id)
+      }
+      return newHidden
+    })
+  }
+
+  const renderComponent = (id: string) => {
+    switch (id) {
+      case 'systemMonitor':
+        return <SystemMonitor />
+      case 'pingPrimary':
+        return (
           <PingStatsCard
             server="PRIMARY"
-            color={isDark ? '#2563eb' : '#3b82f6'}
+            color={isDarkMode ? '#2563eb' : '#3b82f6'}
           />
+        )
+      case 'pingSecondary':
+        return (
           <PingStatsCard
             server="SECONDARY"
-            color={isDark ? '#0891b2' : '#06b6d4'}
+            color={isDarkMode ? '#0891b2' : '#06b6d4'}
           />
-          {interfaces.map((iface, index) => (
+        )
+      case 'speedTest':
+        return <SpeedTestNew />
+      case 'connectionTuning':
+        return <ConnectionTuningNew />
+      default:
+        if (id.startsWith('device_')) {
+          const deviceName = id.replace('device_', '')
+          const device = interfaces.find(d => d.name === deviceName)
+          if (!device) return null
+          const index = interfaces.indexOf(device)
+          return (
             <NetworkStatsCard
-              key={iface.name}
-              label={iface.label || iface.name}
-              color={colors[index % colors.length][isDark ? 'dark' : 'light']}
-              data={getNetworkCardData(iface.name)}
+              key={device.name}
+              label={device.label || device.name}
+              color={colors[index % colors.length][isDarkMode ? 'dark' : 'light']}
+              data={getNetworkCardData(device.name)}
             />
-          ))}
-          <SpeedTestNew />
-        </div>
+          )
+        }
+        return null
+    }
+  }
+
+  const visibleItems = items.filter(id => !hiddenItems.has(id))
+  const hiddenItemsList = items.filter(id => hiddenItems.has(id))
+
+  const getComponentLabel = (id: string) => {
+    switch (id) {
+      case 'systemMonitor':
+        return 'System Monitor'
+      case 'pingPrimary':
+        return 'Primary Ping Stats'
+      case 'pingSecondary':
+        return 'Secondary Ping Stats'
+      case 'speedTest':
+        return 'Speed Test'
+      case 'connectionTuning':
+        return 'Connection Settings'
+      default:
+        if (id.startsWith('device_')) {
+          const deviceName = id.replace('device_', '')
+          const device = interfaces.find(d => d.name === deviceName)
+          return device?.label || deviceName
+        }
+        return id
+    }
+  }
+
+  return (
+    <div className="p-0 mx-5 mt-14">
+      <div className="space-y-8 mx-auto">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={visibleItems} strategy={rectSortingStrategy}>
+            <div className="grid gap-3 px-4 dashboard-grid">
+              {visibleItems.map((id) => (
+                <SortableItem key={id} id={id} isEditMode={isEditMode}>
+                  <div className="relative">
+                    {isEditMode && (
+                      <button
+                        onClick={() => toggleVisibility(id)}
+                        className="absolute top-2 left-2 z-20 p-1 bg-red-500 dark:bg-red-600 text-white rounded-full hover:bg-red-600 dark:hover:bg-red-700"
+                        title={`Hide ${getComponentLabel(id)}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18"></line>
+                          <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                      </button>
+                    )}
+                    {renderComponent(id)}
+                  </div>
+                </SortableItem>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        {isEditMode && hiddenItemsList.length > 0 && (
+          <div className="mt-8 p-4 bg-gray-200 dark:bg-gray-800 rounded-lg">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Hidden Components</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {hiddenItemsList.map(id => (
+                <div key={id} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded shadow-sm hover:shadow dark:shadow-gray-900">
+                  <button
+                    onClick={() => toggleVisibility(id)}
+                    className="p-1 bg-green-500 dark:bg-green-600 text-white rounded-full hover:bg-green-600 dark:hover:bg-green-700 flex-shrink-0"
+                    title={`Show ${getComponentLabel(id)}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
+                  <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {getComponentLabel(id)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
