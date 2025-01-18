@@ -11,6 +11,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler
 } from 'chart.js'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -21,7 +22,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 )
 
 interface PingData {

@@ -3,6 +3,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
+const UPDATE_INTERVAL_MS = 3000; // 1 second
+const HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,15 +31,23 @@ export async function GET(request: NextRequest) {
   let isStreamActive = true;
   const lastStats: { [device: string]: { rxBytes: number; txBytes: number; timestamp: number } } = {};
 
+  console.log('ifstat-stream: Listing devices');
   // Get list of devices
   const devices: string[] = [];
   try {
     const { stdout } = await execAsync('ls /sys/class/net');
-    devices.push(...stdout.trim().split('\n').filter(dev => dev !== 'lo'));
+    // Add error handling for empty device list
+    const filteredDevices = stdout.trim().split('\n').filter(dev => dev !== 'lo');
+    if (filteredDevices.length === 0) {
+      return new Response('No valid network devices found', { status: 404 });
+    }
+    devices.push(...filteredDevices);
   } catch (err) {
     console.error('Error getting network devices:', err);
     return new Response('Failed to get network devices', { status: 500 });
   }
+
+  console.log('New client connected to ifstat-stream');
 
   const stream = new ReadableStream({
     start: async (controller) => {
@@ -100,11 +110,14 @@ export async function GET(request: NextRequest) {
                     device
                   };
 
+//                  console.log('ifstat-stream: Stream is active');
                   // Only send data if the stream is still active
                   if (isStreamActive) {
                     try {
                       // Send data
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+  //                    console.log(`ifstat-stream: Sending data: ${JSON.stringify(data)}`);
+
                     } catch (error) {
                       console.log(`Stream closed, stopping data collection:`, error);
                       isStreamActive = false;
@@ -141,8 +154,9 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // Send heartbeat every 30 seconds
-          if (isStreamActive && Date.now() % 30000 < 1000) {
+          // Send heartbeat every 30 seconds - more precise check
+          const timeSinceLastHeartbeat = Date.now() % HEARTBEAT_INTERVAL_MS;
+          if (isStreamActive && timeSinceLastHeartbeat < UPDATE_INTERVAL_MS) {
             try {
               controller.enqueue(encoder.encode('event: heartbeat\ndata: {}\n\n'));
             } catch (enqueueError) {
@@ -154,7 +168,7 @@ export async function GET(request: NextRequest) {
               }
             }
           }
-        }, 1000);
+        }, UPDATE_INTERVAL_MS);
       } catch (error) {
         console.error('Stream setup error:', error);
         isStreamActive = false;

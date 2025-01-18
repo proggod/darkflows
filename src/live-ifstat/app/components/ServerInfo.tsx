@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 interface NetworkInterface {
   name: string
   speed?: string
+  id?: string
 }
 
 interface ServerInfoData {
@@ -27,7 +28,14 @@ export default function ServerInfo() {
         if (data.error) {
           setError(data.error)
         } else {
-          setInfo(data)
+          const serverInfo = {
+            ...data.serverInfo,
+            interfaces: data.serverInfo.interfaces.map((iface: NetworkInterface, index: number) => ({
+              ...iface,
+              id: `${iface.name}-${index}`
+            }))
+          }
+          setInfo(serverInfo)
         }
       })
       .catch(() => setError('Failed to load server info'))
@@ -56,7 +64,7 @@ export default function ServerInfo() {
       <h3 className="font-semibold mt-4 mb-2">Network Interfaces:</h3>
       <ul className="list-disc list-inside text-gray-700 dark:text-gray-300">
         {info.interfaces.map((iface) => (
-          <li key={iface.name}>
+          <li key={iface.id || iface.name}>
             {iface.name} - {iface.speed || 'Unknown speed'}
           </li>
         ))}

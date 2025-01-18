@@ -10,17 +10,41 @@ export default function SpeedTest() {
     ping: number;
   } | null>(null);
 
-  const runTest = async () => {
+  const runTest = () => {
     setIsRunning(true);
-    try {
-      const response = await fetch('/api/speedtest');
-      const data = await response.json();
-      setResults(data);
-    } catch (error) {
-      console.error('Failed to run speed test:', error);
-    } finally {
+    setResults(null);
+    
+    const eventSource = new EventSource('/api/speedtest');
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.result) {
+          setResults({
+            download: data.result.download,
+            upload: data.result.upload,
+            ping: data.result.idleLatency
+          });
+          eventSource.close();
+          setIsRunning(false);
+        } else if (data.error) {
+          console.error('Speed test error:', data.error);
+          eventSource.close();
+          setIsRunning(false);
+        }
+      } catch (error) {
+        console.error('Failed to parse speed test data:', error);
+        eventSource.close();
+        setIsRunning(false);
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.error('Speed test connection failed');
+      eventSource.close();
       setIsRunning(false);
-    }
+    };
   };
 
   return (

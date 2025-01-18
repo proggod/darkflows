@@ -9,12 +9,20 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      maxWidth: {
+        '8xl': '100rem',
+      },
+      height: {
+        'card': '200px'
+      },
       colors: {
         primary: '#0070f3',
         secondary: '#ff4081',
         success: '#00c853',
         warning: '#ffd600',
         error: '#ff1744',
+        background: "var(--background)",
+        foreground: "var(--foreground)",
       },
       screens: {
         '3xl': '1920px',

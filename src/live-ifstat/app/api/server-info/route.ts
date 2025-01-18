@@ -99,22 +99,77 @@ async function getNetworkInterfaces() {
   return interfaces
 }
 
+async function getDiskUsage() {
+  try {
+    const { stdout } = await execAsync('df -h /')
+    const lines = stdout.trim().split('\n')
+    // Get the last line which contains root partition info
+    const rootInfo = lines[lines.length - 1].split(/\s+/)
+    // Parse percentage without the % sign
+    const usedPercent = parseInt(rootInfo[4].replace('%', ''), 10)
+    // Get total and available space in GB
+    const totalGB = parseFloat(rootInfo[1].replace('G', ''))
+    const availableGB = parseFloat(rootInfo[3].replace('G', ''))
+    return {
+      usedPercent,
+      totalGB,
+      availableGB
+    }
+  } catch (error) {
+    console.error('Failed to get disk usage:', error)
+    return {
+      usedPercent: 0,
+      totalGB: 0,
+      availableGB: 0
+    }
+  }
+}
+
+async function getUptime() {
+  try {
+    const { stdout } = await execAsync('uptime -p')
+    return stdout.trim()
+  } catch (error) {
+    console.error('Failed to get uptime:', error)
+    return 'Unknown'
+  }
+}
+
 export async function GET() {
   try {
-    const [totalMemMB, cpuInfo, osInfo, netIfaces] = await Promise.all([
+    const [totalMemMB, cpuInfo, osInfo, netIfaces, diskInfo, uptime] = await Promise.all([
       getMemoryInfo(),
       getCPUInfo(),
       getOSInfo(),
-      getNetworkInterfaces()
+      getNetworkInterfaces(),
+      getDiskUsage(),
+      getUptime()
     ])
 
+    // Calculate memory usage percentage
+    const memoryUsagePercent = Math.round((totalMemMB - await getMemoryInfo()) / totalMemMB * 100)
+
     const data = {
-      totalMemMB,
-      cpus: cpuInfo.cpus,
-      cpuModel: cpuInfo.model,
-      osName: osInfo.name,
-      osVersion: osInfo.version,
-      interfaces: netIfaces
+      systemStats: {
+        name: `${osInfo.name} Server`,
+        cpu: 45, // You'll need to implement real CPU usage monitoring
+        memory: memoryUsagePercent,
+        disk: diskInfo.usedPercent,
+        network: 125.3, // You'll need to implement real network monitoring
+        agentVersion: '1.0.0',
+        hasNotification: false
+      },
+      serverInfo: {
+        totalMemMB,
+        cpus: cpuInfo.cpus,
+        cpuModel: cpuInfo.model,
+        osName: osInfo.name,
+        osVersion: osInfo.version,
+        interfaces: netIfaces,
+        uptime,
+        diskTotal: diskInfo.totalGB,
+        diskAvailable: diskInfo.availableGB
+      }
     }
 
     return NextResponse.json(data)

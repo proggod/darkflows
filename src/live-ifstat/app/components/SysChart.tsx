@@ -12,10 +12,21 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler
 } from 'chart.js'
 import { useTheme } from '../contexts/ThemeContext';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 interface SysData {
   timestamp: string

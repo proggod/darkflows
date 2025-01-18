@@ -19,3 +19,37 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@layer components {
+  .dashboard-grid {
+    /* Base: 1 column on the smallest screens */
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1rem; /* optional spacing between items */
+  }
+
+  /* 2 columns on at least 768px (md) screens */
+  @media (min-width: 768px) {
+    .dashboard-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  /* 3 columns on at least 1024px (lg) screens */
+  @media (min-width: 1024px) {
+    .dashboard-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  /* 4 columns on at least 1280px (xl) screens */
+  @media (min-width: 1700px) {
+    .dashboard-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .dashboard-grid > * {
+    height: 100%;
+  }
+}
+

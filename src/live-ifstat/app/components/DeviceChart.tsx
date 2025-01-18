@@ -12,12 +12,13 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js'
 import { useNetworkData } from '../contexts/NetworkDataContext'
 import Modal from './Modal'
 import { useTheme } from '../contexts/ThemeContext'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler)
 
 interface DeviceChartProps {
   device: string

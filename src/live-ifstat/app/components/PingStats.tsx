@@ -26,6 +26,9 @@ export default function PingStats() {
     const fetchData = async () => {
       try {
         const response = await fetch('/api/ping-status')
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
         const data = await response.json()
         if (data.error) {
           setError(data.error)
@@ -39,7 +42,7 @@ export default function PingStats() {
     }
 
     fetchData()
-    const interval = setInterval(fetchData, 5000)
+    const interval = setInterval(fetchData, 2000)
     return () => clearInterval(interval)
   }, [])
 
