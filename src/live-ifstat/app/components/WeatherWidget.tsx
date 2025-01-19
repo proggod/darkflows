@@ -43,13 +43,18 @@ export function WeatherWidget() {
   const [showZipInput, setShowZipInput] = useState(false)
   const [zipCode, setZipCode] = useState('')
   const [error, setError] = useState('')
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>(() => {
-    return localStorage.getItem('selectedMetric') as MetricType || 'temperature'
-  })
-  const [tempUnit, setTempUnit] = useState<TempUnit>(() => {
-    return localStorage.getItem('tempUnit') as TempUnit || 'F'
-  })
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>('temperature')
+  const [tempUnit, setTempUnit] = useState<TempUnit>('F')
   const { isDarkMode } = useTheme()
+
+  useEffect(() => {
+    // Load preferences from localStorage on client-side
+    const savedMetric = localStorage.getItem('selectedMetric') as MetricType
+    const savedTempUnit = localStorage.getItem('tempUnit') as TempUnit
+    
+    if (savedMetric) setSelectedMetric(savedMetric)
+    if (savedTempUnit) setTempUnit(savedTempUnit)
+  }, [])
 
   // Save preferences to localStorage
   useEffect(() => {

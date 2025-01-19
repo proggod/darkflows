@@ -8,6 +8,7 @@ import NetworkStatsCard from '@/components/NetworkStatsCard'
 import ConnectionTuningNew from '@/components/ConnectionTuningNew'
 import InterfaceStatusCard from '@/components/InterfaceStatusCard'
 import WeatherCard from '@/components/WeatherCard'
+import SambaSharesCard from '@/components/SambaSharesCard'
 import { useEditMode } from '@/contexts/EditModeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import {
@@ -62,7 +63,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares']
 
 // Add a version list of all available components to detect when new ones are added
 const COMPONENTS_VERSION = [
@@ -75,7 +76,8 @@ const COMPONENTS_VERSION = [
   'reservations',
   'leases',
   'weather',
-  'processes'
+  'processes',
+  'sambaShares'
 ]
 
 export default function CombinedDashboard() {
@@ -290,23 +292,26 @@ export default function CombinedDashboard() {
       case 'leases':
         return <LeasesCard />
       case 'weather':
-        return <WeatherCard key={id} />
+        return <WeatherCard />
       case 'processes':
         return <ServicesCard />
+      case 'sambaShares':
+        return <SambaSharesCard />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
+          const deviceData = getNetworkCardData(deviceName)
           const device = interfaces.find(i => i.name === deviceName)
-          if (device) {
-            const colorIndex = interfaces.findIndex(i => i.name === deviceName) % colors.length
-            return (
-              <NetworkStatsCard
-                data={getNetworkCardData(deviceName)}
-                label={device.label || device.name}
-                color={colors[colorIndex][isDarkMode ? 'dark' : 'light']}
-              />
-            )
-          }
+          if (!device) return null
+          
+          const colorIndex = interfaces.findIndex(i => i.name === deviceName) % colors.length
+          return (
+            <NetworkStatsCard
+              data={deviceData}
+              label={device.label || device.name}
+              color={isDarkMode ? colors[colorIndex].dark : colors[colorIndex].light}
+            />
+          )
         }
         return null
     }
@@ -337,6 +342,8 @@ export default function CombinedDashboard() {
         return 'Weather'
       case 'processes':
         return 'System Services'
+      case 'sambaShares':
+        return 'Samba Shares'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -362,7 +369,7 @@ export default function CombinedDashboard() {
                   key={id} 
                   id={id} 
                   isEditMode={isEditMode}
-                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' ? 'row-span-2' : ''}
+                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' ? 'row-span-2' : ''}
                 >
                   <div className="relative h-full">
                     {isEditMode && (
