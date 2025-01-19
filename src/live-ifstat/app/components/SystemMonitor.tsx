@@ -135,13 +135,8 @@ const SystemMonitor: React.FC = () => {
   const memoryUsage = sysData ? 100 - sysData.percentFree : 0;
 
   // Get the label for the active connection
-  const activeDevice = connectionStatus?.active === 'PRIMARY' || connectionStatus?.active === 'SECONDARY' ?
-    // If active is PRIMARY/SECONDARY, find device by type
-    devices.find(device => device.type?.toUpperCase() === connectionStatus.active) :
-    // Otherwise find by interface name
-    devices.find(device => device.name === connectionStatus?.active);
-    
-  const activeLabel = activeDevice?.label || connectionStatus?.active || 'Unknown';
+  const activeDevice = devices.find(device => device.type?.toUpperCase() === connectionStatus?.active)
+  const activeLabel = activeDevice?.label || activeDevice?.name || connectionStatus?.active || 'Unknown'
 
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200 h-card">

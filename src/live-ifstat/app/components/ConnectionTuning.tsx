@@ -156,15 +156,24 @@ export default function ConnectionTuning() {
   const switchGateway = async (type: 'PRIMARY' | 'SECONDARY') => {
     setLoading(true)
     try {
-      await fetch('/api/switch-gateway', {
+      const response = await fetch('/api/switch-gateway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type })
       })
+      
+      if (!response.ok) {
+        throw new Error('Failed to switch gateway')
+      }
+      
+      // Wait a moment for the switch to complete
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      await fetchConnectionStatus()
     } catch (error) {
       console.error('Failed to switch gateway:', error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -220,7 +229,7 @@ export default function ConnectionTuning() {
           </div>
           <button
             onClick={() => switchGateway('PRIMARY')}
-            disabled={loading}
+            disabled={loading || activeConnection === 'PRIMARY'}
             className="w-full bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded hover:bg-green-600 dark:hover:bg-green-700 disabled:opacity-50"
           >
             Switch to Primary
@@ -275,7 +284,7 @@ export default function ConnectionTuning() {
           </div>
           <button
             onClick={() => switchGateway('SECONDARY')}
-            disabled={loading}
+            disabled={loading || activeConnection === 'SECONDARY'}
             className="w-full bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded hover:bg-green-600 dark:hover:bg-green-700 disabled:opacity-50"
           >
             Switch to Secondary

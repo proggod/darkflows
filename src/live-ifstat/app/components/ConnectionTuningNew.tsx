@@ -110,15 +110,24 @@ export default function ConnectionTuningNew() {
   const switchGateway = async (type: 'PRIMARY' | 'SECONDARY') => {
     setLoading(true)
     try {
-      await fetch('/api/switch-gateway', {
+      const response = await fetch('/api/switch-gateway', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type })
       })
+      
+      if (!response.ok) {
+        throw new Error('Failed to switch gateway')
+      }
+      
+      // Wait a moment for the switch to complete
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      await fetchConnectionStatus()
     } catch (error) {
       console.error('Error switching gateway:', error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const renderConnectionSection = (type: 'PRIMARY' | 'SECONDARY') => {
