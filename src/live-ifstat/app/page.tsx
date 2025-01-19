@@ -28,6 +28,7 @@ import {
 import { SortableItem } from '@/components/SortableItem'
 import ReservationsCard from '@/components/ReservationsCard'
 import LeasesCard from '@/components/LeasesCard'
+import ServicesCard from '@/components/ServicesCard'
 
 interface NetworkInterface {
   name: string
@@ -61,7 +62,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes']
 
 // Add a version list of all available components to detect when new ones are added
 const COMPONENTS_VERSION = [
@@ -73,7 +74,8 @@ const COMPONENTS_VERSION = [
   'connectionTuning',
   'reservations',
   'leases',
-  'weather'
+  'weather',
+  'processes'
 ]
 
 export default function CombinedDashboard() {
@@ -289,6 +291,8 @@ export default function CombinedDashboard() {
         return <LeasesCard />
       case 'weather':
         return <WeatherCard key={id} />
+      case 'processes':
+        return <ServicesCard />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -331,6 +335,8 @@ export default function CombinedDashboard() {
         return 'Leases'
       case 'weather':
         return 'Weather'
+      case 'processes':
+        return 'System Services'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -356,7 +362,7 @@ export default function CombinedDashboard() {
                   key={id} 
                   id={id} 
                   isEditMode={isEditMode}
-                  className={id === 'reservations' || id === 'leases' || id === 'weather' ? 'row-span-2' : ''}
+                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' ? 'row-span-2' : ''}
                 >
                   <div className="relative h-full">
                     {isEditMode && (

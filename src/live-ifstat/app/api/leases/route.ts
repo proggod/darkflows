@@ -23,7 +23,8 @@ export async function GET() {
       JOIN 
         lease_state ls ON l4.state = ls.state 
       WHERE 
-        l4.expire > NOW() OR l4.expire IS NULL 
+        (l4.expire > NOW() OR l4.expire IS NULL)
+        AND l4.state = 0
       ORDER BY 
         l4.expire
     `) as [mysql.RowDataPacket[], mysql.FieldPacket[]];
