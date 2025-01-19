@@ -2,11 +2,13 @@
 
 /usr/local/darkflows/bin/setup_default_route.sh
 
+/usr/local/darkflows/bin/min.sh
+
 /usr/local/darkflows/bin/nftables.sh
 
 #restore original in case of issue, next reboot will run fine
 #rm /usr/local/darkflows/bin/nftables.sh
-#cp /usr/local/darkflows/bin/nftables_orig.sh /usr/local/darkflows/bin/nftables.sh
+#cp /usr/local/darkflows/bin/nftables_man.sh /usr/local/darkflows/bin/nftables.sh
 #chmod a+x /usr/local/darkflows/bin/nftables.sh
 
 

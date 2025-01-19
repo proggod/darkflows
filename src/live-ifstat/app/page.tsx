@@ -6,6 +6,7 @@ import SpeedTestNew from '@/components/SpeedTestNew'
 import PingStatsCard from '@/components/PingStatsCard'
 import NetworkStatsCard from '@/components/NetworkStatsCard'
 import ConnectionTuningNew from '@/components/ConnectionTuningNew'
+import InterfaceStatusCard from '@/components/InterfaceStatusCard'
 import { useEditMode } from '@/contexts/EditModeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import {
@@ -57,7 +58,17 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning']
+
+// Add a version list of all available components to detect when new ones are added
+const COMPONENTS_VERSION = [
+  'systemMonitor',
+  'interfaceStatus', 
+  'pingPrimary',
+  'pingSecondary',
+  'speedTest',
+  'connectionTuning'
+]
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -74,15 +85,25 @@ export default function CombinedDashboard() {
       try {
         const savedOrder = localStorage.getItem('betaDashboardOrder')
         const savedHidden = localStorage.getItem('betaDashboardHidden')
+        const savedVersion = localStorage.getItem('betaDashboardVersion')
         
-        if (savedOrder) {
-          setItems(JSON.parse(savedOrder))
+        // Check if saved version matches current version
+        if (savedVersion === JSON.stringify(COMPONENTS_VERSION)) {
+          if (savedOrder) {
+            setItems(JSON.parse(savedOrder))
+          }
+          if (savedHidden) {
+            setHiddenItems(new Set(JSON.parse(savedHidden)))
+          }
         } else {
+          // Version mismatch - reset to defaults
+          console.log('Dashboard components changed - resetting layout')
+          localStorage.removeItem('betaDashboardOrder')
+          localStorage.removeItem('betaDashboardHidden')
           setItems(DEFAULT_ITEMS)
-        }
-        
-        if (savedHidden) {
-          setHiddenItems(new Set(JSON.parse(savedHidden)))
+          setHiddenItems(new Set())
+          // Save new version
+          localStorage.setItem('betaDashboardVersion', JSON.stringify(COMPONENTS_VERSION))
         }
       } catch (e) {
         console.error('Failed to load saved dashboard state:', e)
@@ -96,6 +117,7 @@ export default function CombinedDashboard() {
   useEffect(() => {
     localStorage.setItem('betaDashboardOrder', JSON.stringify(items))
     localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)))
+    localStorage.setItem('betaDashboardVersion', JSON.stringify(COMPONENTS_VERSION))
   }, [items, hiddenItems])
 
   useEffect(() => {
@@ -243,6 +265,8 @@ export default function CombinedDashboard() {
     switch (id) {
       case 'systemMonitor':
         return <SystemMonitor />
+      case 'interfaceStatus':
+        return <InterfaceStatusCard />
       case 'pingPrimary':
         return (
           <PingStatsCard
@@ -287,6 +311,8 @@ export default function CombinedDashboard() {
     switch (id) {
       case 'systemMonitor':
         return 'System Monitor'
+      case 'interfaceStatus':
+        return 'Cake Status'
       case 'pingPrimary':
         return 'Primary Ping Stats'
       case 'pingSecondary':

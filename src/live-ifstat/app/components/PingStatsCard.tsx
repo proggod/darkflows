@@ -191,9 +191,10 @@ const PingStatsCard = ({
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
             {deviceLabel} Connection Latency
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Current: {currentPing}ms • Avg: {rollingAvg}ms
-          </p>
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+            <span>Current: {currentPing}ms</span>
+            <span>Average: {rollingAvg}ms</span>
+          </div>
         </div>
         <div className="flex-1 min-h-[100px]">
           <Line

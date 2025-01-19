@@ -1,4 +1,8 @@
 #!/bin/bash
+sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
 
 # Source the network configuration file
 source /etc/darkflows/d_network.cfg || { echo "Failed to source network configuration"; exit 1; }
