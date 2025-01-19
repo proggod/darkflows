@@ -114,4 +114,33 @@ export async function DELETE(request: Request) {
     console.error('Error deleting reservation:', error);
     return NextResponse.json({ error: 'Failed to delete reservation' }, { status: 500 });
   }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const updatedReservation = await request.json();
+    const config = await readConfig();
+    
+    // Find and update the reservation
+    const reservationIndex = config.Dhcp4.subnet4[0].reservations.findIndex((r: KeaReservation) => 
+      r['ip-address'] === updatedReservation['ip-address'] && 
+      r['hw-address'].toLowerCase() === updatedReservation['hw-address'].toLowerCase()
+    );
+    
+    if (reservationIndex === -1) {
+      return NextResponse.json(
+        { error: 'Reservation not found' }, 
+        { status: 404 }
+      );
+    }
+    
+    // Update the reservation
+    config.Dhcp4.subnet4[0].reservations[reservationIndex] = updatedReservation;
+    
+    await writeConfig(config);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating reservation:', error);
+    return NextResponse.json({ error: 'Failed to update reservation' }, { status: 500 });
+  }
 } 

@@ -5,9 +5,10 @@ interface Props {
   id: string;
   children: React.ReactNode;
   isEditMode: boolean;
+  className?: string;
 }
 
-export function SortableItem({ id, children, isEditMode }: Props) {
+export function SortableItem({ id, children, isEditMode, className = '' }: Props) {
   const {
     attributes,
     listeners,
@@ -21,15 +22,16 @@ export function SortableItem({ id, children, isEditMode }: Props) {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 1 : 0,
+    height: '100%',
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative ${isDragging ? 'z-10' : ''}`}
+      className={`relative ${isDragging ? 'z-10' : ''} ${className}`}
     >
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 h-full">
         {isEditMode && (
           <div
             {...attributes}

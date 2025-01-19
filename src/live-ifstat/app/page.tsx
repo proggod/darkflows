@@ -7,6 +7,7 @@ import PingStatsCard from '@/components/PingStatsCard'
 import NetworkStatsCard from '@/components/NetworkStatsCard'
 import ConnectionTuningNew from '@/components/ConnectionTuningNew'
 import InterfaceStatusCard from '@/components/InterfaceStatusCard'
+import WeatherCard from '@/components/WeatherCard'
 import { useEditMode } from '@/contexts/EditModeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import {
@@ -25,6 +26,8 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { SortableItem } from '@/components/SortableItem'
+import ReservationsCard from '@/components/ReservationsCard'
+import LeasesCard from '@/components/LeasesCard'
 
 interface NetworkInterface {
   name: string
@@ -58,7 +61,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather']
 
 // Add a version list of all available components to detect when new ones are added
 const COMPONENTS_VERSION = [
@@ -67,7 +70,10 @@ const COMPONENTS_VERSION = [
   'pingPrimary',
   'pingSecondary',
   'speedTest',
-  'connectionTuning'
+  'connectionTuning',
+  'reservations',
+  'leases',
+  'weather'
 ]
 
 export default function CombinedDashboard() {
@@ -262,43 +268,41 @@ export default function CombinedDashboard() {
   }
 
   const renderComponent = (id: string) => {
+    if (hiddenItems.has(id)) return null
+
     switch (id) {
       case 'systemMonitor':
         return <SystemMonitor />
       case 'interfaceStatus':
         return <InterfaceStatusCard />
       case 'pingPrimary':
-        return (
-          <PingStatsCard
-            server="PRIMARY"
-            color={isDarkMode ? '#2563eb' : '#3b82f6'}
-          />
-        )
+        return <PingStatsCard server="PRIMARY" color={isDarkMode ? '#2563eb' : '#3b82f6'} />
       case 'pingSecondary':
-        return (
-          <PingStatsCard
-            server="SECONDARY"
-            color={isDarkMode ? '#0891b2' : '#06b6d4'}
-          />
-        )
+        return <PingStatsCard server="SECONDARY" color={isDarkMode ? '#0891b2' : '#06b6d4'} />
       case 'speedTest':
         return <SpeedTestNew />
       case 'connectionTuning':
         return <ConnectionTuningNew />
+      case 'reservations':
+        return <ReservationsCard />
+      case 'leases':
+        return <LeasesCard />
+      case 'weather':
+        return <WeatherCard key={id} />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
-          const device = interfaces.find(d => d.name === deviceName)
-          if (!device) return null
-          const index = interfaces.indexOf(device)
-          return (
-            <NetworkStatsCard
-              key={device.name}
-              label={device.label || device.name}
-              color={colors[index % colors.length][isDarkMode ? 'dark' : 'light']}
-              data={getNetworkCardData(device.name)}
-            />
-          )
+          const device = interfaces.find(i => i.name === deviceName)
+          if (device) {
+            const colorIndex = interfaces.findIndex(i => i.name === deviceName) % colors.length
+            return (
+              <NetworkStatsCard
+                data={getNetworkCardData(deviceName)}
+                label={device.label || device.name}
+                color={colors[colorIndex][isDarkMode ? 'dark' : 'light']}
+              />
+            )
+          }
         }
         return null
     }
@@ -321,6 +325,12 @@ export default function CombinedDashboard() {
         return 'Speed Test'
       case 'connectionTuning':
         return 'Connection Settings'
+      case 'reservations':
+        return 'DHCP Reservations'
+      case 'leases':
+        return 'Leases'
+      case 'weather':
+        return 'Weather'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -340,10 +350,15 @@ export default function CombinedDashboard() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={visibleItems} strategy={rectSortingStrategy}>
-            <div className="grid gap-3 px-4 dashboard-grid">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-[250px] gap-3 px-4">
               {visibleItems.map((id) => (
-                <SortableItem key={id} id={id} isEditMode={isEditMode}>
-                  <div className="relative">
+                <SortableItem 
+                  key={id} 
+                  id={id} 
+                  isEditMode={isEditMode}
+                  className={id === 'reservations' || id === 'leases' || id === 'weather' ? 'row-span-2' : ''}
+                >
+                  <div className="relative h-full">
                     {isEditMode && (
                       <button
                         onClick={() => toggleVisibility(id)}
@@ -376,12 +391,9 @@ export default function CombinedDashboard() {
                     title={`Show ${getComponentLabel(id)}`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 5v14M5 12h14"/>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                   </button>
-                  <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                    {getComponentLabel(id)}
-                  </span>
                 </div>
               ))}
             </div>
