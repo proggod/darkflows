@@ -1,50 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-
-interface PingData {
-  ping_delay_ms: number
-  rolling_avg_ms: number
-  packet_loss: boolean
-  highest_ping: number
-  lowest_ping: number
-  samples: string
-}
-
-interface PingStatus {
-  timestamp: string
-  servers: {
-    [key: string]: PingData
-  }
-}
+import { usePingData } from '../contexts/PingDataContext'
 
 export default function PingStats() {
-  const [pingData, setPingData] = useState<PingStatus | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/ping-status')
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data = await response.json()
-        if (data.error) {
-          setError(data.error)
-        } else {
-          setPingData(data)
-        }
-      } catch (err) {
-        console.error(err)
-        setError('Failed to fetch ping data')
-      }
-    }
-
-    fetchData()
-    const interval = setInterval(fetchData, 2000)
-    return () => clearInterval(interval)
-  }, [])
+  const { pingData, error } = usePingData()
 
   if (error) {
     return <div className="text-red-600 dark:text-red-400 p-4">Error: {error}</div>

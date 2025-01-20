@@ -354,8 +354,8 @@ export default function CombinedDashboard() {
   }
 
   return (
-    <div className="p-0 mx-5 mt-14">
-      <div className="space-y-8 mx-auto">
+    <div className="p-0 mx-0 sm:mx-5 mt-14">
+      <div className="space-y-8 mx-auto p-0">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

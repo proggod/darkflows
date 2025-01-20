@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import fs from 'fs/promises'
 
 const execAsync = promisify(exec)
+const HIDE_SERVICES_FILE = '/etc/darkflows/hide_services.txt'
 
 interface ServiceData {
   name: string
@@ -10,8 +12,21 @@ interface ServiceData {
   running: boolean
 }
 
+async function getHiddenServices(): Promise<Set<string>> {
+  try {
+    const content = await fs.readFile(HIDE_SERVICES_FILE, 'utf-8')
+    return new Set(content.split('\n').map(line => line.trim()).filter(Boolean))
+  } catch (error) {
+    console.error(`Error reading ${HIDE_SERVICES_FILE}:`, error)
+    return new Set()
+  }
+}
+
 export async function GET() {
   try {
+    // Get list of services to hide
+    const hiddenServices = await getHiddenServices()
+
     // Get all services and their enabled status
     const { stdout: unitFilesOutput } = await execAsync('systemctl list-unit-files --type=service')
     const { stdout: runningOutput } = await execAsync('systemctl list-units --type=service --state=running')
@@ -31,15 +46,18 @@ export async function GET() {
       .filter(line => line.trim())
       .forEach(line => {
         const [unitFile, state] = line.trim().split(/\s+/)
-        // Only include enabled or disabled services and exclude systemd- services
-        if ((state === 'enabled' || state === 'disabled') && !unitFile.startsWith('systemd-')) {
+        // Only include enabled or disabled services and exclude hidden services
+        if ((state === 'enabled' || state === 'disabled')) {
           // Remove .service suffix if present
           const name = unitFile.replace(/\.service$/, '')
-          services.set(name, {
-            name,
-            enabled: state,
-            running: false
-          })
+          // Skip if service is in the hidden list, starts with systemd-, or ends with @
+          if (!hiddenServices.has(name) && !name.startsWith('systemd-') && !name.endsWith('@')) {
+            services.set(name, {
+              name,
+              enabled: state,
+              running: false
+            })
+          }
         }
       })
 
@@ -57,7 +75,6 @@ export async function GET() {
           if (services.has(name)) {
             services.get(name)!.running = true
           }
-          // We don't add unknown services anymore since we only want enabled/disabled ones
         })
     }
 

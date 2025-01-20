@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -14,6 +13,7 @@ import {
   Filler
 } from 'chart.js'
 import { useTheme } from '../contexts/ThemeContext'
+import { usePingData } from '../contexts/PingDataContext'
 
 ChartJS.register(
   CategoryScale,
@@ -26,41 +26,9 @@ ChartJS.register(
   Filler
 )
 
-interface PingData {
-  ping_delay_ms: number
-  rolling_avg_ms: number
-  packet_loss: boolean
-  highest_ping: number
-  lowest_ping: number
-  samples: string
-}
-
-interface PingStatus {
-  timestamp: string
-  servers: {
-    [key: string]: PingData
-  }
-}
-
 export default function PingChart() {
-  const [pingData, setPingData] = useState<PingStatus | null>(null)
+  const { pingData } = usePingData()
   const { isDarkMode } = useTheme();
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/ping-status')
-        const data = await response.json()
-        setPingData(data)
-      } catch (err) {
-        console.error('Failed to fetch ping data:', err)
-      }
-    }
-
-    fetchData()
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
-  }, [])
 
   if (!pingData) return null
 
@@ -81,40 +49,48 @@ export default function PingChart() {
       tension: 0.3,
     })) : [],
   }
-  
+
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index' as const,
+      intersect: false,
+    },
     plugins: {
       legend: {
         position: 'top' as const,
-        labels: { color: textColor }
+        labels: {
+          color: textColor,
+        },
       },
       title: {
-        display: true,
-        text: 'Connection Ping Times',
-        color: textColor
+        display: false,
       },
     },
     scales: {
-      x: {
-        grid: { color: gridColor },
-        ticks: { color: textColor }
-      },
       y: {
         beginAtZero: true,
-        grid: { color: gridColor },
-        ticks: { color: textColor },
-        title: {
-          display: true,
-          text: 'Ping (ms)',
-          color: textColor
+        grid: {
+          color: gridColor,
+        },
+        ticks: {
+          color: textColor,
+        },
+      },
+      x: {
+        grid: {
+          color: gridColor,
+        },
+        ticks: {
+          color: textColor,
         },
       },
     },
   }
 
   return (
-    <div className="p-4">
+    <div className="h-[300px] p-4">
       <Line data={chartData} options={options} />
     </div>
   )

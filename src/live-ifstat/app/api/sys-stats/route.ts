@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
               }
             }
           }
-        }, 1000);
+        }, 5000);
       } catch (error) {
         console.error('Stream setup error:', error);
         isStreamActive = false;

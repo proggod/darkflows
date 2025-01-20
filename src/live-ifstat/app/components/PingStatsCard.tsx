@@ -14,6 +14,7 @@ import {
   TooltipItem,
   Filler
 } from 'chart.js'
+import { usePingData } from '../contexts/PingDataContext'
 
 ChartJS.register(
   CategoryScale,
@@ -25,22 +26,6 @@ ChartJS.register(
   Legend,
   Filler
 )
-
-interface PingData {
-  ping_delay_ms: number
-  rolling_avg_ms: number
-  packet_loss: boolean
-  highest_ping: number
-  lowest_ping: number
-  samples: string
-}
-
-interface PingStatus {
-  timestamp: string
-  servers: {
-    [key: string]: PingData
-  }
-}
 
 interface NetworkDevice {
   name: string;
@@ -80,6 +65,7 @@ const PingStatsCard = ({
   const [rollingAvg, setRollingAvg] = useState<number>(0)
   const [packetLoss, setPacketLoss] = useState<boolean>(false)
   const [devices, setDevices] = useState<NetworkDevice[]>([])
+  const { pingData: sharedPingData } = usePingData()
 
   useEffect(() => {
     // Fetch devices first
@@ -94,39 +80,26 @@ const PingStatsCard = ({
     };
 
     fetchDevices();
+  }, [])
 
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/ping-status')
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        const data: PingStatus = await response.json()
-        
-        if (data.servers[server]) {
-          const samples = JSON.parse(data.servers[server].samples)
-          const timestamp = Date.now();
-          const formattedData = samples.map((value: number, index: number) => ({
-            x: index,
-            value: value,
-            key: `${server}-${timestamp}-${index}`,
-            uniqueId: `${server}-${timestamp}-${index}`
-          }))
+  useEffect(() => {
+    if (sharedPingData?.servers[server]) {
+      const serverData = sharedPingData.servers[server]
+      const samples = JSON.parse(serverData.samples)
+      const timestamp = Date.now();
+      const formattedData = samples.map((value: number, index: number) => ({
+        x: index,
+        value: value,
+        key: `${server}-${timestamp}-${index}`,
+        uniqueId: `${server}-${timestamp}-${index}`
+      }))
 
-          setPingData(formattedData)
-          setCurrentPing(data.servers[server].ping_delay_ms)
-          setRollingAvg(data.servers[server].rolling_avg_ms)
-          setPacketLoss(data.servers[server].packet_loss)
-        }
-      } catch (err) {
-        console.error('Failed to fetch ping data:', err)
-      }
+      setPingData(formattedData)
+      setCurrentPing(serverData.ping_delay_ms)
+      setRollingAvg(serverData.rolling_avg_ms)
+      setPacketLoss(serverData.packet_loss)
     }
-
-    fetchData()
-    const interval = setInterval(fetchData, 2000)
-    return () => clearInterval(interval)
-  }, [server])
+  }, [sharedPingData, server])
 
   const maxPing = Math.max(...pingData.map(d => d.value), currentPing, rollingAvg)
   const yAxisMax = Math.ceil(maxPing / 25) * 25

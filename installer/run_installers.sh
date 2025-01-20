@@ -9,6 +9,7 @@
 /usr/local/darkflows/installer/extract_configs.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log
 /usr/local/darkflows/installer/detect_network.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log
 /usr/local/darkflows/installer/setup_services.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log
+/usr/local/darkflows/installer/install_docker.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log
 systemctl disable first-boot.service 2>&1 | tee -a /dev/tty1 /tmp/installer.log
 echo "=========== Welcome to DarkFlows, your system is ready for use! =========="
 
