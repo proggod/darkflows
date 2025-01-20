@@ -1,17 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
+// Define the context type with params as a Promise
+interface RouteContext {
+  params: Promise<{
+    name: string;
+  }>;
+}
+
 export async function GET(
-  request: Request,
-  { params }: { params: { name: string } }
+  request: NextRequest,
+  context: RouteContext
 ) {
   try {
-    const serviceName = params.name
+    // Await the params Promise to get the actual parameters
+    const { name } = await context.params;
+    
     // Validate service name to prevent command injection while allowing common service name characters
-    if (!serviceName.match(/^[a-zA-Z0-9-._@]+$/)) {
+    if (!name.match(/^[a-zA-Z0-9-._@]+$/)) {
       return NextResponse.json({ error: 'Invalid service name' }, { status: 400 })
     }
 
@@ -23,7 +32,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid time range' }, { status: 400 })
     }
 
-    const { stdout } = await execAsync(`journalctl -u ${serviceName}.service --since "${timeRange} minute ago"`)
+    const { stdout } = await execAsync(`journalctl -u ${name}.service --since "${timeRange} minute ago"`)
     
     return NextResponse.json({ logs: stdout })
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
+import { NextRequest } from 'next/server';
 
 const KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf';
 
@@ -71,7 +72,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const reservation = await request.json();
     const config = await readConfig();

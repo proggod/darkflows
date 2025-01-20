@@ -65,21 +65,6 @@ interface InterfaceStats {
 
 const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares']
 
-// Add a version list of all available components to detect when new ones are added
-const COMPONENTS_VERSION = [
-  'systemMonitor',
-  'interfaceStatus', 
-  'pingPrimary',
-  'pingSecondary',
-  'speedTest',
-  'connectionTuning',
-  'reservations',
-  'leases',
-  'weather',
-  'processes',
-  'sambaShares'
-]
-
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
   const [networkStats, setNetworkStats] = useState<InterfaceStats>({})
@@ -95,28 +80,39 @@ export default function CombinedDashboard() {
       try {
         const savedOrder = localStorage.getItem('betaDashboardOrder')
         const savedHidden = localStorage.getItem('betaDashboardHidden')
-        const savedVersion = localStorage.getItem('betaDashboardVersion')
         
-        // Check if saved version matches current version
-        if (savedVersion === JSON.stringify(COMPONENTS_VERSION)) {
-          if (savedOrder) {
-            setItems(JSON.parse(savedOrder))
-          }
-          if (savedHidden) {
-            setHiddenItems(new Set(JSON.parse(savedHidden)))
+        // Check if we have saved state and parse it
+        const parsedOrder = savedOrder ? JSON.parse(savedOrder) : null
+        const parsedHidden = savedHidden ? JSON.parse(savedHidden) : null
+        
+        // Verify all default components exist in saved order
+        const hasAllComponents = DEFAULT_ITEMS.every(item => 
+          parsedOrder ? parsedOrder.includes(item) : false
+        )
+        
+        if (parsedOrder && hasAllComponents) {
+          // Only use saved order if it has all required components
+          setItems(parsedOrder)
+          if (parsedHidden) {
+            setHiddenItems(new Set(parsedHidden))
           }
         } else {
-          // Version mismatch - reset to defaults
-          console.log('Dashboard components changed - resetting layout')
+          // Reset to defaults if any components are missing
+          console.log('Missing components in dashboard - resetting layout')
           localStorage.removeItem('betaDashboardOrder')
           localStorage.removeItem('betaDashboardHidden')
+          localStorage.removeItem('betaDashboardVersion')
           setItems(DEFAULT_ITEMS)
           setHiddenItems(new Set())
-          // Save new version
-          localStorage.setItem('betaDashboardVersion', JSON.stringify(COMPONENTS_VERSION))
         }
       } catch (e) {
         console.error('Failed to load saved dashboard state:', e)
+        // Reset to defaults on error
+        localStorage.removeItem('betaDashboardOrder')
+        localStorage.removeItem('betaDashboardHidden')
+        localStorage.removeItem('betaDashboardVersion')
+        setItems(DEFAULT_ITEMS)
+        setHiddenItems(new Set())
       }
     }
 
@@ -125,9 +121,12 @@ export default function CombinedDashboard() {
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('betaDashboardOrder', JSON.stringify(items))
-    localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)))
-    localStorage.setItem('betaDashboardVersion', JSON.stringify(COMPONENTS_VERSION))
+    try {
+      localStorage.setItem('betaDashboardOrder', JSON.stringify(items))
+      localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)))
+    } catch (e) {
+      console.error('Failed to save dashboard state:', e)
+    }
   }, [items, hiddenItems])
 
   useEffect(() => {
@@ -395,7 +394,7 @@ export default function CombinedDashboard() {
         {isEditMode && hiddenItemsList.length > 0 && (
           <div className="mt-8 p-4 bg-gray-200 dark:bg-gray-800 rounded-lg">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Hidden Components</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {hiddenItemsList.map(id => (
                 <div key={id} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded shadow-sm hover:shadow dark:shadow-gray-900">
                   <button
@@ -404,9 +403,11 @@ export default function CombinedDashboard() {
                     title={`Show ${getComponentLabel(id)}`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                   </button>
+                  <span className="text-gray-900 dark:text-gray-100">{getComponentLabel(id)}</span>
                 </div>
               ))}
             </div>

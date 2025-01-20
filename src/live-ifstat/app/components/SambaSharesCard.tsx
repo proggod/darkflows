@@ -511,7 +511,7 @@ export default function SambaSharesCard() {
   const handleSaveShare = async (share: SambaShare) => {
     try {
       setError('')
-      const response = await fetch('/api/samba/shares', {
+      const response = await fetch('/api/samba/shares' + (editingShare ? `/${share.name}` : ''), {
         method: editingShare ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -519,16 +519,9 @@ export default function SambaSharesCard() {
         body: JSON.stringify(share),
       })
 
-      let errorData;
-      try {
-        errorData = await response.json()
-      } catch (e) {
-        console.error('Failed to parse response:', e)
-        throw new Error('Server error: Invalid response format')
-      }
-
       if (!response.ok) {
-        throw new Error(errorData.error || 'Failed to save share')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save share')
       }
 
       setShowAddShare(false)
@@ -536,7 +529,7 @@ export default function SambaSharesCard() {
       await loadData()
     } catch (error) {
       console.error('Error saving share:', error)
-      setError(error instanceof Error ? error.message : 'Failed to save share')
+      setError('Failed to save share')
     }
   }
 

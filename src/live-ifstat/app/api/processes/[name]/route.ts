@@ -1,21 +1,30 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
+// Define the context type with params as a Promise
+interface RouteContext {
+  params: Promise<{
+    name: string;
+  }>;
+}
+
 export async function GET(
-  request: Request,
-  { params }: { params: { name: string } }
+  request: NextRequest,
+  context: RouteContext
 ) {
   try {
-    const serviceName = params.name
+    // Await the params Promise to get the actual parameters
+    const { name } = await context.params;
+
     // Validate service name to prevent command injection
-    if (!serviceName.match(/^[a-zA-Z0-9-]+$/)) {
+    if (!name.match(/^[a-zA-Z0-9-]+$/)) {
       return NextResponse.json({ error: 'Invalid service name' }, { status: 400 })
     }
 
-    const { stdout } = await execAsync(`systemctl status ${serviceName}`)
+    const { stdout } = await execAsync(`systemctl status ${name}`)
     
     // Split output into lines and remove the last 10 lines (logs)
     const lines = stdout.split('\n')

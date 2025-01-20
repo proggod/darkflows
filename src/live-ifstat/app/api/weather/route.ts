@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 interface Location {
   latitude: string
@@ -7,7 +7,7 @@ interface Location {
   zipCode?: string
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const lat = searchParams.get('lat') || '51.5074' // Default to London
   const lon = searchParams.get('lon') || '-0.1278'
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 }
 
 // Add ZIP code lookup endpoint
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { zipCode } = await request.json()
     const response = await fetch(`https://api.zippopotam.us/us/${zipCode}`)
