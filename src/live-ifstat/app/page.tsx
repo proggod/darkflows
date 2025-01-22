@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import SystemMonitor from '@/components/SystemMonitor'
 import SpeedTestNew from '@/components/SpeedTestNew'
 import PingStatsCard from '@/components/PingStatsCard'
+import { DnsClientsCard } from '@/components/DnsClientsCard'
 import NetworkStatsCard from '@/components/NetworkStatsCard'
 import ConnectionTuningNew from '@/components/ConnectionTuningNew'
 import InterfaceStatusCard from '@/components/InterfaceStatusCard'
@@ -63,7 +64,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients']
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -296,6 +297,8 @@ export default function CombinedDashboard() {
         return <ServicesCard />
       case 'sambaShares':
         return <SambaSharesCard />
+      case 'dnsClients':
+        return <DnsClientsCard />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -343,6 +346,8 @@ export default function CombinedDashboard() {
         return 'System Services'
       case 'sambaShares':
         return 'Samba Shares'
+      case 'dnsClients':
+        return 'DNS Clients'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -368,7 +373,7 @@ export default function CombinedDashboard() {
                   key={id} 
                   id={id} 
                   isEditMode={isEditMode}
-                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' ? 'row-span-2' : ''}
+                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' || id === 'dnsClients' ? 'row-span-2' : ''}
                 >
                   <div className="relative h-full">
                     {isEditMode && (

@@ -32,8 +32,11 @@ export default function LeasesCard() {
         fetch('/api/reservations').then(res => res.json())
       ])
 
+      // Ensure leasesData is an array
+      const leasesArray = Array.isArray(leasesData) ? leasesData : [];
+      
       // Mark leases that are reserved
-      const markedLeases = leasesData.map((lease: Lease) => ({
+      const markedLeases = leasesArray.map((lease: Lease) => ({
         ...lease,
         is_reserved: reservationsData.some((r: ReservationData) => 
           r['ip-address'] === lease.ip_address || 

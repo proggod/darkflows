@@ -6,44 +6,43 @@ export async function GET() {
   try {
     connection = await mysql.createConnection({
       socketPath: process.env.DATABASE_SOCKET,
-      user: process.env.DATABASE_USER,
-      password: process.env.DATABASE_PASSWORD,
-      database: process.env.DATABASE_NAME
+      user: 'root',
+      database: 'kea'
     });
 
-    const [rows] = await connection.execute(`
+    const [leases] = await connection.execute<mysql.RowDataPacket[]>(`
       SELECT 
-        INET_NTOA(l4.address) AS ip_address, 
-        HEX(l4.hwaddr) AS mac_address, 
-        l4.hostname AS device_name, 
-        l4.expire, 
-        ls.name AS state_name 
-      FROM 
-        lease4 l4 
-      JOIN 
-        lease_state ls ON l4.state = ls.state 
-      WHERE 
-        (l4.expire > NOW() OR l4.expire IS NULL)
-        AND l4.state = 0
-      ORDER BY 
-        l4.expire
-    `) as [mysql.RowDataPacket[], mysql.FieldPacket[]];
+        INET_NTOA(address) AS ip_address,
+        HEX(hwaddr) AS mac_address,
+        hostname AS device_name,
+        expire,
+        state
+      FROM lease4
+      WHERE (expire > NOW() OR expire IS NULL)
+        AND state = 0
+      ORDER BY expire
+    `);
 
-    const leases = rows.map((row) => ({
-      ip_address: row.ip_address,
-      mac_address: row.mac_address && row.mac_address.trim()
-        ? row.mac_address.match(/../g).join(':').toLowerCase()
+    const formattedLeases = leases.map((lease: any) => ({
+      ip_address: lease.ip_address,
+      mac_address: lease.mac_address && lease.mac_address.trim()
+        ? lease.mac_address.match(/../g)?.join(':').toLowerCase() || 'N/A'
         : 'N/A',
-      device_name: row.device_name || 'N/A',
-      expire: row.expire ? new Date(row.expire) : null,
-      state_name: row.state_name
+      device_name: lease.device_name || 'N/A',
+      expire: lease.expire ? new Date(lease.expire) : null,
+      state: lease.state
     }));
 
-    return NextResponse.json(leases);
+    return NextResponse.json(formattedLeases);
   } catch (error) {
     console.error('Error fetching leases:', error);
-    return NextResponse.json({ error: 'Failed to fetch leases' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch leases' },
+      { status: 500 }
+    );
   } finally {
-    if (connection) await connection.end();
+    if (connection) {
+      await connection.end();
+    }
   }
-} 
+}

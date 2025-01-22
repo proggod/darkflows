@@ -167,16 +167,16 @@ export default function ConnectionTuningNew() {
               </label>
               <div className="flex gap-1 flex-1">
                 <input
-                  type="number"
+                  type="text" 
                   value={(config[ingressKey] as BandwidthValue).value}
                   onChange={(e) => handleBandwidthChange(ingressKey, e.target.value)}
-                  className="flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  className="w-10 flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                   placeholder="Value"
                 />
                 <select
                   value={(config[ingressKey] as BandwidthValue).unit}
                   onChange={(e) => handleUnitChange(ingressKey, e.target.value)}
-                  className="w-14 px-1 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  className="w-12 px-1 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   <option value="mbit">Mbs</option>
                   <option value="gbit">Gbs</option>
@@ -190,16 +190,16 @@ export default function ConnectionTuningNew() {
               </label>
               <div className="flex gap-1 flex-1">
                 <input
-                  type="number"
+                  type="text"
                   value={(config[egressKey] as BandwidthValue).value}
                   onChange={(e) => handleBandwidthChange(egressKey, e.target.value)}
-                  className="flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  className="w-10 flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                   placeholder="Value"
                 />
                 <select
                   value={(config[egressKey] as BandwidthValue).unit}
                   onChange={(e) => handleUnitChange(egressKey, e.target.value)}
-                  className="w-14 px-1 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  className="w-12 px-1 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 >
                   <option value="mbit">Mbs</option>
                   <option value="gbit">Gbs</option>
