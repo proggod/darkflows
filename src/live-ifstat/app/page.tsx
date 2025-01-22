@@ -31,6 +31,7 @@ import { SortableItem } from '@/components/SortableItem'
 import ReservationsCard from '@/components/ReservationsCard'
 import LeasesCard from '@/components/LeasesCard'
 import ServicesCard from '@/components/ServicesCard'
+import RouteHostToSecondary from '@/components/RouteHostToSecondary'
 
 interface NetworkInterface {
   name: string
@@ -64,7 +65,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary']
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -299,6 +300,8 @@ export default function CombinedDashboard() {
         return <SambaSharesCard />
       case 'dnsClients':
         return <DnsClientsCard />
+      case 'routeToSecondary':
+        return <RouteHostToSecondary />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -348,6 +351,8 @@ export default function CombinedDashboard() {
         return 'Samba Shares'
       case 'dnsClients':
         return 'DNS Clients'
+      case 'routeToSecondary':
+        return 'Route to Secondary'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
