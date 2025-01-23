@@ -128,7 +128,7 @@ nft add rule inet filter output oif $PRIMARY_INTERFACE tcp sport 12222 ct state 
 # Redirect 3080 with Hairpin NAT
 nft add chain ip nat prerouting { type nat hook prerouting priority 100 \; }
 nft add rule ip nat prerouting tcp dport 3080 ip saddr != 192.168.1.110 dnat to 192.168.1.110:3080
-nft add rule ip nat postrouting ip saddr 192.168.0.0/23 ip daddr 192.168.1.110 tcp dport 3080 snat to 192.168.1.1
+nft add rule ip nat postrouting ip saddr $IP_RANGE ip daddr 192.168.1.110 tcp dport 3080 snat to 192.168.1.1
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp dport 3080 ct state new,established accept
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp sport 3080 ct state established accept
 nft add rule inet filter forward iif $PRIMARY_INTERFACE oif $INTERNAL_INTERFACE tcp dport 3080 ct state new,established accept
@@ -140,7 +140,7 @@ fi
 
 # Redirect 5080 with Hairpin NAT
 nft add rule ip nat prerouting tcp dport 5080 ip saddr != 192.168.1.110 dnat to 192.168.1.110:5080
-nft add rule ip nat postrouting ip saddr 192.168.0.0/23 ip daddr 192.168.1.110 tcp dport 5080 snat to 192.168.1.1
+nft add rule ip nat postrouting ip saddr $IP_RANGE ip daddr 192.168.1.110 tcp dport 5080 snat to 192.168.1.1
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp dport 5080 ct state new,established accept
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp sport 5080 ct state established accept
 nft add rule inet filter forward iif $PRIMARY_INTERFACE oif $INTERNAL_INTERFACE tcp dport 5080 ct state new,established accept
@@ -152,7 +152,7 @@ fi
 
 # Redirect 5080 with Hairpin NAT
 nft add rule ip nat prerouting tcp dport 3000 ip saddr != 192.168.1.110 dnat to 192.168.1.110:3000
-nft add rule ip nat postrouting ip saddr 192.168.0.0/23 ip daddr 192.168.1.110 tcp dport 3000 snat to 192.168.1.1
+nft add rule ip nat postrouting ip saddr $IP_RANGE ip daddr 192.168.1.110 tcp dport 3000 snat to 192.168.1.1
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp dport 3000 ct state new,established accept
 nft add rule inet filter forward iif $INTERNAL_INTERFACE oif $INTERNAL_INTERFACE tcp sport 3000 ct state established accept
 nft add rule inet filter forward iif $PRIMARY_INTERFACE oif $INTERNAL_INTERFACE tcp dport 3000 ct state new,established accept
