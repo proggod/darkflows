@@ -70,7 +70,7 @@ async function ensureDir(filePath: string) {
   try {
     await fs.mkdir(path.dirname(filePath), { recursive: true })
   } catch (error) {
-    if ((error as any).code !== 'EEXIST') {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
       throw error
     }
   }
@@ -83,7 +83,7 @@ async function readRoutes(): Promise<string[]> {
     const content = await fs.readFile(ROUTES_FILE, 'utf-8')
     return content.split('\n').filter(line => line.trim())
   } catch (error) {
-    if ((error as any).code === 'ENOENT') {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       await ensureDir(ROUTES_FILE)
       await fs.writeFile(ROUTES_FILE, '', { mode: 0o644 })
       return []

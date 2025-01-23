@@ -5,6 +5,7 @@ import mysql from 'mysql2/promise';
 import { getMacVendor } from '../helpers/mac-vendor';
 import { promises as fs } from 'fs';
 
+
 const KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf';
 
 interface KeaConfig {
@@ -37,12 +38,6 @@ async function getSqliteDb(): Promise<Database> {
 interface DnsQuery {
   lastSeen: number;
   ip: string;
-}
-
-interface DnsClient {
-  ip: string;
-  name: string;
-  status: 'static' | 'reserved' | 'dynamic';
 }
 
 async function readKeaConfig(): Promise<KeaConfig> {
@@ -100,7 +95,7 @@ async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved
     const hostnameMap = new Map<string, { name: string, isReserved: boolean, mac?: string }>();
 
     // Format MAC addresses and add leases
-    leases.forEach((lease: any) => {
+    leases.forEach((lease: mysql.RowDataPacket) => {
       if (lease.ip_address && lease.mac_address) {
         // Format MAC address with colons
         const mac = lease.mac_address.match(/.{2}/g)?.join(':');
@@ -115,7 +110,7 @@ async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved
     });
 
     // Format MAC addresses and add/update reservations
-    reservations.forEach((reservation: any) => {
+    reservations.forEach((reservation: mysql.RowDataPacket) => {
       if (reservation.ip_address && reservation.mac_address) {
         // Format MAC address with colons
         const mac = reservation.mac_address.match(/.{2}/g)?.join(':');
@@ -130,7 +125,7 @@ async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved
     });
 
     // Add static reservations from Kea config
-    staticReservations.forEach((reservation: any) => {
+    staticReservations.forEach((reservation: { 'hw-address': string; 'ip-address': string; hostname?: string }) => {
       const mac = reservation['hw-address'].toLowerCase();
       hostnameMap.set(reservation['ip-address'], {
         name: reservation.hostname || 'N/A',
@@ -177,66 +172,28 @@ export async function GET() {
     const clients = await Promise.all(dnsClients.map(async entry => {
       const keaInfo = hostnameMap.get(entry.ip);
       let name = keaInfo?.name || 'N/A';
-      let status = keaInfo ? (keaInfo.isReserved ? 'reserved' : 'dynamic') : 'static';
+      const status = keaInfo ? (keaInfo.isReserved ? 'reserved' : 'dynamic') : 'static';
 
-      // Debug log for this IP
-      console.log('Processing IP:', {
-        ip: entry.ip,
-        initialName: name,
-        hasMac: !!keaInfo?.mac,
-        mac: keaInfo?.mac
-      });
-
-      // If no name but we have a MAC address, try to get vendor name
+      // If name is N/A and we have a MAC, try to get vendor info
       if (name === 'N/A' && keaInfo?.mac) {
-        try {
-          const vendor = await getMacVendor(keaInfo.mac);
-          console.log('Vendor lookup result:', {
-            ip: entry.ip,
-            mac: keaInfo.mac,
-            vendor
-          });
-          if (vendor !== 'Unknown') {
-            name = vendor;
-          }
-        } catch (error) {
-          console.error('Error looking up vendor:', {
-            ip: entry.ip,
-            mac: keaInfo.mac,
-            error
-          });
+        const vendor = await getMacVendor(keaInfo.mac);
+        if (vendor) {
+          name = `Unknown ${vendor} Device`;
         }
       }
 
       return {
         ip: entry.ip,
         name,
+        mac: keaInfo?.mac || null,
         status,
-        mac: keaInfo?.mac
+        lastSeen: entry.lastSeen
       };
     }));
 
-    // Log final results
-    console.log('Final results:', clients.map(c => ({
-      ip: c.ip,
-      name: c.name,
-      status: c.status,
-      mac: c.mac
-    })));
-
     return NextResponse.json(clients);
-  } catch (error) {
-    console.error('Error fetching DNS clients:', {
-      error: error instanceof Error ? error.message : error,
-      dbPath: process.env.PIHOLE_DB_PATH,
-      timestamp: new Date().toISOString()
-    });
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch DNS clients',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    console.error('Error fetching DNS clients:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
