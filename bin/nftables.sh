@@ -175,3 +175,5 @@ nft list ruleset
 
 echo "Configuration applied successfully."
 
+/usr/local/darkflows/bin/setup_secondwan.sh
+
