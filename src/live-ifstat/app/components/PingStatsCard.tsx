@@ -158,7 +158,7 @@ const PingStatsCard = ({
   const deviceLabel = devices.find(device => device.type?.toUpperCase() === server)?.label || server;
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200 h-card">
+    <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200">
       <div className="flex flex-col h-full">
         <div className="px-1 pb-2">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -169,12 +169,14 @@ const PingStatsCard = ({
             <span>Average: {rollingAvg}ms</span>
           </div>
         </div>
-        <div className="flex-1 min-h-[100px]">
-          <Line
-            data={chartData}
-            options={options}
-            className="!w-full !h-full"
-          />
+        <div className="flex-1 min-h-0">
+          <div className="h-full">
+            <Line
+              data={chartData}
+              options={options}
+              className="!w-full !h-full"
+            />
+          </div>
         </div>
         <div className="flex justify-between text-xs mt-1 px-1">
           <PingStats

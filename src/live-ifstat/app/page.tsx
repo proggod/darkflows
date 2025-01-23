@@ -33,6 +33,7 @@ import LeasesCard from '@/components/LeasesCard'
 import ServicesCard from '@/components/ServicesCard'
 import RouteHostToSecondary from '@/components/RouteHostToSecondary'
 import PortForwards from '@/components/PortForwards'
+import DnsHosts from '@/components/DnsHosts'
 
 interface NetworkInterface {
   name: string
@@ -66,7 +67,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards', 'dnsHosts']
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -305,6 +306,8 @@ export default function CombinedDashboard() {
         return <RouteHostToSecondary />
       case 'portForwards':
         return <PortForwards />
+      case 'dnsHosts':
+        return <DnsHosts />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -358,6 +361,8 @@ export default function CombinedDashboard() {
         return 'Route to Secondary'
       case 'portForwards':
         return 'Port Forwards'
+      case 'dnsHosts':
+        return 'DNS Hosts'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
