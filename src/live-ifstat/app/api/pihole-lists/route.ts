@@ -5,11 +5,6 @@ import { promisify } from 'util'
 const execAsync = promisify(exec)
 const LIST_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-list-manager.py'
 
-interface ListEntry {
-  domain: string
-  type: 'whitelist' | 'blacklist'
-}
-
 // Helper to parse the list output into structured data
 function parseListOutput(output: string): string[] {
   return output
