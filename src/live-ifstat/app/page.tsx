@@ -34,6 +34,7 @@ import ServicesCard from '@/components/ServicesCard'
 import RouteHostToSecondary from '@/components/RouteHostToSecondary'
 import PortForwards from '@/components/PortForwards'
 import DnsHosts from '@/components/DnsHosts'
+import PiholeLists from '@/components/PiholeLists'
 
 interface NetworkInterface {
   name: string
@@ -67,7 +68,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards', 'dnsHosts']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards', 'dnsHosts', 'piholeLists']
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -308,6 +309,8 @@ export default function CombinedDashboard() {
         return <PortForwards />
       case 'dnsHosts':
         return <DnsHosts />
+      case 'piholeLists':
+        return <PiholeLists />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -363,6 +366,8 @@ export default function CombinedDashboard() {
         return 'Port Forwards'
       case 'dnsHosts':
         return 'DNS Hosts'
+      case 'piholeLists':
+        return 'Pi-hole Lists'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -388,7 +393,7 @@ export default function CombinedDashboard() {
                   key={id} 
                   id={id} 
                   isEditMode={isEditMode}
-                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' || id === 'dnsClients' ? 'row-span-2' : ''}
+                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' ? 'row-span-2' : ''}
                 >
                   <div className="relative h-full">
                     {isEditMode && (
