@@ -16,7 +16,10 @@ interface NetworkConfig {
   PRIMARY_INGRESS_BANDWIDTH: BandwidthValue
   SECONDARY_EGRESS_BANDWIDTH: BandwidthValue
   SECONDARY_INGRESS_BANDWIDTH: BandwidthValue
-  [key: string]: BandwidthValue
+  PRIMARY_LABEL: string
+  SECONDARY_LABEL: string
+  CAKE_PARAMS: string
+  [key: string]: BandwidthValue | string
 }
 
 async function parseConfig(): Promise<NetworkConfig> {
@@ -26,17 +29,34 @@ async function parseConfig(): Promise<NetworkConfig> {
       PRIMARY_EGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
       PRIMARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
       SECONDARY_EGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
-      SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' }
+      SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
+      PRIMARY_LABEL: '',
+      SECONDARY_LABEL: '',
+      CAKE_PARAMS: ''
     }
 
     const lines = content.split('\n')
     for (const line of lines) {
-      const match = line.match(/^(\w+)_(\w+)_BANDWIDTH="([^"]*)"/)
-      if (match) {
-        const [, type, direction, value] = match
+      const bandwidthMatch = line.match(/^(\w+)_(\w+)_BANDWIDTH="([^"]*)"/)
+      if (bandwidthMatch) {
+        const [, type, direction, value] = bandwidthMatch
         const key = `${type}_${direction}_BANDWIDTH`
         const [numValue, unit = 'mbit'] = value.split(/(?<=\d)(?=[a-z])/i)
         config[key] = { value: numValue, unit: unit.toLowerCase() }
+        continue
+      }
+
+      const labelMatch = line.match(/^(\w+)_LABEL="([^"]*)"/)
+      if (labelMatch) {
+        const [, type, value] = labelMatch
+        const key = `${type}_LABEL`
+        config[key] = value
+        continue
+      }
+
+      const cakeMatch = line.match(/^CAKE_PARAMS="([^"]*)"/)
+      if (cakeMatch) {
+        config.CAKE_PARAMS = cakeMatch[1]
       }
     }
 
@@ -59,14 +79,31 @@ async function writeConfig(config: NetworkConfig): Promise<void> {
       }
 
       // Check if line is a bandwidth setting
-      const match = line.match(/^(\w+)_(\w+)_BANDWIDTH="([^"]*)"/)
-      if (match) {
-        const [, type, direction] = match
+      const bandwidthMatch = line.match(/^(\w+)_(\w+)_BANDWIDTH="([^"]*)"/)
+      if (bandwidthMatch) {
+        const [, type, direction] = bandwidthMatch
         const key = `${type}_${direction}_BANDWIDTH`
-        if (config[key]) {
+        if (config[key] && typeof config[key] !== 'string') {
           return `${key}="${config[key].value}${config[key].unit}"`
         }
       }
+
+      // Check if line is a label setting
+      const labelMatch = line.match(/^(\w+)_LABEL="([^"]*)"/)
+      if (labelMatch) {
+        const [, type] = labelMatch
+        const key = `${type}_LABEL`
+        if (config[key]) {
+          return `${key}="${config[key]}"`
+        }
+      }
+
+      // Check if line is CAKE_PARAMS
+      const cakeMatch = line.match(/^CAKE_PARAMS="([^"]*)"/)
+      if (cakeMatch) {
+        return `CAKE_PARAMS="${config.CAKE_PARAMS}"`
+      }
+
       return line
     })
     

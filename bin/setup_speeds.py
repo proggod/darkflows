@@ -59,20 +59,20 @@ def set_default_route(interface, gateway):
     log(f"Setting default route to {gateway} on {interface}...")
     run_command(f"ip route replace default via {gateway} dev {interface}")
 
-def configure_cake(interface, bandwidth, is_ingress=False):
+def configure_cake(interface, bandwidth, is_ingress=False, cake_params=""):
     """Configure CAKE on a given interface with the full configuration."""
     log(f"Configuring CAKE on {interface} with bandwidth {bandwidth}...")
     if is_ingress:
         # Ingress traffic on ifb0
         run_command(
             f"tc qdisc replace dev ifb0 root handle 1: cake bandwidth {bandwidth} "
-            f"memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter nowash split-gso"
+            f"memlimit 32mb {cake_params}"
         )
     else:
         # Egress traffic on the interface
         run_command(
             f"tc qdisc replace dev {interface} root cake bandwidth {bandwidth} "
-            f"nat memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter split-gso"
+            f"nat memlimit 32mb {cake_params}"
         )
 
 def run_speedtest():
@@ -157,6 +157,7 @@ def main():
     primary_interface = config.get("PRIMARY_INTERFACE")
     secondary_interface = config.get("SECONDARY_INTERFACE")
     internal_interface = config.get("INTERNAL_INTERFACE")
+    cake_params = config.get("CAKE_PARAMS", "")
 
     if not primary_interface or not secondary_interface or not internal_interface:
         log("Error: Missing interface configuration.")
@@ -172,8 +173,8 @@ def main():
 
     # Step 1: Switch to primary connection and set CAKE to high bandwidth
     set_default_route(primary_interface, primary_gateway)
-    configure_cake(primary_interface, HIGH_BANDWIDTH)
-    configure_cake("ifb0", HIGH_BANDWIDTH, is_ingress=True)
+    configure_cake(primary_interface, HIGH_BANDWIDTH, cake_params=cake_params)
+    configure_cake("ifb0", HIGH_BANDWIDTH, is_ingress=True, cake_params=cake_params)
 
     # Step 2: Verify CAKE configuration
     show_tc_qdisc([primary_interface, secondary_interface, internal_interface, "ifb0"])
@@ -186,8 +187,8 @@ def main():
 
     # Step 4: Switch to secondary connection and set CAKE to high bandwidth
     set_default_route(secondary_interface, secondary_gateway)
-    configure_cake(secondary_interface, HIGH_BANDWIDTH)
-    configure_cake("ifb0", HIGH_BANDWIDTH, is_ingress=True)
+    configure_cake(secondary_interface, HIGH_BANDWIDTH, cake_params=cake_params)
+    configure_cake("ifb0", HIGH_BANDWIDTH, is_ingress=True, cake_params=cake_params)
 
     # Step 5: Verify CAKE configuration
     show_tc_qdisc([primary_interface, secondary_interface, internal_interface, "ifb0"])
@@ -199,9 +200,9 @@ def main():
 
     # Step 7: Switch back to primary connection and reconfigure CAKE
     set_default_route(primary_interface, primary_gateway)
-    configure_cake(primary_interface, f"{int(primary_results['download'] * 0.85)}mbit")
-    configure_cake("ifb0", f"{int(primary_results['download'] * 0.85)}mbit", is_ingress=True)
-    configure_cake(internal_interface, config.get("INTERNAL_EGRESS_BANDWIDTH"))
+    configure_cake(primary_interface, f"{int(primary_results['download'] * 0.85)}mbit", cake_params=cake_params)
+    configure_cake("ifb0", f"{int(primary_results['download'] * 0.85)}mbit", is_ingress=True, cake_params=cake_params)
+    configure_cake(internal_interface, config.get("INTERNAL_EGRESS_BANDWIDTH"), cake_params=cake_params)
 
     # Step 8: Update configuration with 85% of speed test results
     update_config(config, primary_results, secondary_results)
@@ -213,5 +214,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 

@@ -69,7 +69,7 @@ update_ifb0() {
     # Attach ifb0 to new interface
     tc qdisc add dev "$new_interface" handle ffff: ingress
     tc filter replace dev "$new_interface" parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0
-    tc qdisc add dev ifb0 root cake bandwidth "$ingress_bandwidth" memlimit 32mb diffserv4 rtt 50ms triple-isolate no-ack-filter
+    tc qdisc add dev ifb0 root cake bandwidth "$ingress_bandwidth" ${CAKE_PARAMS:-} memlimit 32mb
 
     log "CAKE ingress reconfigured for $new_interface."
 }
@@ -81,7 +81,7 @@ configure_cake_egress() {
 
     log "Configuring CAKE egress for $interface with bandwidth $bandwidth..."
     tc qdisc del dev "$interface" root > /dev/null 2>&1 || true
-    tc qdisc add dev "$interface" root cake bandwidth "$bandwidth" memlimit 32mb diffserv4 rtt 50ms triple-isolate no-ack-filter
+    tc qdisc add dev "$interface" root cake bandwidth "$bandwidth" ${CAKE_PARAMS:-} memlimit 32mb
     log "CAKE egress configured for $interface."
 }
 
@@ -155,4 +155,5 @@ fi
 switch_gateway "$1"
 
 log "Gateway switch completed."
+
 

@@ -69,10 +69,7 @@ reset_egress() {
     tc qdisc add dev "$iface" root cake \
       bandwidth "$egress_bw" \
       memlimit 32mb \
-      diffserv4 \
-      rtt 50ms \
-      triple-isolate \
-      no-ack-filter
+      ${CAKE_PARAMS:-}
   fi
 }
 
@@ -101,10 +98,7 @@ reset_ingress() {
     tc qdisc add dev ifb0 root cake \
       bandwidth "$current_ifb0_bw" \
       memlimit 32mb \
-      diffserv4 \
-      rtt 50ms \
-      triple-isolate \
-      no-ack-filter
+      ${CAKE_PARAMS:-}
     ifb0_initialized=1
   fi
 }
@@ -266,6 +260,9 @@ fi
 
 # Load network configuration
 source "$CONFIG_FILE"
+
+# Set CAKE parameters (default to empty string if not defined)
+CAKE_PARAMS="${CAKE_PARAMS:-}"
 
 # Define interfaces and their corresponding bandwidth settings from the config
 interfaces=("$PRIMARY_INTERFACE" "$INTERNAL_INTERFACE" "ifb0")

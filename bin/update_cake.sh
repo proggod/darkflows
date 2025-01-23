@@ -3,6 +3,9 @@
 # Source the network configuration file
 source /etc/darkflows/d_network.cfg || { echo "Failed to source network configuration"; exit 1; }
 
+# Set CAKE parameters (default to empty string if not defined)
+COMMON_CAKE_PARAMS="${CAKE_PARAMS:-}"
+
 # Function to validate bandwidth value (case-insensitive)
 validate_bandwidth() {
     local bandwidth=$1
@@ -86,21 +89,21 @@ change_cake_bandwidth() {
 
     # Change bandwidth for egress traffic on the primary interface
     echo "Changing CAKE bandwidth for egress traffic on $PRIMARY_INTERFACE to ${PRIMARY_EGRESS_BANDWIDTH}..."
-    tc qdisc replace dev $PRIMARY_INTERFACE root cake bandwidth ${PRIMARY_EGRESS_BANDWIDTH} nat memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter split-gso || { echo "Failed to change CAKE bandwidth on $PRIMARY_INTERFACE"; exit 1; }
+    tc qdisc replace dev $PRIMARY_INTERFACE root cake bandwidth ${PRIMARY_EGRESS_BANDWIDTH} nat memlimit 32mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $PRIMARY_INTERFACE"; exit 1; }
 
     # Change bandwidth for egress traffic on the secondary interface (if configured)
     if [ -n "$SECONDARY_INTERFACE" ]; then
         echo "Changing CAKE bandwidth for egress traffic on $SECONDARY_INTERFACE to ${SECONDARY_EGRESS_BANDWIDTH}..."
-        tc qdisc replace dev $SECONDARY_INTERFACE root cake bandwidth ${SECONDARY_EGRESS_BANDWIDTH} nat memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter split-gso || { echo "Failed to change CAKE bandwidth on $SECONDARY_INTERFACE"; exit 1; }
+        tc qdisc replace dev $SECONDARY_INTERFACE root cake bandwidth ${SECONDARY_EGRESS_BANDWIDTH} nat memlimit 32mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $SECONDARY_INTERFACE"; exit 1; }
     fi
 
     # Change bandwidth for ingress traffic on ifb0
     echo "Changing CAKE bandwidth for ingress traffic on ifb0 to ${INGRESS_BANDWIDTH}..."
-    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} memlimit 32mb diffserv4 rtt 50ms triple-isolate ack-filter nowash split-gso || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
+    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} memlimit 32mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
 
     # Change bandwidth for local traffic on the internal interface
     echo "Changing CAKE bandwidth for local traffic on $INTERNAL_INTERFACE to ${INTERNAL_EGRESS_BANDWIDTH}..."
-    tc qdisc replace dev $INTERNAL_INTERFACE root cake bandwidth ${INTERNAL_EGRESS_BANDWIDTH} memlimit 64mb besteffort rtt 50ms ack-filter split-gso || { echo "Failed to change CAKE bandwidth on $INTERNAL_INTERFACE"; exit 1; }
+    tc qdisc replace dev $INTERNAL_INTERFACE root cake bandwidth ${INTERNAL_EGRESS_BANDWIDTH} memlimit 64mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $INTERNAL_INTERFACE"; exit 1; }
 }
 
 # Main script logic
@@ -117,4 +120,5 @@ tc -s qdisc show dev $INTERNAL_INTERFACE
 if [ -n "$SECONDARY_INTERFACE" ]; then
     tc -s qdisc show dev $SECONDARY_INTERFACE
 fi
+
 

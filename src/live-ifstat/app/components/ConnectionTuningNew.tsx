@@ -12,6 +12,9 @@ interface TuningConfig {
   PRIMARY_INGRESS_BANDWIDTH: BandwidthValue;
   SECONDARY_EGRESS_BANDWIDTH: BandwidthValue;
   SECONDARY_INGRESS_BANDWIDTH: BandwidthValue;
+  PRIMARY_LABEL: string;
+  SECONDARY_LABEL: string;
+  CAKE_PARAMS: string;
   [key: string]: BandwidthValue | string;
 }
 
@@ -20,7 +23,10 @@ export default function ConnectionTuningNew() {
     PRIMARY_EGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
     PRIMARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
     SECONDARY_EGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
-    SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' }
+    SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
+    PRIMARY_LABEL: '',
+    SECONDARY_LABEL: '',
+    CAKE_PARAMS: ''
   })
   const [loading, setLoading] = useState(false)
   const [activeConnection, setActiveConnection] = useState<string | null>(null)
@@ -75,6 +81,20 @@ export default function ConnectionTuningNew() {
         ...((prev[key] as BandwidthValue) || { value: '' }),
         unit: unit
       }
+    }))
+  }
+
+  const handleCakeParamsChange = (value: string) => {
+    setConfig(prev => ({
+      ...prev,
+      CAKE_PARAMS: value
+    }))
+  }
+
+  const handleLabelChange = (type: string, value: string) => {
+    setConfig(prev => ({
+      ...prev,
+      [`${type}_LABEL`]: value
     }))
   }
 
@@ -134,6 +154,7 @@ export default function ConnectionTuningNew() {
     const isActive = activeConnection === type
     const ingressKey = `${type}_INGRESS_BANDWIDTH`
     const egressKey = `${type}_EGRESS_BANDWIDTH`
+    const labelKey = `${type}_LABEL`
 
     return (
       <div className="flex flex-col justify-between space-y-2 border border-gray-200 dark:border-gray-700 rounded p-2">
@@ -206,6 +227,19 @@ export default function ConnectionTuningNew() {
                 </select>
               </div>
             </div>
+
+            <div className="flex items-center gap-1">
+              <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-5">
+                ISP
+              </label>
+              <input
+                type="text"
+                value={config[labelKey] as string || ''}
+                onChange={(e) => handleLabelChange(type, e.target.value)}
+                className="flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                placeholder={`${type.charAt(0) + type.slice(1).toLowerCase()} Label`}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -215,27 +249,44 @@ export default function ConnectionTuningNew() {
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
       <div className="flex flex-col h-full">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 px-1">Connection Settings</h2>
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Connection Settings</h2>
+          <button
+            onClick={handleApply}
+            disabled={loading}
+            className="px-3 py-1 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? 'Applying...' : 'Apply'}
+          </button>
+        </div>
         
         <div className="flex-1 grid grid-cols-2 gap-2">
           {renderConnectionSection('PRIMARY')}
           {renderConnectionSection('SECONDARY')}
         </div>
 
-        {error && (
-          <div className="mt-1.5 p-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
-            <p className="text-[10px] text-red-800 dark:text-red-200">{error}</p>
+        <div className="mt-2 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={config.CAKE_PARAMS}
+              onChange={(e) => handleCakeParamsChange(e.target.value)}
+              className="flex-1 px-2 py-1 text-xs rounded-l bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="CAKE Parameters"
+            />
+            <button
+              onClick={() => handleCakeParamsChange("ethernet besteffort wash internet split-gso rtt 50ms")}
+              className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-r border border-l-0 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+            >
+              D
+            </button>
           </div>
-        )}
 
-        <div className="mt-2 flex justify-center">
-          <button
-            onClick={handleApply}
-            disabled={loading}
-            className="w-full px-3 py-1.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Applying...' : 'Apply Changes'}
-          </button>
+          {error && (
+            <div className="p-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
+              <p className="text-[10px] text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
