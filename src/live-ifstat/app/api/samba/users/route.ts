@@ -51,7 +51,7 @@ async function getUsers(): Promise<SambaUser[]> {
       }
     } catch {
       // If grep fails (no matches), that's fine - it means no users are disabled
-      console.log('No disabled users found')
+      //console.log('No disabled users found')
     }
 
     // Get groups for each user

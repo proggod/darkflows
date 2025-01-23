@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   let isStreamActive = true;
   const lastStats: { [device: string]: { rxBytes: number; txBytes: number; timestamp: number } } = {};
 
-  console.log('ifstat-stream: Listing devices');
+//  console.log('ifstat-stream: Listing devices');
   // Get list of devices
   const devices: string[] = [];
   try {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     return new Response('Failed to get network devices', { status: 500 });
   }
 
-  console.log('New client connected to ifstat-stream');
+//  console.log('New client connected to ifstat-stream');
 
   const stream = new ReadableStream({
     start: async (controller) => {

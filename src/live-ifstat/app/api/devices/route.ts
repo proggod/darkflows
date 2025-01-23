@@ -70,7 +70,7 @@ export async function GET() {
       ...config
     }))
     
-    console.log('Devices API response:', JSON.stringify(devices, null, 2))
+//    console.log('Devices API response:', JSON.stringify(devices, null, 2))
     return NextResponse.json({ devices })
   } catch (error) {
     console.error('Error fetching network devices:', error)

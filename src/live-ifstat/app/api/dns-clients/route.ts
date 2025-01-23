@@ -135,14 +135,14 @@ async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved
     });
 
     // Debug log to see what we're getting
-    console.log('Sample data:', {
-      sampleLease: leases[0],
-      sampleReservation: reservations[0],
-      sampleStaticReservation: staticReservations[0],
-      totalLeases: leases.length,
-      totalReservations: reservations.length,
-      totalStaticReservations: staticReservations.length
-    });
+  //  console.log('Sample data:', {
+  //    sampleLease: leases[0],
+  //    sampleReservation: reservations[0],
+  //    sampleStaticReservation: staticReservations[0],
+  //    totalLeases: leases.length,
+  //    totalReservations: reservations.length,
+  //    totalStaticReservations: staticReservations.length
+  //  });
 
     return hostnameMap;
   } finally {

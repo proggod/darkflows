@@ -13,11 +13,11 @@ export async function getMacVendor(macAddress: string): Promise<string> {
     const macPrefix = macAddress.toLowerCase().replace(/:/g, '').slice(0, 6);
 
     // Debug log
-    console.log('Looking up MAC vendor:', {
-      macAddress,
-      prefix: macPrefix,
-      originalPrefix: macAddress.slice(0, 8)
-    });
+  //  console.log('Looking up MAC vendor:', {
+  //    macAddress,
+  //    prefix: macPrefix,
+  //    originalPrefix: macAddress.slice(0, 8)
+  //  });
 
     const [rows] = await connection.execute<mysql.RowDataPacket[]>(
       'SELECT vendor FROM mac_vendor_lookup WHERE mac_prefix = ?',
@@ -27,12 +27,12 @@ export async function getMacVendor(macAddress: string): Promise<string> {
     const vendor = (rows as { vendor: string }[])[0]?.vendor || 'Unknown';
 
     // Debug log
-    console.log('Vendor lookup result:', {
-      macAddress,
-      prefix: macPrefix,
-      vendor,
-      rowCount: rows.length
-    });
+    //console.log('Vendor lookup result:', {
+    //  macAddress,
+    //  prefix: macPrefix,
+    //  vendor,
+    //  rowCount: rows.length
+    //});
 
     return vendor;
   } catch (error) {
