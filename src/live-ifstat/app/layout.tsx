@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: 'Live Interface Stats',
-  description: 'Real-time network interface statistics',
+  title: 'DarkFlows Router Interface',
+  description: 'DarkFlows Router Interface',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

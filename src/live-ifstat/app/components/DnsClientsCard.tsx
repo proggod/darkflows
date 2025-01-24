@@ -48,6 +48,31 @@ export function DnsClientsCard() {
     }));
   };
 
+  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>, client: DnsClient) => {
+    if (e.key === 'Enter' && client.status === 'reserved' && client.mac) {
+      try {
+        const response = await fetch('/api/reservations', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'ip-address': client.ip,
+            'hw-address': client.mac,
+            'hostname': editedNames[client.ip] || client.name
+          })
+        });
+
+        if (response.ok) {
+          fetchClients();
+        } else {
+          setError('Failed to update hostname');
+        }
+      } catch (error) {
+        console.error('Error updating hostname:', error);
+        setError('Error updating hostname');
+      }
+    }
+  };
+
   const handleReserve = async (client: DnsClient) => {
     if (!client.mac) {
       setError('Cannot reserve IP without MAC address');
@@ -160,7 +185,9 @@ export function DnsClientsCard() {
                       type="text"
                       value={editedNames[client.ip] || client.name}
                       onChange={(e) => handleNameChange(client.ip, e.target.value)}
-                      className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs"
+                      onKeyPress={(e) => handleKeyPress(e, client)}
+                      disabled={client.status === 'static'}
+                      className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs disabled:text-gray-500"
                     />
                   </td>
                   <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
