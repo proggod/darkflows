@@ -8,7 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Install the packages without prompting
 # apt-get install -y nftables kea mariadb-server curl screen vlan irqbalance
-
+apt install -y python3-pexpect
 #activate
 systemctl enable irqbalance --now
 

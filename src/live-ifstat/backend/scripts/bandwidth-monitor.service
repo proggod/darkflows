@@ -1,0 +1,14 @@
+[Unit]
+Description=Bandwidth Usage Monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bandwidth_monitor_daemon.py
+Restart=always
+User=root
+StandardOutput=append:/var/log/bandwidth_monitor.log
+StandardError=append:/var/log/bandwidth_monitor.log
+
+[Install]
+WantedBy=multi-user.target 
