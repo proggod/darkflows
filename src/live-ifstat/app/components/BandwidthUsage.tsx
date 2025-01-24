@@ -28,10 +28,15 @@ interface ApiResponse {
   status: 'active' | 'error';
 }
 
+type SortField = 'total' | '2s_down' | '2s_up' | '40s_down' | '40s_up' | 'host';
+type SortDirection = 'asc' | 'desc';
+
 export default function BandwidthUsage() {
   const [bandwidthData, setBandwidthData] = useState<{ [ip: string]: BandwidthStats }>({});
   const [hostnames, setHostnames] = useState<{ [ip: string]: string }>({});
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>('total');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const fetchData = async () => {
     try {
@@ -66,31 +71,78 @@ export default function BandwidthUsage() {
     return () => clearInterval(interval);
   }, []);
 
+  const parseValue = (value: string | undefined) => {
+    if (!value) return 0;
+    const num = parseFloat(value);
+    if (isNaN(num)) return 0;
+    if (value.includes('Mb')) return num * 1000000;
+    if (value.includes('MB')) return num * 1000000;
+    if (value.includes('Kb')) return num * 1000;
+    if (value.includes('KB')) return num * 1000;
+    if (value.includes('b')) return num;
+    return 0;
+  };
+
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
   const sortedIPs = Object.entries(bandwidthData)
-    .sort(([, a], [, b]) => {
-      // Parse the bandwidth values to numbers for comparison
-      const parseValue = (value: string | undefined) => {
-        if (!value) return 0;
-        const num = parseFloat(value);
-        if (isNaN(num)) return 0;
-        if (value.includes('Mb')) return num * 1000000;
-        if (value.includes('MB')) return num * 1000000;
-        if (value.includes('Kb')) return num * 1000;
-        if (value.includes('KB')) return num * 1000;
-        if (value.includes('b')) return num;
-        return 0;
-      };
-      
-      const aTotal = parseValue(a.last_2s_sent) + parseValue(a.last_2s_received);
-      const bTotal = parseValue(b.last_2s_sent) + parseValue(b.last_2s_received);
-      return bTotal - aTotal;
+    .sort(([ipA, a], [ipB, b]) => {
+      let aValue = 0;
+      let bValue = 0;
+
+      switch (sortField) {
+        case 'host':
+          const hostnameA = (hostnames[ipA] || 'Unknown').replace('Unknown ', '').toLowerCase();
+          const hostnameB = (hostnames[ipB] || 'Unknown').replace('Unknown ', '').toLowerCase();
+          return sortDirection === 'asc' 
+            ? hostnameA.localeCompare(hostnameB)
+            : hostnameB.localeCompare(hostnameA);
+        case '2s_down':
+          aValue = parseValue(a.last_2s_received);
+          bValue = parseValue(b.last_2s_received);
+          break;
+        case '2s_up':
+          aValue = parseValue(a.last_2s_sent);
+          bValue = parseValue(b.last_2s_sent);
+          break;
+        case '40s_down':
+          aValue = parseValue(a.last_40s_received);
+          bValue = parseValue(b.last_40s_received);
+          break;
+        case '40s_up':
+          aValue = parseValue(a.last_40s_sent);
+          bValue = parseValue(b.last_40s_sent);
+          break;
+        case 'total':
+        default:
+          aValue = parseValue(a.last_2s_sent) + parseValue(a.last_2s_received);
+          bValue = parseValue(b.last_2s_sent) + parseValue(b.last_2s_received);
+      }
+
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
     })
     .map(([ip]) => ip);
 
+  const SortArrow = ({ field }: { field: SortField }) => {
+    if (field !== sortField) return null;
+    return (
+      <span className="ml-1 text-gray-400">
+        {sortDirection === 'asc' ? '↑' : '↓'}
+      </span>
+    );
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Network Bandwidth</h2>
+      <div className="mb-2">
+        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">Network Bandwidth</h2>
       </div>
 
       {error && (
@@ -103,11 +155,36 @@ export default function BandwidthUsage() {
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
             <tr>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Host</th>
-              <th className="px-2 py-0.5 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">2s Down</th>
-              <th className="px-2 py-0.5 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">2s Up</th>
-              <th className="px-2 py-0.5 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">40s Down</th>
-              <th className="px-2 py-0.5 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">40s Up</th>
+              <th 
+                className="px-2 py-0.5 text-left text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('host')}
+              >
+                Host<SortArrow field="host" />
+              </th>
+              <th 
+                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('2s_down')}
+              >
+                2s D<SortArrow field="2s_down" />
+              </th>
+              <th 
+                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('2s_up')}
+              >
+                2s U<SortArrow field="2s_up" />
+              </th>
+              <th 
+                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('40s_down')}
+              >
+                40s D<SortArrow field="40s_down" />
+              </th>
+              <th 
+                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('40s_up')}
+              >
+                40s U<SortArrow field="40s_up" />
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800">
