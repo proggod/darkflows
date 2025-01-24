@@ -12,6 +12,7 @@ import WeatherCard from '@/components/WeatherCard'
 import SambaSharesCard from '@/components/SambaSharesCard'
 import { useEditMode } from '@/contexts/EditModeContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { SystemSettingsCard } from '@/components/SystemSettingsCard'
 import {
   DndContext,
   closestCenter,
@@ -69,7 +70,7 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards', 'dnsHosts', 'piholeLists', 'bandwidth']
+const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards', 'dnsHosts', 'piholeLists', 'bandwidth', 'systemSettings']
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -314,6 +315,8 @@ export default function CombinedDashboard() {
         return <PiholeLists />
       case 'bandwidth':
         return <BandwidthUsage />
+      case 'systemSettings':
+        return <SystemSettingsCard />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -373,6 +376,8 @@ export default function CombinedDashboard() {
         return 'Pi-hole Lists'
       case 'bandwidth':
         return 'Bandwidth Usage'
+      case 'systemSettings':
+        return 'System Settings'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -398,7 +403,7 @@ export default function CombinedDashboard() {
                   key={id} 
                   id={id} 
                   isEditMode={isEditMode}
-                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' ? 'row-span-2' : ''}
+                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' || id === 'systemSettings' ? 'row-span-2' : ''}
                 >
                   <div className="relative h-full">
                     {isEditMode && (
