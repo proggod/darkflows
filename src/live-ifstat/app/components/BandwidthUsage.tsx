@@ -28,6 +28,44 @@ interface ApiResponse {
   status: 'active' | 'error';
 }
 
+interface ConnectionData {
+  connection_id: string;
+  source: string;
+  destination: string;
+  sent: {
+    last_2s: string;
+    last_10s: string;
+    last_40s: string;
+    cumulative: string;
+  };
+  received: {
+    last_2s: string;
+    last_10s: string;
+    last_40s: string;
+    cumulative: string;
+  };
+}
+
+interface DetailedStats {
+  target_ip: string;
+  connections: ConnectionData[];
+  totals: {
+    sent: string;
+    received: string;
+    cumulative: {
+      sent: string;
+      received: string;
+      total: string;
+    };
+  };
+  peak_rates: {
+    sent: string;
+    received: string;
+    total: string;
+  };
+  hostname: string;
+}
+
 type SortField = 'total' | '2s_down' | '2s_up' | '40s_down' | '40s_up' | 'host';
 type SortDirection = 'asc' | 'desc';
 
@@ -37,6 +75,9 @@ export default function BandwidthUsage() {
   const [error, setError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('total');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [selectedIP, setSelectedIP] = useState<string | null>(null);
+  const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -62,6 +103,27 @@ export default function BandwidthUsage() {
     } catch (err) {
       setError('Error fetching data');
       console.error(err);
+    }
+  };
+
+  const fetchDetailedStats = async (ip: string) => {
+    setIsLoading(true);
+    try {
+      const encodedIP = encodeURIComponent(ip);
+      const response = await fetch(`/api/bandwidth/${encodedIP}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      if (!data || !data.peak_rates) {
+        throw new Error('Invalid data format received');
+      }
+      setDetailedStats(data);
+    } catch (err) {
+      console.error('Error fetching detailed stats:', err);
+      setError('Error fetching connection details');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -192,7 +254,15 @@ export default function BandwidthUsage() {
               <tr key={ip} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <div className="flex flex-col">
-                    <span className="font-medium">{(hostnames[ip] || 'Unknown').replace('Unknown ', '')}</span>
+                    <span 
+                      className="font-medium cursor-pointer hover:text-blue-500"
+                      onClick={() => {
+                        setSelectedIP(ip);
+                        fetchDetailedStats(ip);
+                      }}
+                    >
+                      {(hostnames[ip] || 'Unknown').replace('Unknown ', '')}
+                    </span>
                     <span className="text-[10px] text-gray-500 dark:text-gray-400">{ip}</span>
                   </div>
                 </td>
@@ -213,6 +283,83 @@ export default function BandwidthUsage() {
           </tbody>
         </table>
       </div>
+
+      {selectedIP && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 max-w-2xl w-full max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">
+                Connection Details for {detailedStats?.hostname || hostnames[selectedIP] || selectedIP}
+              </h3>
+              <button 
+                onClick={() => {
+                  setSelectedIP(null);
+                  setDetailedStats(null);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {isLoading ? (
+              <div className="flex justify-center items-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+              </div>
+            ) : detailedStats ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Peak Rates</h4>
+                    <div className="text-sm">
+                      <div>Sent: {detailedStats.peak_rates?.sent || '0B'}</div>
+                      <div>Received: {detailedStats.peak_rates?.received || '0B'}</div>
+                      <div>Total: {detailedStats.peak_rates?.total || '0B'}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-2">Cumulative Totals</h4>
+                    <div className="text-sm">
+                      <div>Sent: {detailedStats.totals?.cumulative?.sent || '0B'}</div>
+                      <div>Received: {detailedStats.totals?.cumulative?.received || '0B'}</div>
+                      <div>Total: {detailedStats.totals?.cumulative?.total || '0B'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Active Connections</h4>
+                  <div className="space-y-2">
+                    {detailedStats.connections?.map((conn) => (
+                      <div key={conn.connection_id} className="border dark:border-gray-700 rounded p-2">
+                        <div className="text-sm font-medium">Connection {conn.connection_id}</div>
+                        <div className="text-xs">Source: {conn.source}</div>
+                        <div className="text-xs">Destination: {conn.destination}</div>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <div className="text-xs">
+                            <div>Sent (2s): {conn.sent?.last_2s || '0B'}</div>
+                            <div>Sent (10s): {conn.sent?.last_10s || '0B'}</div>
+                            <div>Sent (40s): {conn.sent?.last_40s || '0B'}</div>
+                          </div>
+                          <div className="text-xs">
+                            <div>Received (2s): {conn.received?.last_2s || '0B'}</div>
+                            <div>Received (10s): {conn.received?.last_10s || '0B'}</div>
+                            <div>Received (40s): {conn.received?.last_40s || '0B'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center p-4 text-gray-500">
+                No data available
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

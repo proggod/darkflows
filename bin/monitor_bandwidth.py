@@ -8,10 +8,27 @@ import pexpect
 import json
 import re
 
+def get_internal_interface():
+    config_path = Path('/etc/darkflows/d_network.cfg')
+    try:
+        with config_path.open('r') as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('INTERNAL_INTERFACE='):
+                    value = line.split('=', 1)[1].strip(' \'"')
+                    return value
+            raise ValueError("INTERNAL_INTERFACE not found in config file")
+    except FileNotFoundError:
+        raise ValueError(f"Config file not found at {config_path}")
+
 # Configuration
 LOG_PATH = Path('/var/log/bandwidth_monitor.log')
 JSON_PATH = Path('/dev/shm/bandwidth.json')
-INTERFACE = 'enp2s0'
+try:
+    INTERFACE = get_internal_interface()
+except ValueError as e:
+    print(f"Fatal error: {e}")
+    sys.exit(1)
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 SCREEN_CAPTURE_TIMEOUT = 5
 
@@ -208,5 +225,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

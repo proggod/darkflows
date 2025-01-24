@@ -34,13 +34,11 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const url = '/api/ifstat-stream'
-    console.log('Creating shared EventSource connection to:', url)
     setConnectionStatus('connecting')
 
     const es = new EventSource(url)
 
     es.onopen = () => {
-      console.log('Shared EventSource connection opened')
       setConnectionStatus('connected')
       setLastError(null)
     }
@@ -49,13 +47,10 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
       try {
         // Ignore heartbeat messages
         if (e.type === 'heartbeat') {
-          console.log('Received heartbeat')
           return
         }
 
-        console.log('Received message:', e.data)
         const newData = JSON.parse(e.data) as IfstatData
-        console.log('Parsed data:', newData)
 
         if (!newData.device || typeof newData.kbIn !== 'number' || typeof newData.kbOut !== 'number') {
           console.error('Invalid data format:', newData)
@@ -65,13 +60,11 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
         const device = newData.device
 
         setData(prev => {
-          console.log('Current data for', device, ':', prev[device]?.length || 0, 'points')
           const deviceData = prev[device] || []
           const updated = [...deviceData, newData]
           if (updated.length > MAX_DATA_POINTS) {
             updated.shift()
           }
-          console.log('Updated data for', device, ':', updated.length, 'points')
           return {
             ...prev,
             [device]: updated
@@ -91,7 +84,6 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
       
       // Attempt to reconnect after a delay
       setTimeout(() => {
-        console.log('Attempting to reconnect...')
         if (es.readyState === EventSource.CLOSED) {
           window.location.reload()
         }
@@ -99,17 +91,12 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     }
 
     return () => {
-      console.log('Cleaning up shared EventSource connection')
       es.close()
     }
   }, [])
 
   // Debug output whenever data changes
   useEffect(() => {
-    console.log('Network data updated:', Object.keys(data).map(device => ({
-      device,
-      points: data[device].length
-    })))
   }, [data])
 
   return (
@@ -126,11 +113,7 @@ export function useNetworkData(device: string) {
   }
 
   // Debug output whenever component requests data
-  console.log(`[${device}] Requesting data:`, {
-    available: context.data[device]?.length || 0,
-    status: context.connectionStatus,
-    error: context.lastError
-  })
+
 
   return {
     data: context.data[device] || [],
