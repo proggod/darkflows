@@ -135,16 +135,28 @@ def parse_bandwidth(data: str) -> dict:
             
             if internal_match:
                 hosts[internal_match.group(1)] = {
-                    'last_2s_sent': external_match.group(1),
-                    'last_10s_sent': external_match.group(2),
-                    'last_40s_sent': external_match.group(3),
-                    'cumulative_sent': external_match.group(4),
-                    'last_2s_received': internal_match.group(2),
-                    'last_10s_received': internal_match.group(3),
-                    'last_40s_received': internal_match.group(4),
-                    'cumulative_received': internal_match.group(5),
+                    'last_2s_sent': internal_match.group(2),  # Now sent is from internal
+                    'last_10s_sent': internal_match.group(3),
+                    'last_40s_sent': internal_match.group(4),
+                    'cumulative_sent': internal_match.group(5),
+                    'last_2s_received': external_match.group(1),  # Now received is from external
+                    'last_10s_received': external_match.group(2),
+                    'last_40s_received': external_match.group(3),
+                    'cumulative_received': external_match.group(4),
                     'last_updated': time.time()
                 }
+
+#                hosts[internal_match.group(1)] = {
+#                    'last_2s_sent': external_match.group(1),
+#                    'last_10s_sent': external_match.group(2),
+#                    'last_40s_sent': external_match.group(3),
+#                    'cumulative_sent': external_match.group(4),
+#                    'last_2s_received': internal_match.group(2),
+#                    'last_10s_received': internal_match.group(3),
+#                    'last_40s_received': internal_match.group(4),
+#                    'cumulative_received': internal_match.group(5),
+#                    'last_updated': time.time()
+#                }
                 i += 2
             else:
                 i += 1
