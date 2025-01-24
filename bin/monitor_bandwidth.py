@@ -8,22 +8,19 @@ import pexpect
 import json
 import re
 
-# Configure rotating file handler for logs
+# Configuration
 LOG_PATH = Path('/var/log/bandwidth_monitor.log')
+JSON_PATH = Path('/dev/shm/bandwidth.json')
+INTERFACE = 'enp2s0'
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+SCREEN_CAPTURE_TIMEOUT = 5
+
 logging.basicConfig(
-    handlers=[
-        logging.handlers.RotatingFileHandler(
-            LOG_PATH,
-            maxBytes=1_000_000,
-            backupCount=3
-        )
-    ],
+    handlers=[logging.handlers.RotatingFileHandler(LOG_PATH, maxBytes=1_000_000, backupCount=3)],
     format=LOG_FORMAT,
     level=logging.INFO
 )
 
-# Custom console spinner
 class ProgressSpinner:
     def __init__(self):
         self.spinner = itertools.cycle(['|', '/', '-', '\\'])
@@ -31,12 +28,13 @@ class ProgressSpinner:
 
     def start(self):
         self.active = True
-        sys.stdout.write("\033[?25l")  # Hide cursor
+        sys.stdout.write("\033[?25l")
+        sys.stdout.write("[Bandwidth Monitor] Starting... ")
         
     def stop(self):
         self.active = False
-        sys.stdout.write("\033[K")  # Clear line
-        sys.stdout.write("\033[?25h")  # Show cursor
+        sys.stdout.write("\033[K")
+        sys.stdout.write("\033[?25h")
 
     def spin(self):
         if self.active:
@@ -44,46 +42,78 @@ class ProgressSpinner:
             sys.stdout.flush()
             sys.stdout.write('\b')
 
-spinner = ProgressSpinner()
+spinner = ProgressSpinner()  # Initialize spinner here
 
 def strip_ansi(text: str) -> str:
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    return ansi_escape.sub('', text)
+    return re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', text)
 
-def log_initial_state():
-    logging.info("="*40)
-    logging.info("Starting Bandwidth Monitor")
-    logging.info(f"Python version: {sys.version}")
-    logging.info(f"Logging to: {LOG_PATH}")
-    logging.info("="*40)
+def capture_full_screen(child):
+    """Capture the complete iftop screen output."""
+    child.sendcontrol('l')
+    time.sleep(0.5)  # Wait for screen clear
+    
+    output = ""
+    start_time = time.time()
+    
+    while time.time() - start_time < SCREEN_CAPTURE_TIMEOUT:
+        try:
+            child.expect(['Cumulative \(sent/received/total\):', pexpect.TIMEOUT], timeout=0.5)
+            current = child.before + child.after
+            output += current
+            
+            if 'Cumulative (sent/received/total):' in output:
+                # Get the final line after cumulative stats
+                child.expect('\n', timeout=0.5)
+                output += child.before + child.after
+                return output
+                
+        except pexpect.EOF:
+            break
+            
+    return output
 
 def parse_bandwidth(data: str) -> dict:
     hosts = {}
-    lines = data.strip().split('\n')
+    sections = data.split('====')
     
+    # Find the section with the most complete data
+    max_hosts_section = None
+    max_hosts_count = 0
+    
+    for section in sections:
+        if not section.strip():
+            continue
+            
+        lines = section.strip().split('\n')
+        host_count = sum(1 for line in lines if '=>' in line)
+        
+        if host_count > max_hosts_count:
+            max_hosts_count = host_count
+            max_hosts_section = section
+    
+    if not max_hosts_section:
+        return hosts
+        
+    lines = max_hosts_section.strip().split('\n')
     i = 0
     while i < len(lines):
-        line = lines[i]
-        if any(char * 3 in line for char in ['=', '-']) or \
-           'Host name' in line or \
-           'Total' in line or \
-           'Peak' in line or \
-           'Cumulative' in line:
+        line = lines[i].strip()
+        
+        if not line or 'Host name' in line or 'Total' in line or \
+           'Peak' in line or any(char * 3 in line for char in ['=', '-']):
             i += 1
             continue
             
         external_match = re.search(
-            r'\*\s*=>\s*([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)',
+            r'\*?\s*=>\s*([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)',
             line
         )
         
-        if external_match:
-            i += 1
-            if i >= len(lines): break
-            
+        if external_match and i + 1 < len(lines):
+            internal_line = strip_ansi(lines[i + 1])
             internal_match = re.search(
                 r'(192\.\d+\.\d+\.\d+)\s*<=\s*([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)',
-                strip_ansi(lines[i])
+                internal_line
             )
             
             if internal_match:
@@ -98,111 +128,83 @@ def parse_bandwidth(data: str) -> dict:
                     'cumulative_received': internal_match.group(5),
                     'last_updated': time.time()
                 }
-            i += 1
+                i += 2
+            else:
+                i += 1
         else:
             i += 1
             
     return hosts
 
 def main():
-    json_path = Path('/dev/shm/bandwidth.json')
-    interface = 'enp2s0'
     last_valid_data = {'hosts': {}, 'status': 'initializing'}
     
     try:
-        log_initial_state()
-        logging.info("Initializing iftop process")
-        print("\n[Bandwidth Monitor] Starting... (Ctrl+C to stop)")
-        
+        print("\n[Bandwidth Monitor] Initializing...")
         child = pexpect.spawn(
-            f'iftop -nNt -i {interface}',
-            timeout=5,
+            f'iftop -nNt -L 100 -o 40s -i {INTERFACE}',
+            timeout=10,
             encoding='utf-8',
             codec_errors='ignore'
         )
-        child.send('s')
-        time.sleep(2)
+
+        child.send('s')  # Enable cumulative stats
+        time.sleep(2)  # Initial stabilization
         
         spinner.start()
-        logging.info("Entering main monitoring loop")
-        cycle_count = 0
-
+        print("\n[Bandwidth Monitor] Running (Ctrl+C to stop)")
+        
         while True:
             try:
-                # Capture output
-                child.sendcontrol('l')
-                output = ""
-                for _ in range(3):
-                    try:
-                        child.expect(r'.+', timeout=0.2)
-                        output += child.before + child.after
-                    except (pexpect.TIMEOUT, pexpect.EOF):
-                        break
-
-                # Process data
+                output = capture_full_screen(child)
                 cleaned = strip_ansi(output)
                 current_hosts = parse_bandwidth(cleaned)
-                cycle_count += 1
-
-                # Update spinner
-                spinner.spin()
-
-                # Log every 10 cycles (≈10 seconds)
-                if cycle_count % 10 == 0:
-                    logging.info(f"Processed {cycle_count} cycles")
-                    logging.debug(f"Current hosts: {list(current_hosts.keys())}")
-
-                # Prepare new data
+                
                 new_data = {
                     'timestamp': time.time(),
                     'hosts': current_hosts or last_valid_data['hosts'],
                     'status': 'active' if current_hosts else 'no_traffic'
                 }
-
-                # Only update if we have new hosts data
+                
                 if current_hosts:
                     last_valid_data = new_data
                 else:
-                    last_valid_data['timestamp'] = new_data['timestamp']
-                    last_valid_data['status'] = new_data['status']
+                    last_valid_data.update({
+                        'timestamp': new_data['timestamp'],
+                        'status': new_data['status']
+                    })
 
-                # Atomic write using rename
-                temp_path = json_path.with_suffix('.tmp')
+                temp_path = JSON_PATH.with_suffix('.tmp')
                 with temp_path.open('w') as f:
                     json.dump(last_valid_data, f, indent=2)
-                temp_path.rename(json_path)
+                temp_path.rename(JSON_PATH)
 
-                time.sleep(1)
+                sys.stdout.write("\r" + " " * 80)  # Clear line
+                if current_hosts:
+                    sys.stdout.write(f"\r[Update] Processed {len(current_hosts)} hosts")
+                else:
+                    sys.stdout.write("\r[Update] No active hosts detected")
+                sys.stdout.flush()
+
+                time.sleep(2)
 
             except KeyboardInterrupt:
-                raise
+                break
             except Exception as e:
                 logging.error(f"Processing error: {str(e)}", exc_info=True)
                 spinner.stop()
                 print(f"\n[!] Error encountered - see {LOG_PATH}")
                 spinner.start()
 
-    except KeyboardInterrupt:
-        spinner.stop()
-        print("\n[!] Shutting down gracefully...")
-        logging.info("Received keyboard interrupt, shutting down")
-        last_valid_data.update({
-            'timestamp': time.time(),
-            'status': 'shutdown'
-        })
-        with json_path.open('w') as f:
-            json.dump(last_valid_data, f)
-        child.close()
-        
     except Exception as e:
-        spinner.stop()
-        print(f"\n[!] Critical error: {str(e)}")
-        logging.critical("Unhandled exception", exc_info=True)
+        logging.critical(f"Fatal error: {str(e)}", exc_info=True)
         sys.exit(1)
         
     finally:
         spinner.stop()
-        logging.info("Shutdown complete\n")
+        child.close()
+        print("\n[Bandwidth Monitor] Shutdown complete")
+        logging.info("Shutdown complete")
 
 if __name__ == "__main__":
     main()
