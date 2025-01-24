@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -78,21 +79,17 @@ async function getHostInfo(ip: string): Promise<string> {
   }
 }
 
-export async function GET(
-  request: Request,
-  { params }: { params: { ip: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const paramsData = await Promise.resolve(params);
+    // Get IP from URL pattern instead of context
+    const ip = decodeURIComponent(request.url.split('/').pop() || '');
     
-    if (!paramsData?.ip) {
+    if (!ip) {
       return NextResponse.json(
         { error: 'IP address is required' },
         { status: 400 }
       );
     }
-
-    const ip = decodeURIComponent(paramsData.ip);
     
     // Execute the bandwidth monitoring script
     const { stdout, stderr } = await execAsync(
@@ -123,7 +120,7 @@ export async function GET(
     }
     
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch bandwidth details' },
       { status: 500 }
