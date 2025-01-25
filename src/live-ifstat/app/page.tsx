@@ -437,15 +437,15 @@ export default function CombinedDashboard() {
 
   return (
     <>
-      <div className="p-0 mx-0 sm:mx-5 mt-14">
-        <div className="space-y-8 mx-auto p-0">
+      <div className="p-4">
+        <div className="space-y-8">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={visibleItems} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 auto-rows-[250px] gap-3 px-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 auto-rows-[250px] gap-3">
                 {visibleItems.map((id) => (
                   <SortableItem 
                     key={id} 

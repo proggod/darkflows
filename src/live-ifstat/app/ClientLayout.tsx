@@ -29,7 +29,7 @@ function ThemeToggle() {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+    <div className="min-h-screen antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <div className="fixed top-2 right-4 z-50 flex items-center gap-2">
         <EditModeButton />
         <ThemeToggle />
