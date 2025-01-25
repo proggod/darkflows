@@ -13,6 +13,7 @@ import SambaSharesCard from '@/components/SambaSharesCard'
 import { useEditMode } from '@/contexts/EditModeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { SystemSettingsCard } from '@/components/SystemSettingsCard'
+import { BlockClientsCard } from '@/components/BlockClientsCard'
 import {
   DndContext,
   closestCenter,
@@ -37,6 +38,7 @@ import PortForwards from '@/components/PortForwards'
 import DnsHosts from '@/components/DnsHosts'
 import PiholeLists from '@/components/PiholeLists'
 import BandwidthUsage from './components/BandwidthUsage'
+import React from 'react'
 
 interface NetworkInterface {
   name: string
@@ -70,7 +72,48 @@ interface InterfaceStats {
   [key: string]: StoredNetworkStats[]
 }
 
-const DEFAULT_ITEMS = ['systemMonitor', 'interfaceStatus', 'pingPrimary', 'pingSecondary', 'speedTest', 'connectionTuning', 'reservations', 'leases', 'weather', 'processes', 'sambaShares', 'dnsClients', 'routeToSecondary', 'portForwards', 'dnsHosts', 'piholeLists', 'bandwidth', 'systemSettings']
+const DEFAULT_ITEMS = [
+  'systemMonitor',
+  'interfaceStatus',
+  'pingPrimary',
+  'pingSecondary',
+  'speedTest',
+  'connectionTuning',
+  'reservations',
+  'leases',
+  'weather',
+  'processes',
+  'sambaShares',
+  'dnsClients',
+  'blockClients',
+  'routeToSecondary',
+  'portForwards',
+  'dnsHosts',
+  'piholeLists',
+  'bandwidth',
+  'systemSettings'
+]
+
+function ViewportDisplay() {
+  const [width, setWidth] = React.useState<number | undefined>(undefined);
+
+  React.useEffect(() => {
+    // Set initial width
+    setWidth(window.innerWidth);
+    
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  if (width === undefined) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 bg-black/80 text-white px-4 py-2 rounded-full z-50">
+      Width: {width}px
+    </div>
+  );
+}
 
 export default function CombinedDashboard() {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
@@ -317,6 +360,8 @@ export default function CombinedDashboard() {
         return <BandwidthUsage />
       case 'systemSettings':
         return <SystemSettingsCard />
+      case 'blockClients':
+        return <BlockClientsCard />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -378,6 +423,8 @@ export default function CombinedDashboard() {
         return 'Bandwidth Usage'
       case 'systemSettings':
         return 'System Settings'
+      case 'blockClients':
+        return 'Block Clients'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -389,66 +436,71 @@ export default function CombinedDashboard() {
   }
 
   return (
-    <div className="p-0 mx-0 sm:mx-5 mt-14">
-      <div className="space-y-8 mx-auto p-0">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={visibleItems} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 auto-rows-[250px] gap-3 px-4">
-              {visibleItems.map((id) => (
-                <SortableItem 
-                  key={id} 
-                  id={id} 
-                  isEditMode={isEditMode}
-                  className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' || id === 'systemSettings' ? 'row-span-2' : ''}
-                >
-                  <div className="relative h-full">
-                    {isEditMode && (
-                      <button
-                        onClick={() => toggleVisibility(id)}
-                        className="absolute top-2 left-2 z-20 p-1 bg-red-500 dark:bg-red-600 text-white rounded-full hover:bg-red-600 dark:hover:bg-red-700"
-                        title={`Hide ${getComponentLabel(id)}`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <line x1="18" y1="6" x2="6" y2="18"></line>
-                          <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                      </button>
-                    )}
-                    {renderComponent(id)}
-                  </div>
-                </SortableItem>
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-
-        {isEditMode && hiddenItemsList.length > 0 && (
-          <div className="mt-8 p-4 bg-gray-200 dark:bg-gray-800 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Hidden Components</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {hiddenItemsList.map(id => (
-                <div key={id} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded shadow-sm hover:shadow dark:shadow-gray-900">
-                  <button
-                    onClick={() => toggleVisibility(id)}
-                    className="p-1 bg-green-500 dark:bg-green-600 text-white rounded-full hover:bg-green-600 dark:hover:bg-green-700 flex-shrink-0"
-                    title={`Show ${getComponentLabel(id)}`}
+    <>
+      <div className="p-0 mx-0 sm:mx-5 mt-14">
+        <div className="space-y-8 mx-auto p-0">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={visibleItems} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 auto-rows-[250px] gap-3 px-4">
+                {visibleItems.map((id) => (
+                  <SortableItem 
+                    key={id} 
+                    id={id} 
+                    isEditMode={isEditMode}
+                    className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || 
+                             id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' || 
+                             id === 'systemSettings' || id === 'blockClients' ? 'row-span-2' : ''}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                  </button>
-                  <span className="text-gray-900 dark:text-gray-100">{getComponentLabel(id)}</span>
-                </div>
-              ))}
+                    <div className="relative h-full">
+                      {isEditMode && (
+                        <button
+                          onClick={() => toggleVisibility(id)}
+                          className="absolute top-2 left-2 z-20 p-1 bg-red-500 dark:bg-red-600 text-white rounded-full hover:bg-red-600 dark:hover:bg-red-700"
+                          title={`Hide ${getComponentLabel(id)}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      )}
+                      {renderComponent(id)}
+                    </div>
+                  </SortableItem>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          {isEditMode && hiddenItemsList.length > 0 && (
+            <div className="mt-8 p-4 bg-gray-200 dark:bg-gray-800 rounded-lg">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Hidden Components</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {hiddenItemsList.map(id => (
+                  <div key={id} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded shadow-sm hover:shadow dark:shadow-gray-900">
+                    <button
+                      onClick={() => toggleVisibility(id)}
+                      className="p-1 bg-green-500 dark:bg-green-600 text-white rounded-full hover:bg-green-600 dark:hover:bg-green-700 flex-shrink-0"
+                      title={`Show ${getComponentLabel(id)}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </button>
+                    <span className="text-gray-900 dark:text-gray-100">{getComponentLabel(id)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+      <ViewportDisplay />
+    </>
   )
 }

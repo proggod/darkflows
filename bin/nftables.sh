@@ -50,50 +50,27 @@ tc filter add dev $PRIMARY_INTERFACE parent ffff: protocol all u32 match u32 0 0
 echo "Configuring CAKE for $PRIMARY_INTERFACE (egress)..."
 tc qdisc add dev $PRIMARY_INTERFACE root cake \
     bandwidth ${PRIMARY_EGRESS_BANDWIDTH} \
-    $COMMON_CAKE_PARAMS \
-    nat \
-    memlimit 32mb
+    $COMMON_CAKE_PARAMS 
 
 # IFB0 (Download) - Using autorate-ingress with baseline from config
 echo "Configuring CAKE for ifb0 (ingress)..."
 tc qdisc add dev ifb0 root cake \
     bandwidth ${PRIMARY_INGRESS_BANDWIDTH} \
-    $COMMON_CAKE_PARAMS \
-    memlimit 32mb
-### VERSION A END ###
+    $COMMON_CAKE_PARAMS 
 
-### VERSION B START - FIXED BANDWIDTH (Comment out Version A and uncomment this section to use) ###
-# # Primary interface (Upload)
-# echo "Configuring CAKE for $PRIMARY_INTERFACE (egress)..."
-# tc qdisc add dev $PRIMARY_INTERFACE root cake \
-#     bandwidth ${PRIMARY_EGRESS_BANDWIDTH} \
-#     $COMMON_CAKE_PARAMS \
-#     nat \
-#     memlimit 32mb
-#
-# # IFB0 (Download)
-# echo "Configuring CAKE for ifb0 (ingress)..."
-# tc qdisc add dev ifb0 root cake \
-#     bandwidth ${PRIMARY_INGRESS_BANDWIDTH} \
-#     $COMMON_CAKE_PARAMS \
-#     memlimit 32mb
-### VERSION B END ###
 
 # Internal interface (same for both versions)
 echo "Configuring CAKE for $INTERNAL_INTERFACE..."
 tc qdisc add dev $INTERNAL_INTERFACE root cake \
     bandwidth ${INTERNAL_EGRESS_BANDWIDTH} \
-    $COMMON_CAKE_PARAMS \
-    memlimit 64mb
+    $COMMON_CAKE_PARAMS 
 
 # Secondary interface (if configured)
 if [ -n "$SECONDARY_INTERFACE" ]; then
     echo "Configuring CAKE for $SECONDARY_INTERFACE..."
     tc qdisc add dev $SECONDARY_INTERFACE root cake \
         bandwidth ${SECONDARY_EGRESS_BANDWIDTH} \
-        $COMMON_CAKE_PARAMS \
-        nat \
-        memlimit 32mb
+        $COMMON_CAKE_PARAMS 
 fi
 
 # Set default policies
@@ -175,5 +152,6 @@ nft list ruleset
 
 echo "Configuration applied successfully."
 
+#/usr/local/darkflows/bin/setup_blocking.sh
 /usr/local/darkflows/bin/setup_secondwan.sh
 

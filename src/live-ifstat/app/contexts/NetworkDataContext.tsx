@@ -36,7 +36,7 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     const url = '/api/ifstat-stream'
     setConnectionStatus('connecting')
 
-    const es = new EventSource(url)
+    let es = new EventSource(url)
 
     es.onopen = () => {
       setConnectionStatus('connected')
@@ -82,10 +82,20 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
       setConnectionStatus('error')
       setLastError('Connection error occurred')
       
-      // Attempt to reconnect after a delay
+      // Try to reconnect after a delay without reloading the page
       setTimeout(() => {
         if (es.readyState === EventSource.CLOSED) {
-          window.location.reload()
+          es.close()
+          const newEs = new EventSource(url)
+          es = newEs
+          
+          newEs.onopen = () => {
+            setConnectionStatus('connected')
+            setLastError(null)
+          }
+          
+          newEs.onmessage = es.onmessage
+          newEs.onerror = es.onerror
         }
       }, 5000)
     }

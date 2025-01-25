@@ -85,7 +85,7 @@ export default function RouteHostToSecondary() {
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
       <div className="flex flex-col h-full">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 px-1">Route Host to Secondary</h2>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Route Host to Secondary</h3>
         
         <div className="flex-1 overflow-auto">
           {ips.length === 0 ? (

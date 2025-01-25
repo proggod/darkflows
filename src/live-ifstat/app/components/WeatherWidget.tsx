@@ -342,7 +342,7 @@ export function WeatherWidget() {
             ) : (
               <button 
                 onClick={() => setShowZipInput(true)}
-                className="text-xl font-medium hover:text-gray-500 transition-colors"
+                className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
               >
                 {location.cityName}
               </button>
@@ -356,19 +356,31 @@ export function WeatherWidget() {
         <div className="flex gap-3 px-3 border-b border-gray-700">
           <button
             onClick={() => handleMetricChange('temperature')}
-            className={`pb-1 px-1 text-xs ${selectedMetric === 'temperature' ? 'border-b-2 border-yellow-500' : ''}`}
+            className={`h-6 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+              selectedMetric === 'temperature' 
+                ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
           >
             Temperature
           </button>
           <button
             onClick={() => handleMetricChange('precipitation')}
-            className={`pb-1 px-1 text-xs ${selectedMetric === 'precipitation' ? 'border-b-2 border-blue-500' : ''}`}
+            className={`h-6 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+              selectedMetric === 'precipitation'
+                ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
           >
             Precipitation
           </button>
           <button
             onClick={() => handleMetricChange('wind')}
-            className={`pb-1 px-1 text-xs ${selectedMetric === 'wind' ? 'border-b-2 border-green-500' : ''}`}
+            className={`h-6 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+              selectedMetric === 'wind'
+                ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
           >
             Wind
           </button>

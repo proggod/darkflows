@@ -160,14 +160,10 @@ const PingStatsCard = ({
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200">
       <div className="flex flex-col h-full">
-        <div className="px-1 pb-2">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {deviceLabel} Connection Latency
-          </h3>
-          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>Current: {currentPing}ms</span>
-            <span>Average: {rollingAvg}ms</span>
-          </div>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Ping Stats - {deviceLabel}</h3>
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+          <span>Current: {currentPing}ms</span>
+          <span>Average: {rollingAvg}ms</span>
         </div>
         <div className="flex-1 min-h-0">
           <div className="h-full">

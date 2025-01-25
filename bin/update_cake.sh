@@ -89,21 +89,21 @@ change_cake_bandwidth() {
 
     # Change bandwidth for egress traffic on the primary interface
     echo "Changing CAKE bandwidth for egress traffic on $PRIMARY_INTERFACE to ${PRIMARY_EGRESS_BANDWIDTH}..."
-    tc qdisc replace dev $PRIMARY_INTERFACE root cake bandwidth ${PRIMARY_EGRESS_BANDWIDTH} nat memlimit 32mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $PRIMARY_INTERFACE"; exit 1; }
+    tc qdisc replace dev $PRIMARY_INTERFACE root cake bandwidth ${PRIMARY_EGRESS_BANDWIDTH} $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $PRIMARY_INTERFACE"; exit 1; }
 
     # Change bandwidth for egress traffic on the secondary interface (if configured)
     if [ -n "$SECONDARY_INTERFACE" ]; then
         echo "Changing CAKE bandwidth for egress traffic on $SECONDARY_INTERFACE to ${SECONDARY_EGRESS_BANDWIDTH}..."
-        tc qdisc replace dev $SECONDARY_INTERFACE root cake bandwidth ${SECONDARY_EGRESS_BANDWIDTH} nat memlimit 32mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $SECONDARY_INTERFACE"; exit 1; }
+        tc qdisc replace dev $SECONDARY_INTERFACE root cake bandwidth ${SECONDARY_EGRESS_BANDWIDTH} $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $SECONDARY_INTERFACE"; exit 1; }
     fi
 
     # Change bandwidth for ingress traffic on ifb0
     echo "Changing CAKE bandwidth for ingress traffic on ifb0 to ${INGRESS_BANDWIDTH}..."
-    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} memlimit 32mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
+    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
 
     # Change bandwidth for local traffic on the internal interface
     echo "Changing CAKE bandwidth for local traffic on $INTERNAL_INTERFACE to ${INTERNAL_EGRESS_BANDWIDTH}..."
-    tc qdisc replace dev $INTERNAL_INTERFACE root cake bandwidth ${INTERNAL_EGRESS_BANDWIDTH} memlimit 64mb $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $INTERNAL_INTERFACE"; exit 1; }
+    tc qdisc replace dev $INTERNAL_INTERFACE root cake bandwidth ${INTERNAL_EGRESS_BANDWIDTH} $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $INTERNAL_INTERFACE"; exit 1; }
 }
 
 # Main script logic

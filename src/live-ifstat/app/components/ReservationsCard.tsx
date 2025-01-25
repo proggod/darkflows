@@ -1,16 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Button, IconButton, Tooltip } from '@mui/material'
-import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
+import DeleteIcon from '@mui/icons-material/Delete'
 
 interface Reservation {
   'ip-address': string
   'hw-address': string
   hostname: string
 }
+
+type SortField = 'ip-address' | 'hw-address' | 'name';
+type SortDirection = 'asc' | 'desc';
 
 export default function ReservationsCard() {
   const [reservations, setReservations] = useState<Reservation[]>([])
@@ -22,6 +24,8 @@ export default function ReservationsCard() {
     hostname: ''
   })
   const [error, setError] = useState<string>('')
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   useEffect(() => {
     fetchReservations()
@@ -157,19 +161,58 @@ export default function ReservationsCard() {
     setNewReservation({ 'ip-address': '', 'hw-address': '', hostname: '' })
   }
 
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortArrow = ({ field }: { field: SortField }) => {
+    if (field !== sortField) return null;
+    return (
+      <span className="ml-1 text-gray-400">
+        {sortDirection === 'asc' ? '↑' : '↓'}
+      </span>
+    );
+  };
+
+  const sortedReservations = [...reservations].sort((a, b) => {
+    let comparison = 0;
+    switch (sortField) {
+      case 'ip-address':
+        // Split IP into octets and compare numerically
+        const aOctets = a['ip-address'].split('.').map(Number);
+        const bOctets = b['ip-address'].split('.').map(Number);
+        for (let i = 0; i < 4; i++) {
+          if (aOctets[i] !== bOctets[i]) {
+            comparison = aOctets[i] - bOctets[i];
+            break;
+          }
+        }
+        break;
+      case 'hw-address':
+        comparison = a['hw-address'].localeCompare(b['hw-address']);
+        break;
+      case 'name':
+        const hostnameA = a.hostname || 'N/A';
+        const hostnameB = b.hostname || 'N/A';
+        comparison = hostnameA.localeCompare(hostnameB);
+        break;
+    }
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-[450px] flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">DHCP Reservations</h2>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          startIcon={<AddIcon />}
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DHCP Reservations</h3>
+        <AddIcon 
           onClick={() => !isEditing && setOpenDialog(!openDialog)}
-          size="small"
-        >
-          {openDialog ? 'Cancel' : 'Add'}
-        </Button>
+          className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+        />
       </div>
 
       {error && (
@@ -209,77 +252,66 @@ export default function ReservationsCard() {
               ...newReservation,
               hostname: e.target.value
             })}
-            placeholder="Hostname"
-            className="px-2 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
+            placeholder="Hostname (optional)"
+            className="px-2 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white col-span-2"
           />
-          <div className="flex gap-1">
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={isEditing ? handleEdit : handleAdd}
-              size="small"
-              className="min-w-0 h-6 flex-grow"
-            >
-              {isEditing ? 'Update' : 'Add'}
-            </Button>
-            <IconButton
+          <div className="col-span-2 flex justify-end gap-2">
+            <button
               onClick={handleDialogClose}
-              size="small"
-              className="p-0 h-6 w-6 min-h-0 border border-gray-300 dark:border-gray-600"
+              className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-900 dark:text-white">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </IconButton>
+              Cancel
+            </button>
+            <button
+              onClick={isEditing ? handleEdit : handleAdd}
+              className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors"
+            >
+              {isEditing ? 'Save' : 'Add'}
+            </button>
           </div>
         </div>
       )}
 
-      <div className="overflow-auto flex-grow -mx-3 px-3">
-        <table className="w-full">
+      <div className="overflow-auto flex-grow -mx-3">
+        <table className="w-full h-full">
           <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
             <tr className="bg-gray-50 dark:bg-gray-700">
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">IP Address</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">MAC Address</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Hostname</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-10">Actions</th>
+              <th 
+                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 w-[80px]"
+                onClick={() => handleSort('ip-address')}
+              >
+                IP<SortArrow field="ip-address" />
+              </th>
+              <th 
+                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('name')}
+              >
+                Name<SortArrow field="name" />
+              </th>
+              <th className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-10">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800">
-            {reservations.map((reservation) => (
-              <tr key={reservation['ip-address']} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+            {sortedReservations.map((reservation, index) => (
+              <tr key={reservation['ip-address']} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
+              }`}>
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
                   {reservation['ip-address']}
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  {reservation['hw-address']}
-                </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   {reservation.hostname || 'N/A'}
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <div className="flex gap-1">
-                    <Tooltip title="Edit Reservation">
-                      <IconButton 
-                        onClick={() => startEdit(reservation)}
-                        color="primary"
-                        size="small"
-                        className="p-0 h-4 w-4 min-h-0"
-                      >
-                        <EditIcon style={{ fontSize: '14px' }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete Reservation">
-                      <IconButton 
-                        onClick={() => handleDelete(reservation)}
-                        color="error"
-                        size="small"
-                        className="p-0 h-4 w-4 min-h-0"
-                      >
-                        <DeleteIcon style={{ fontSize: '14px' }} />
-                      </IconButton>
-                    </Tooltip>
+                    <EditIcon
+                      onClick={() => startEdit(reservation)}
+                      className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500"
+                    />
+                    <DeleteIcon
+                      onClick={() => handleDelete(reservation)}
+                      className="w-2 h-2 text-red-500 dark:text-red-400 cursor-pointer hover:text-red-600 dark:hover:text-red-500"
+                    />
                   </div>
                 </td>
               </tr>

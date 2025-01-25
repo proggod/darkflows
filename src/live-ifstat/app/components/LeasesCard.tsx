@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Button } from '@mui/material'
 
 interface Lease {
   ip_address: string
@@ -17,9 +16,14 @@ interface ReservationData {
   'hw-address': string
 }
 
+type SortField = 'ip_address' | 'mac_address' | 'device_name' | 'status';
+type SortDirection = 'asc' | 'desc';
+
 export default function LeasesCard() {
   const [leases, setLeases] = useState<Lease[]>([])
   const [error, setError] = useState<string>('')
+  const [sortField, setSortField] = useState<SortField>('device_name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   useEffect(() => {
     fetchLeases()
@@ -97,10 +101,59 @@ export default function LeasesCard() {
     }
   }
 
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortArrow = ({ field }: { field: SortField }) => {
+    if (field !== sortField) return null;
+    return (
+      <span className="ml-1 text-gray-400">
+        {sortDirection === 'asc' ? '↑' : '↓'}
+      </span>
+    );
+  };
+
+  const sortedLeases = [...leases].sort((a, b) => {
+    let comparison = 0;
+    switch (sortField) {
+      case 'ip_address':
+        // Split IP into octets and compare numerically
+        const aOctets = a.ip_address.split('.').map(Number);
+        const bOctets = b.ip_address.split('.').map(Number);
+        for (let i = 0; i < 4; i++) {
+          if (aOctets[i] !== bOctets[i]) {
+            comparison = aOctets[i] - bOctets[i];
+            break;
+          }
+        }
+        break;
+      case 'mac_address':
+        comparison = a.mac_address.localeCompare(b.mac_address);
+        break;
+      case 'device_name':
+        const nameA = a.device_name || 'N/A';
+        const nameB = b.device_name || 'N/A';
+        comparison = nameA.localeCompare(nameB);
+        break;
+      case 'status':
+        const statusA = a.is_reserved ? 'reserved' : 'dynamic';
+        const statusB = b.is_reserved ? 'reserved' : 'dynamic';
+        comparison = statusA.localeCompare(statusB);
+        break;
+    }
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-[490px] flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Active DHCP Leases</h2>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Active DHCP Leases</h3>
       </div>
 
       {error && (
@@ -109,48 +162,56 @@ export default function LeasesCard() {
         </div>
       )}
 
-      <div className="overflow-auto flex-grow -mx-3 px-3">
-        <table className="w-full">
+      <div className="overflow-auto flex-grow -mx-3">
+        <table className="w-full h-full">
           <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
             <tr className="bg-gray-50 dark:bg-gray-700">
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">IP Address</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">MAC Address</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-24">Name</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px]">Status</th>
+              <th 
+                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 w-[80px]"
+                onClick={() => handleSort('ip_address')}
+              >
+                IP<SortArrow field="ip_address" />
+              </th>
+              <th 
+                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('device_name')}
+              >
+                Name<SortArrow field="device_name" />
+              </th>
+              <th 
+                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('status')}
+              >
+                Status<SortArrow field="status" />
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800">
-            {leases.map((lease) => (
-              <tr key={lease.ip_address} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${lease.is_reserved ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+            {sortedLeases.map((lease, index) => (
+              <tr key={lease.ip_address} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
+              }`}>
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
                   {lease.ip_address}
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  {lease.mac_address}
-                </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   {lease.device_name || 'N/A'}
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   {lease.is_reserved ? (
-                    <Button
-                      variant="outlined"
-                      size="small"
+                    <button
                       onClick={() => handleRemoveReservation(lease)}
-                      className="pb-0 min-h-0 h-4 text-[10px] w-[72px] leading-none"
-                      color="error"
+                      className="h-6 px-2 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 transition-colors w-[72px]"
                     >
                       REMOVE
-                    </Button>
+                    </button>
                   ) : (
-                    <Button
-                      variant="outlined"
-                      size="small"
+                    <button
                       onClick={() => handleReserve(lease)}
-                      className="min-h-0 h-3 text-[10px] w-[72px] leading-none"
+                      className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors w-[72px]"
                     >
                       RESERVE
-                    </Button>
+                    </button>
                   )}
                 </td>
               </tr>

@@ -128,9 +128,9 @@ export default function ServicesCard() {
   })
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-[490px] flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">System Services</h2>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Services</h3>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {services.length} services
@@ -161,26 +161,28 @@ export default function ServicesCard() {
         </div>
       )}
 
-      <div className="overflow-auto flex-grow -mx-3 px-3">
-        <table className="w-full">
+      <div className="overflow-auto flex-grow -mx-3">
+        <table className="w-full h-full">
           <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
             <tr className="bg-gray-50 dark:bg-gray-700">
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Service Name</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-24">Enabled</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-24">Status</th>
-              <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-10">Logs</th>
+              <th className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Service Name</th>
+              <th className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-24">Enabled</th>
+              <th className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-24">Status</th>
+              <th className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-10">Logs</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800">
-            {filteredServices.map((service) => (
-              <tr key={service.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+            {filteredServices.map((service, index) => (
+              <tr key={service.name} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
+              }`}>
                 <td 
-                  className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                  className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                   onClick={() => handleServiceClick(service.name)}
                 >
                   {service.name}
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <span className={`px-1.5 py-0.5 rounded ${
                     service.enabled === 'enabled' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' :
                     'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
@@ -188,7 +190,7 @@ export default function ServicesCard() {
                     {service.enabled}
                   </span>
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <span className={`px-1.5 py-0.5 rounded ${
                     service.running ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' :
                     'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
@@ -196,7 +198,7 @@ export default function ServicesCard() {
                     {service.running ? 'Running' : 'Stopped'}
                   </span>
                 </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <button
                     onClick={(e) => handleShowLogs(service.name, e)}
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"

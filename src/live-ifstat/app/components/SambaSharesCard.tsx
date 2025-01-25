@@ -126,14 +126,12 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
                   }
                 }}
               />
-              <Button
-                variant="outlined"
+              <button
                 onClick={() => setShowFileBrowser(true)}
-                size="small"
-                className="text-xs"
+                className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
               >
                 Browse
-              </Button>
+              </button>
             </div>
 
             <Select
@@ -191,12 +189,18 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
           </div>
         </DialogContent>
         <DialogActions className="p-4">
-          <Button onClick={onClose} className="text-xs">
+          <button
+            onClick={onClose}
+            className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+          >
             Cancel
-          </Button>
-          <Button onClick={handleSave} variant="contained" className="text-xs">
+          </button>
+          <button
+            onClick={handleSave}
+            className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors"
+          >
             Save
-          </Button>
+          </button>
         </DialogActions>
       </Dialog>
 
@@ -387,12 +391,18 @@ function UserDialog({ open, onClose, onSave, user, groups }: UserDialogProps) {
         </div>
       </DialogContent>
       <DialogActions className="p-4">
-        <Button onClick={onClose} className="text-xs">
+        <button
+          onClick={onClose}
+          className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+        >
           Cancel
-        </Button>
-        <Button onClick={handleSave} variant="contained" className="text-xs">
+        </button>
+        <button
+          onClick={handleSave}
+          className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors"
+        >
           Save
-        </Button>
+        </button>
       </DialogActions>
     </Dialog>
   )
@@ -447,12 +457,18 @@ function GroupDialog({ open, onClose, onSave }: GroupDialogProps) {
         />
       </DialogContent>
       <DialogActions className="p-4">
-        <Button onClick={onClose} className="text-xs">
+        <button
+          onClick={onClose}
+          className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+        >
           Cancel
-        </Button>
-        <Button onClick={handleSave} variant="contained" className="text-xs">
+        </button>
+        <button
+          onClick={handleSave}
+          className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors"
+        >
           Save
-        </Button>
+        </button>
       </DialogActions>
     </Dialog>
   )
@@ -678,7 +694,7 @@ export default function SambaSharesCard() {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-[490px] flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Samba Shares</h2>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Samba Shares</h3>
         <Button
           size="small"
           variant="outlined"

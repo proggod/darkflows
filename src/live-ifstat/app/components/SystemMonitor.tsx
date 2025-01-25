@@ -4,7 +4,7 @@
 const NETWORK_UPDATE_INTERVAL = 10000; // 30 seconds
 
 import { useState, useEffect } from 'react';
-import { MoreVertical, Bell, Cpu, Box, HardDrive, Wifi } from 'lucide-react';
+import { Cpu, Box, HardDrive, Wifi } from 'lucide-react';
 
 interface SysData {
   timestamp: string;
@@ -140,72 +140,67 @@ const SystemMonitor: React.FC = () => {
 
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200 h-card">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center space-x-2">
-          <div className={`w-1.5 h-1.5 rounded-full bg-green-500`}/>
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-200">System Information</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <Bell className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-          <MoreVertical className="w-3 h-3 text-gray-500 dark:text-gray-400" />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-            <Wifi className="w-3 h-3 mr-1" />ISP:</span>
-          <div className="flex justify-between flex-1">
-            <span className="text-xs text-gray-400 dark:text-gray-400">{activeLabel}</span>
-            <span className="text-xs text-gray-400 dark:text-gray-400">{serverInfo?.uptime || 'Unknown'}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center">
-          <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-            <Cpu className="w-3 h-3 mr-1" />CPU:</span>
-          <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
-            <div className={`h-full ${getBarColor(sysData?.cpu || 0, 'cpu')} rounded-full ${getBarWidth(sysData?.cpu || 0)}`} />
-          </div>
-          <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{sysData?.cpu?.toFixed(1) || 0}%</span>
-        </div>
-
-        <div>
-          <div className="flex items-center">
-            <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-              <Box className="w-3 h-3 mr-1" />Memory:</span>
-            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
-              <div className={`h-full ${getBarColor(memoryUsage, 'memory')} rounded-full ${getBarWidth(memoryUsage)}`} />
+      <div className="flex flex-col h-full">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">System Monitor</h3>
+        
+        <div className="flex-1 overflow-auto">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
+                <Wifi className="w-3 h-3 mr-1" />ISP:</span>
+              <div className="flex justify-between flex-1">
+                <span className="text-xs text-gray-400 dark:text-gray-400">{activeLabel}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-400">{serverInfo?.uptime || 'Unknown'}</span>
+              </div>
             </div>
-            <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{memoryUsage.toFixed(1)}%</span>
-          </div>
-          <div className="text-xs text-gray-400 dark:text-gray-400 pl-16 mt-0.5">
-            {sysData ? `${(sysData.memFree / 1024).toFixed(1)} GB free of ${(sysData.totalMemMB / 1024).toFixed(1)} GB` : 'Loading...'}
-          </div>
-        </div>
 
-        <div>
-          <div className="flex items-center">
-            <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-              <HardDrive className="w-3 h-3 mr-1" />Disk:</span>
-            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
-              <div className={`h-full ${getBarColor(serverInfo?.disk || 0, 'disk')} rounded-full ${getBarWidth(serverInfo?.disk || 0)}`} />
+            <div className="flex items-center">
+              <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
+                <Cpu className="w-3 h-3 mr-1" />CPU:</span>
+              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
+                <div className={`h-full ${getBarColor(sysData?.cpu || 0, 'cpu')} rounded-full ${getBarWidth(sysData?.cpu || 0)}`} />
+              </div>
+              <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{sysData?.cpu?.toFixed(1) || 0}%</span>
             </div>
-            <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{serverInfo?.disk || 0}%</span>
-          </div>
-          <div className="text-xs text-gray-400 dark:text-gray-400 pl-16 mt-0.5">
-            {serverInfo && typeof serverInfo.diskAvailable === 'number' && typeof serverInfo.diskTotal === 'number' 
-              ? `${serverInfo.diskAvailable.toFixed(1)} GB free of ${serverInfo.diskTotal.toFixed(1)} GB` 
-              : 'Loading...'}
-          </div>
-        </div>
 
-        <div className="text-xs text-gray-400 dark:text-gray-400">
-          {serverInfo ? `${serverInfo.osName} ${serverInfo.osVersion}` : 'Loading OS info...'}
-        </div>
+            <div>
+              <div className="flex items-center">
+                <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
+                  <Box className="w-3 h-3 mr-1" />Memory:</span>
+                <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
+                  <div className={`h-full ${getBarColor(memoryUsage, 'memory')} rounded-full ${getBarWidth(memoryUsage)}`} />
+                </div>
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{memoryUsage.toFixed(1)}%</span>
+              </div>
+              <div className="text-xs text-gray-400 dark:text-gray-400 pl-16 mt-0.5">
+                {sysData ? `${(sysData.memFree / 1024).toFixed(1)} GB free of ${(sysData.totalMemMB / 1024).toFixed(1)} GB` : 'Loading...'}
+              </div>
+            </div>
 
-        <div className="text-xs text-gray-400 dark:text-gray-400">
-          {serverInfo?.cpuModel || 'Loading CPU info...'}
+            <div>
+              <div className="flex items-center">
+                <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
+                  <HardDrive className="w-3 h-3 mr-1" />Disk:</span>
+                <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
+                  <div className={`h-full ${getBarColor(serverInfo?.disk || 0, 'disk')} rounded-full ${getBarWidth(serverInfo?.disk || 0)}`} />
+                </div>
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{serverInfo?.disk || 0}%</span>
+              </div>
+              <div className="text-xs text-gray-400 dark:text-gray-400 pl-16 mt-0.5">
+                {serverInfo && typeof serverInfo.diskAvailable === 'number' && typeof serverInfo.diskTotal === 'number' 
+                  ? `${serverInfo.diskAvailable.toFixed(1)} GB free of ${serverInfo.diskTotal.toFixed(1)} GB` 
+                  : 'Loading...'}
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-400 dark:text-gray-400">
+              {serverInfo ? `${serverInfo.osName} ${serverInfo.osVersion}` : 'Loading OS info...'}
+            </div>
+
+            <div className="text-xs text-gray-400 dark:text-gray-400">
+              {serverInfo?.cpuModel || 'Loading CPU info...'}
+            </div>
+          </div>
         </div>
       </div>
     </div>

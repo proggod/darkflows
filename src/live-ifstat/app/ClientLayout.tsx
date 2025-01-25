@@ -1,7 +1,7 @@
 'use client';
 
 import React from "react";
-import Sidebar from './components/Sidebar';
+//import Sidebar from './components/Sidebar';
 import { EditModeButton } from './contexts/EditModeContext';
 import { useTheme } from './contexts/ThemeContext';
 
@@ -34,7 +34,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <EditModeButton />
         <ThemeToggle />
       </div>
-      <Sidebar />
+      
       {children}
     </div>
   );

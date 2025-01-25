@@ -81,7 +81,7 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
       <div className="flex flex-col h-full">
-        <h2 className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-2 px-1">{title}</h2>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">{title}</h3>
         <div className="flex-1 space-y-0.5 overflow-y-auto">
           <div className="grid grid-cols-4 gap-2 text-[10px] font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-1 px-1 sticky top-0 bg-gray-50 dark:bg-gray-800">
             <div>Interface</div>

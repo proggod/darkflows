@@ -150,17 +150,21 @@ async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const sqliteDb = await getSqliteDb();
     
-    // Get DNS queries from last hour
+    // Get hours from query parameter, default to 1 if not specified
+    const url = new URL(request.url);
+    const hours = parseInt(url.searchParams.get('hours') || '1', 10);
+    
+    // Get DNS queries from specified time period
     const dnsClients = await sqliteDb.all<DnsQuery[]>(`
       SELECT
         MAX(timestamp) as lastSeen,
         client as ip
       FROM queries
-      WHERE timestamp >= strftime('%s', 'now', '-1 hour')
+      WHERE timestamp >= strftime('%s', 'now', '-${hours} hours')
       GROUP BY client
       ORDER BY lastSeen DESC
     `);
@@ -168,30 +172,69 @@ export async function GET() {
     // Get hostnames from Kea
     const hostnameMap = await getKeaHostnames();
 
+    // Create a Set of IPs we've already processed
+    const processedIPs = new Set<string>();
+
     // Format clients with vendor lookup for unknown names
     const clients = await Promise.all(dnsClients.map(async entry => {
+      processedIPs.add(entry.ip);
       const keaInfo = hostnameMap.get(entry.ip);
       let name = keaInfo?.name || 'N/A';
       const status = keaInfo ? (keaInfo.isReserved ? 'reserved' : 'dynamic') : 'static';
+      const mac = keaInfo?.mac || null;
 
-      // If name is N/A and we have a MAC, try to get vendor info
-      if (name === 'N/A' && keaInfo?.mac) {
-        const vendor = await getMacVendor(keaInfo.mac);
+      // Try to get vendor info if we have a MAC address
+      if (mac && (name === 'N/A' || name === '')) {
+        const vendor = await getMacVendor(mac);
         if (vendor) {
           name = `Unknown ${vendor} Device`;
+        } else {
+          // If no vendor info, use MAC address as name
+          name = mac;
         }
       }
 
       return {
         ip: entry.ip,
         name,
-        mac: keaInfo?.mac || null,
+        mac,
         status,
         lastSeen: entry.lastSeen
       };
     }));
 
-    return NextResponse.json(clients);
+    // Add any reserved IPs that haven't made DNS queries
+    const reservedEntries = Array.from(hostnameMap.entries());
+    for (const [ip, info] of reservedEntries) {
+      if (!processedIPs.has(ip) && info.isReserved) {
+        let name = info.name;
+        const mac = info.mac || null;
+        
+        // Try to get vendor info if we have a MAC address
+        if (mac && (name === 'N/A' || name === '')) {
+          const vendor = await getMacVendor(mac);
+          if (vendor) {
+            name = `Unknown ${vendor} Device`;
+          } else {
+            // If no vendor info, use MAC address as name
+            name = mac;
+          }
+        }
+
+        clients.push({
+          ip,
+          name,
+          mac,
+          status: 'reserved',
+          lastSeen: 0
+        });
+      }
+    }
+
+    // Filter out clients without MAC addresses
+    const filteredClients = clients.filter(client => client.mac !== null);
+
+    return NextResponse.json(filteredClients);
   } catch (error: unknown) {
     console.error('Error fetching DNS clients:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

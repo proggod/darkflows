@@ -127,8 +127,8 @@ export function SystemSettingsCard() {
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
       <div className="flex flex-col h-full">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">System Settings</h3>
         <div className="flex items-center justify-between mb-2 px-1">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">System Settings</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => restartService('network')}
@@ -157,7 +157,7 @@ export function SystemSettingsCard() {
           </div>
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 overflow-auto">
           <div className="grid gap-2">
             <div className="flex items-center gap-1">
               <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">Gateway IP</label>

@@ -175,9 +175,9 @@ export default function PiholeLists() {
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200">
       <div className="flex flex-col h-full">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 px-1">Pi-hole Lists</h2>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Pi-hole Lists</h3>
         
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 overflow-auto">
           <div className="h-full overflow-y-auto space-y-4">
             {renderList('whitelist')}
             {renderList('blacklist')}

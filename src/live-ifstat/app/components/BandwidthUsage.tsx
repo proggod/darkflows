@@ -203,85 +203,90 @@ export default function BandwidthUsage() {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
-      <div className="mb-2">
-        <h2 className="text-sm font-medium text-gray-900 dark:text-gray-100">Network Bandwidth</h2>
-      </div>
+      <div className="flex flex-col h-full">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Bandwidth Usage</h3>
+        
+        <div className="flex-1 overflow-auto">
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
+              {error}
+            </div>
+          )}
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
-          {error}
+          <div className="overflow-auto flex-grow">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                <tr>
+                  <th 
+                    className="px-1 py-0.5 text-left text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('host')}
+                  >
+                    Host<SortArrow field="host" />
+                  </th>
+                  <th 
+                    className="px-1 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-16 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('2s_down')}
+                  >
+                    2s D<SortArrow field="2s_down" />
+                  </th>
+                  <th 
+                    className="px-1 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-16 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('2s_up')}
+                  >
+                    2s U<SortArrow field="2s_up" />
+                  </th>
+                  <th 
+                    className="px-1 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-16 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('40s_down')}
+                  >
+                    40s D<SortArrow field="40s_down" />
+                  </th>
+                  <th 
+                    className="px-1 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-16 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                    onClick={() => handleSort('40s_up')}
+                  >
+                    40s U<SortArrow field="40s_up" />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800">
+                {sortedIPs.map((ip) => (
+                  <tr key={ip} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                      <div className="flex flex-col">
+                        <span 
+                          className="font-medium cursor-pointer hover:text-blue-500"
+                          onClick={() => {
+                            setSelectedIP(ip);
+                            fetchDetailedStats(ip);
+                          }}
+                          title={(hostnames[ip] || 'Unknown').replace('Unknown ', '')}
+                        >
+                          {((hostnames[ip] || 'Unknown').replace('Unknown ', '')).length > 16 
+                            ? ((hostnames[ip] || 'Unknown').replace('Unknown ', '')).slice(0, 16) + '...'
+                            : (hostnames[ip] || 'Unknown').replace('Unknown ', '')}
+                        </span>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{ip}</span>
+                      </div>
+                    </td>
+                    <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
+                      {bandwidthData[ip].last_2s_received}
+                    </td>
+                    <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
+                      {bandwidthData[ip].last_2s_sent}
+                    </td>
+                    <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
+                      {bandwidthData[ip].last_40s_received}
+                    </td>
+                    <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
+                      {bandwidthData[ip].last_40s_sent}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
-
-      <div className="overflow-auto flex-grow -mx-3 px-3">
-        <table className="w-full">
-          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-            <tr>
-              <th 
-                className="px-2 py-0.5 text-left text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('host')}
-              >
-                Host<SortArrow field="host" />
-              </th>
-              <th 
-                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('2s_down')}
-              >
-                2s D<SortArrow field="2s_down" />
-              </th>
-              <th 
-                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('2s_up')}
-              >
-                2s U<SortArrow field="2s_up" />
-              </th>
-              <th 
-                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('40s_down')}
-              >
-                40s D<SortArrow field="40s_down" />
-              </th>
-              <th 
-                className="px-2 py-0.5 text-right text-[8px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('40s_up')}
-              >
-                40s U<SortArrow field="40s_up" />
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800">
-            {sortedIPs.map((ip) => (
-              <tr key={ip} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  <div className="flex flex-col">
-                    <span 
-                      className="font-medium cursor-pointer hover:text-blue-500"
-                      onClick={() => {
-                        setSelectedIP(ip);
-                        fetchDetailedStats(ip);
-                      }}
-                    >
-                      {(hostnames[ip] || 'Unknown').replace('Unknown ', '')}
-                    </span>
-                    <span className="text-[10px] text-gray-500 dark:text-gray-400">{ip}</span>
-                  </div>
-                </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
-                  {bandwidthData[ip].last_2s_received}
-                </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
-                  {bandwidthData[ip].last_2s_sent}
-                </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
-                  {bandwidthData[ip].last_40s_received}
-                </td>
-                <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right tabular-nums">
-                  {bandwidthData[ip].last_40s_sent}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
       {selectedIP && (
