@@ -1,63 +1,36 @@
 import { NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
 import { exec } from 'child_process';
-import { NextRequest } from 'next/server';
+import { promisify } from 'util';
+import { readConfig, writeConfig, type KeaReservation } from '@/lib/config';
+import { syncAllSystems } from '@/lib/sync';
 
-const KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf';
+// At the top of the file, after imports
+process.stdout.write('=== Reservations API module loaded ===\n');
 
-interface KeaReservation {
-  'ip-address': string;
-  'hw-address': string;
-  hostname?: string;
-}
+const execAsync = promisify(exec);
+const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-dns-manager.py';
 
-interface KeaConfig {
-  Dhcp4: {
-    subnet4: [{
-      reservations: KeaReservation[];
-    }];
-  };
-}
+async function syncDNSEntry(ip: string, hostname: string, shouldDelete = false) {
+  const timestamp = new Date().toISOString();
+  const prefix = `[${timestamp}] DNS Sync:`;
 
-async function readConfig() {
   try {
-    const content = await fs.readFile(KEA_CONFIG_PATH, 'utf-8');
-    // Remove any trailing commas before parsing
-    const cleanContent = content
-      .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas before } or ]
-      .replace(/,(\s*})/g, '}')       // Remove trailing commas before }
-      .replace(/,(\s*\])/g, ']');     // Remove trailing commas before ]
-    return JSON.parse(cleanContent);
-  } catch (error) {
-    console.error('Error parsing Kea config:', error);
-    throw error;
-  }
-}
+    const cmd = shouldDelete 
+      ? `python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`
+      : `python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`;
+    
+    process.stdout.write(`${prefix} Executing command: ${cmd}\n`);
+    
+    const { stdout, stderr } = shouldDelete
+      ? await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`)
+      : await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`);
 
-async function writeConfig(config: KeaConfig) {
-  // Remove duplicates before writing
-  const seen = new Set<string>();
-  config.Dhcp4.subnet4[0].reservations = config.Dhcp4.subnet4[0].reservations.filter((r: KeaReservation) => {
-    const key = `${r['ip-address']}-${r['hw-address'].toLowerCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  await fs.writeFile(KEA_CONFIG_PATH, JSON.stringify(config, null, 2));
-  try {
-    await new Promise((resolve, reject) => {
-      exec('systemctl restart kea-dhcp4-server', (error: Error | null) => {
-        if (error) {
-          console.warn('Could not restart Kea configuration:', error);
-          reject(error);
-        } else {
-          resolve(true);
-        }
-      });
-    });
+    if (stdout) process.stdout.write(`${prefix} Output: ${stdout}\n`);
+    if (stderr) process.stderr.write(`${prefix} Error: ${stderr}\n`);
+    
+    process.stdout.write(`${prefix} Command executed successfully\n`);
   } catch (error) {
-    console.warn('Could not restart Kea configuration:', error);
+    process.stderr.write(`${prefix} Failed: ${error}\n`);
   }
 }
 
@@ -72,32 +45,22 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const reservation = await request.json();
     const config = await readConfig();
     
-    // Check if reservation with same IP or MAC already exists
-    const isDuplicate = config.Dhcp4.subnet4[0].reservations.some((r: KeaReservation) => 
-      r['ip-address'] === reservation['ip-address'] || 
-      r['hw-address'].toLowerCase() === reservation['hw-address'].toLowerCase()
-    );
-    
-    if (isDuplicate) {
-      return NextResponse.json(
-        { error: 'Reservation with this IP or MAC address already exists' }, 
-        { status: 409 }
-      );
-    }
-    
-    // Add new reservation
+    // Add the new reservation
     config.Dhcp4.subnet4[0].reservations.push(reservation);
     
+    // Write the updated config
     await writeConfig(config);
+    await syncAllSystems();
+    
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error adding reservation:', error);
-    return NextResponse.json({ error: 'Failed to add reservation' }, { status: 500 });
+    console.error('Error creating reservation:', error);
+    return NextResponse.json({ error: 'Failed to create reservation' }, { status: 500 });
   }
 }
 
@@ -106,10 +69,19 @@ export async function DELETE(request: Request) {
     const { ip, mac } = await request.json();
     const config = await readConfig();
     
+    // Find the reservation before deleting to get hostname
+    const reservation = config.Dhcp4.subnet4[0].reservations
+      .find((r: KeaReservation) => r['ip-address'] === ip && r['hw-address'] === mac);
+
+    if (reservation?.hostname) {
+      await syncDNSEntry(ip, reservation.hostname, true);
+    }
+    
     config.Dhcp4.subnet4[0].reservations = config.Dhcp4.subnet4[0].reservations
       .filter((r: KeaReservation) => r['ip-address'] !== ip && r['hw-address'] !== mac);
     
     await writeConfig(config);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting reservation:', error);
@@ -119,26 +91,30 @@ export async function DELETE(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const updatedReservation = await request.json();
+    const reservation = await request.json();
     const config = await readConfig();
     
-    // Find and update the reservation
-    const reservationIndex = config.Dhcp4.subnet4[0].reservations.findIndex((r: KeaReservation) => 
-      r['ip-address'] === updatedReservation['ip-address'] && 
-      r['hw-address'].toLowerCase() === updatedReservation['hw-address'].toLowerCase()
+    // Find existing reservation
+    const existing = config.Dhcp4.subnet4[0].reservations.find(r => 
+      r['ip-address'] === reservation['ip-address'] && 
+      r['hw-address'] === reservation['hw-address']
     );
-    
-    if (reservationIndex === -1) {
-      return NextResponse.json(
-        { error: 'Reservation not found' }, 
-        { status: 404 }
-      );
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
     }
-    
-    // Update the reservation
-    config.Dhcp4.subnet4[0].reservations[reservationIndex] = updatedReservation;
-    
+
+    if (existing.hostname !== reservation.hostname) {
+      // Hostname changed - update DNS
+      await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${existing.hostname}`);
+      await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${reservation['ip-address']} ${reservation.hostname}`);
+    }
+
+    // Update reservation
+    Object.assign(existing, reservation);
     await writeConfig(config);
+    
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating reservation:', error);

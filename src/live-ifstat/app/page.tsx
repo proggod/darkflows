@@ -39,6 +39,7 @@ import DnsHosts from '@/components/DnsHosts'
 import PiholeLists from '@/components/PiholeLists'
 import BandwidthUsage from './components/BandwidthUsage'
 import React from 'react'
+import { useNetworkStats } from '@/hooks/useNetworkStats'
 
 interface NetworkInterface {
   name: string
@@ -47,29 +48,11 @@ interface NetworkInterface {
   type?: 'primary' | 'secondary' | 'internal'
 }
 
-interface RawNetworkStats {
-  timestamp: string
-  kbIn: number
-  kbOut: number
-  device: string
-}
-
-interface StoredNetworkStats {
-  timestamp: number
-  kbIn: number
-  kbOut: number
-  interface: string
-}
-
-type IfstatData = {
+interface IfstatData {
   timestamp: string
   interface: string
   kbIn: number
   kbOut: number
-}
-
-interface InterfaceStats {
-  [key: string]: StoredNetworkStats[]
 }
 
 const DEFAULT_ITEMS = [
@@ -94,30 +77,9 @@ const DEFAULT_ITEMS = [
   'systemSettings'
 ]
 
-function ViewportDisplay() {
-  const [width, setWidth] = React.useState<number | undefined>(undefined);
-
-  React.useEffect(() => {
-    // Set initial width
-    setWidth(window.innerWidth);
-    
-    const handleResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  if (width === undefined) return null;
-
-  return (
-    <div className="fixed bottom-4 right-4 bg-black/80 text-white px-4 py-2 rounded-full z-50">
-      Width: {width}px
-    </div>
-  );
-}
-
-export default function CombinedDashboard() {
+const CombinedDashboard = () => {
   const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
-  const [networkStats, setNetworkStats] = useState<InterfaceStats>({})
+  const { networkStats } = useNetworkStats()
   const { isEditMode } = useEditMode()
   const { isDarkMode } = useTheme()
   
@@ -184,84 +146,6 @@ export default function CombinedDashboard() {
   }, [isDarkMode])
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/ifstat-stream')
-
-    eventSource.onmessage = (event) => {
-      const stats = JSON.parse(event.data) as RawNetworkStats
-      setNetworkStats(prevStats => {
-        const newStats = { ...prevStats }
-        const iface = stats.device
-        
-        if (!newStats[iface]) {
-          newStats[iface] = []
-        }
-        
-        // Convert timestamp to a full date string for today
-        const now = new Date()
-        const [time, period] = stats.timestamp.split(' ')
-        const [hours, minutes, seconds] = time.split(':')
-        let hour = parseInt(hours)
-        
-        // Convert 12-hour format to 24-hour
-        if (period === 'PM' && hour !== 12) {
-          hour += 12
-        } else if (period === 'AM' && hour === 12) {
-          hour = 0
-        }
-        
-        now.setHours(hour, parseInt(minutes), parseInt(seconds))
-        const currentTimestamp = now.getTime()
-        
-        // Only add new data point if it's different from the last one
-        const lastStats = newStats[iface][newStats[iface].length - 1]
-        if (!lastStats || 
-            lastStats.kbIn !== stats.kbIn || 
-            lastStats.kbOut !== stats.kbOut) {
-          
-          newStats[iface].push({
-            timestamp: currentTimestamp,
-            kbIn: stats.kbIn,
-            kbOut: stats.kbOut,
-            interface: iface
-          })
-
-          // Keep only last 20 data points
-          if (newStats[iface].length > 20) {
-            newStats[iface] = newStats[iface].slice(-20)
-          }
-        }
-        
-        return newStats
-      })
-    }
-
-    return () => {
-      eventSource.close()
-    }
-  }, [])
-
-  // Transform stored stats into display format for the NetworkStatsCard
-  const getNetworkCardData = (iface: string): IfstatData[] => {
-    const stats = networkStats[iface]
-    if (!stats || stats.length === 0) {
-      return [{
-        timestamp: new Date().toISOString(),
-        interface: iface,
-        kbIn: 0,
-        kbOut: 0
-      }]
-    }
-
-    // Convert stored stats to display format
-    return stats.map(stat => ({
-      timestamp: new Date(stat.timestamp).toISOString(),
-      interface: stat.interface,
-      kbIn: stat.kbIn,
-      kbOut: stat.kbOut
-    }))
-  }
-
-  useEffect(() => {
     fetch('/api/devices')
       .then(res => res.json())
       .then(data => {
@@ -320,6 +204,25 @@ export default function CombinedDashboard() {
     })
   }
 
+  const getNetworkCardData = (iface: string): IfstatData[] => {
+    const stats = networkStats[iface]
+    if (!stats || stats.length === 0) {
+      return [{
+        timestamp: new Date().toISOString(),
+        interface: iface,
+        kbIn: 0,
+        kbOut: 0
+      }]
+    }
+
+    return stats.map(stat => ({
+      timestamp: new Date(stat.timestamp).toISOString(),
+      interface: stat.interface,
+      kbIn: stat.kbIn,
+      kbOut: stat.kbOut
+    }))
+  }
+
   const renderComponent = (id: string) => {
     if (hiddenItems.has(id)) return null
 
@@ -365,14 +268,13 @@ export default function CombinedDashboard() {
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
-          const deviceData = getNetworkCardData(deviceName)
           const device = interfaces.find(i => i.name === deviceName)
           if (!device) return null
           
           const colorIndex = interfaces.findIndex(i => i.name === deviceName) % colors.length
           return (
             <NetworkStatsCard
-              data={deviceData}
+              data={getNetworkCardData(deviceName)}
               label={device.label || device.name}
               color={isDarkMode ? colors[colorIndex].dark : colors[colorIndex].light}
             />
@@ -504,3 +406,26 @@ export default function CombinedDashboard() {
     </>
   )
 }
+
+function ViewportDisplay() {
+  const [width, setWidth] = React.useState<number | undefined>(undefined);
+
+  React.useEffect(() => {
+    // Set initial width
+    setWidth(window.innerWidth);
+    
+    const handleResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  if (width === undefined) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 bg-black/80 text-white px-4 py-2 rounded-full z-50">
+      Width: {width}px
+    </div>
+  );
+}
+
+export default CombinedDashboard

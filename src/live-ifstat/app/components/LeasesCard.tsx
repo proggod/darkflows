@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { useRefresh } from '../contexts/RefreshContext'
 
 interface Lease {
   ip_address: string
@@ -24,10 +26,15 @@ export default function LeasesCard() {
   const [error, setError] = useState<string>('')
   const [sortField, setSortField] = useState<SortField>('device_name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [editedNames, setEditedNames] = useState<{[key: string]: string}>({});
+  const [editingHostname, setEditingHostname] = useState<string | null>(null);
+  const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({});
+  const { triggerRefresh, registerRefreshCallback } = useRefresh()
 
   useEffect(() => {
     fetchLeases()
-  }, [])
+    return registerRefreshCallback(fetchLeases)
+  }, [registerRefreshCallback])
 
   const fetchLeases = async () => {
     try {
@@ -69,7 +76,8 @@ export default function LeasesCard() {
       })
 
       if (response.ok) {
-        fetchLeases()
+        await fetchLeases()
+        triggerRefresh()
       } else {
         setError('Failed to create reservation')
       }
@@ -91,7 +99,8 @@ export default function LeasesCard() {
       })
 
       if (response.ok) {
-        fetchLeases()
+        await fetchLeases()
+        triggerRefresh()
       } else {
         setError('Failed to remove reservation')
       }
@@ -150,10 +159,74 @@ export default function LeasesCard() {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  const handleNameChange = (ip: string, newName: string) => {
+    setEditedNames(prev => ({
+      ...prev,
+      [ip]: newName
+    }));
+  };
+
+  const startHostnameEdit = (ip: string, currentHostname: string) => {
+    setEditingHostname(ip);
+    setEditedNames(prev => ({
+      ...prev,
+      [ip]: currentHostname || ''
+    }));
+  };
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>, lease: Lease) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const editedName = editedNames[lease.ip_address];
+      if (!editedName || editedName === lease.device_name) return;
+
+      try {
+        setSavingHostnames(prev => ({ ...prev, [lease.ip_address]: true }));
+
+        // Update DNS hostname
+        const dnsResponse = await fetch('/api/dns-hosts', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: lease.ip_address,
+            oldHostname: lease.device_name,
+            newHostname: editedName,
+            mac: lease.mac_address
+          })
+        });
+
+        if (!dnsResponse.ok) {
+          const errorText = await dnsResponse.text();
+          console.error('Failed to update hostname:', errorText);
+          setError('Failed to update hostname');
+          return;
+        }
+
+        await fetchLeases();
+        // Clear editing state after successful update
+        setEditingHostname(null);
+        setEditedNames(prev => {
+          const newState = { ...prev };
+          delete newState[lease.ip_address];
+          return newState;
+        });
+      } catch (error) {
+        console.error('Error updating hostname:', error);
+        setError('Failed to update hostname');
+      } finally {
+        setSavingHostnames(prev => ({ ...prev, [lease.ip_address]: false }));
+      }
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Active DHCP Leases</h3>
+        <RefreshIcon 
+          onClick={fetchLeases}
+          className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+        />
       </div>
 
       {error && (
@@ -195,7 +268,34 @@ export default function LeasesCard() {
                   {lease.ip_address}
                 </td>
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  {lease.device_name || 'N/A'}
+                  {editingHostname === lease.ip_address ? (
+                    <input
+                      type="text"
+                      value={editedNames[lease.ip_address] ?? ''}
+                      onChange={(e) => handleNameChange(lease.ip_address, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleKeyDown(e, lease);
+                        } else if (e.key === 'Escape') {
+                          setEditingHostname(null);
+                        }
+                      }}
+                      onBlur={() => setEditingHostname(null)}
+                      className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
+                        savingHostnames[lease.ip_address] ? 'opacity-50' : ''
+                      }`}
+                      disabled={savingHostnames[lease.ip_address]}
+                      autoFocus
+                      placeholder="N/A"
+                    />
+                  ) : (
+                    <span
+                      onClick={() => startHostnameEdit(lease.ip_address, lease.device_name || '')}
+                      className="cursor-pointer hover:text-blue-500"
+                    >
+                      {lease.device_name || 'N/A'}
+                    </span>
+                  )}
                 </td>
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   {lease.is_reserved ? (

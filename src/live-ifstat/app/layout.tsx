@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { EditModeProvider } from './contexts/EditModeContext';
 import { NetworkDataProvider } from './contexts/NetworkDataContext';
 import { PingDataProvider } from './contexts/PingDataContext';
+import { RefreshProvider } from './contexts/RefreshContext'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <EditModeProvider>
             <NetworkDataProvider>
               <PingDataProvider>
-                <ClientLayout>{children}</ClientLayout>
+                <RefreshProvider>
+                  <ClientLayout>{children}</ClientLayout>
+                </RefreshProvider>
               </PingDataProvider>
             </NetworkDataProvider>
           </EditModeProvider>

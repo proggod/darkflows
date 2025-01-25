@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { readConfig, writeConfig } from '@/lib/config'
+import { syncAllSystems } from '@/lib/sync'
 
 const execAsync = promisify(exec)
 const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-dns-manager.py'
@@ -69,5 +71,48 @@ export async function DELETE(request: Request) {
     console.error('Error in DELETE:', error)
     const message = error instanceof Error ? error.message : 'Failed to remove DNS entry'
     return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const { ip, newHostname, mac } = await request.json();
+    
+    // Get current DNS entries to check for duplicates
+    const { stdout } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`);
+    const entries = parseListOutput(stdout);
+    
+    // Remove all hostnames for this IP
+    const ipEntry = entries.find(e => e.ip === ip);
+    if (ipEntry) {
+      for (const hostname of ipEntry.hostnames) {
+        await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`);
+      }
+    }
+    
+    // Add new hostname
+    await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${newHostname}`);
+    
+    // If we have a MAC address, update the DHCP reservation too
+    if (mac) {
+      const config = await readConfig();
+      const reservations = config.Dhcp4.subnet4[0].reservations;
+      
+      // Find and update the matching reservation
+      const reservation = reservations.find(r => 
+        r['ip-address'] === ip && r['hw-address'] === mac
+      );
+      
+      if (reservation) {
+        reservation.hostname = newHostname;
+        await writeConfig(config);
+      }
+    }
+    
+    await syncAllSystems();
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating hostname:', error);
+    return NextResponse.json({ error: 'Failed to update hostname' }, { status: 500 });
   }
 } 

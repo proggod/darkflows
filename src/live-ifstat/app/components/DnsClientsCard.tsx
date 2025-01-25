@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { useRefresh } from '../contexts/RefreshContext';
 
 interface DnsClient {
   ip: string;
@@ -22,6 +23,8 @@ export function DnsClientsCard() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({});
   const [processingClients, setProcessingClients] = useState<{[key: string]: boolean}>({});
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { triggerRefresh, registerRefreshCallback } = useRefresh();
 
   const fetchClients = async () => {
     try {
@@ -54,32 +57,61 @@ export function DnsClientsCard() {
     }));
   };
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>, client: DnsClient) => {
-    console.log('Key pressed:', e.key);
-    console.log('Client status:', client.status);
-    console.log('Client MAC:', client.mac);
-    
-    if (e.key === 'Enter') {
-      e.preventDefault(); // Prevent default Enter behavior
+  const handleDnsUpdate = async (client: DnsClient, newName: string) => {
+    try {
+      setSavingHostnames(prev => ({ ...prev, [client.ip]: true }));
       
-      if (!client.mac) {
-        console.log('Cannot save: No MAC address');
-        return;
+      const response = await fetch('/api/dns-hosts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ip: client.ip,
+          oldHostname: client.name,
+          newHostname: newName,
+          mac: client.mac
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to update hostname:', errorText);
+        setError('Failed to update hostname');
+        return false;
       }
+
+      return true;
+    } catch (error) {
+      console.error('Error updating hostname:', error);
+      setError('Error updating hostname');
+      return false;
+    } finally {
+      setSavingHostnames(prev => ({ ...prev, [client.ip]: false }));
+    }
+  };
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>, client: DnsClient) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const editedName = editedNames[client.ip];
+      if (!editedName || editedName === client.name) return;
 
       try {
         setSavingHostnames(prev => ({ ...prev, [client.ip]: true }));
-        
+
         // If client is dynamic, reserve it first
         if (client.status === 'dynamic') {
-          console.log('Reserving dynamic client first...');
+          if (!client.mac) {
+            console.log('Cannot save: No MAC address');
+            return;
+          }
+
           const reserveResponse = await fetch('/api/reservations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               'ip-address': client.ip,
               'hw-address': client.mac,
-              'hostname': editedNames[client.ip] || client.name
+              'hostname': editedName
             })
           });
 
@@ -89,41 +121,17 @@ export function DnsClientsCard() {
             setError('Failed to reserve client');
             return;
           }
-          console.log('Successfully reserved client');
-        } else if (client.status !== 'reserved') {
-          console.log('Cannot save: Client not reserved and not dynamic');
-          return;
-        }
-
-        // Now update the hostname if needed
-        if (client.status === 'reserved') {
-          const payload = {
-            'ip-address': client.ip,
-            'hw-address': client.mac,
-            'hostname': editedNames[client.ip] || client.name
-          };
-          console.log('Sending payload:', payload);
-          
-          const response = await fetch('/api/reservations', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          if (response.ok) {
-            console.log('Successfully saved hostname');
-          } else {
-            const errorText = await response.text();
-            console.error('Failed to save hostname:', errorText);
-            setError('Failed to update hostname');
+        } else if (client.status === 'reserved') {
+          // Update DNS hostname for reserved clients
+          const success = await handleDnsUpdate(client, editedName);
+          if (success) {
+            await fetchClients();
+            triggerRefresh();
           }
         }
-
-        // Refresh the client list
-        fetchClients();
       } catch (error) {
-        console.error('Error updating hostname:', error);
-        setError('Error updating hostname');
+        console.error('Error in handleKeyDown:', error);
+        setError('Failed to update hostname');
       } finally {
         setSavingHostnames(prev => ({ ...prev, [client.ip]: false }));
       }
@@ -138,11 +146,22 @@ export function DnsClientsCard() {
 
     try {
       setProcessingClients(prev => ({ ...prev, [client.ip]: true }));
+      
+      const hostname = editedNames[client.ip] || (client.name !== 'N/A' ? client.name : '');
+      
       const reservation = {
         'ip-address': client.ip,
         'hw-address': client.mac,
-        'hostname': editedNames[client.ip] || client.name !== 'N/A' ? editedNames[client.ip] || client.name : ''
+        'hostname': hostname
       };
+
+      console.log('Client reservation request:', {
+        ip: client.ip,
+        mac: client.mac,
+        hostname: hostname,
+        originalName: client.name,
+        editedName: editedNames[client.ip]
+      });
 
       const response = await fetch('/api/reservations', {
         method: 'POST',
@@ -150,11 +169,18 @@ export function DnsClientsCard() {
         body: JSON.stringify(reservation)
       });
 
-      if (response.ok) {
-        fetchClients();
-      } else {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Reservation failed:', {
+          status: response.status,
+          response: errorText
+        });
         setError('Failed to create reservation');
+        return;
       }
+
+      fetchClients();
+      triggerRefresh();
     } catch (error) {
       console.error('Error creating reservation:', error);
       setError('Error creating reservation');
@@ -182,6 +208,7 @@ export function DnsClientsCard() {
 
       if (response.ok) {
         fetchClients();
+        triggerRefresh();
       } else {
         setError('Failed to remove reservation');
       }
@@ -237,21 +264,57 @@ export function DnsClientsCard() {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  const handleSyncDNS = async () => {
+    try {
+      setIsSyncing(true);
+      console.log('Starting DNS sync request...');
+      
+      const response = await fetch('/api/reservations', {
+        method: 'PUT',
+        headers: {
+          'Accept': 'text/plain'
+        }
+      });
+      
+      console.log('Sync response status:', response.status);
+      const text = await response.text();
+      console.log('Response text:', text);
+
+      if (!response.ok) {
+        throw new Error(text || 'Failed to sync DNS entries');
+      }
+
+      await fetchClients();
+    } catch (error) {
+      console.log('Error in handleSyncDNS:', error);
+      setError(error instanceof Error ? error.message : 'Failed to sync DNS entries');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
     fetchClients();
-  }, []);
+    return registerRefreshCallback(fetchClients);
+  }, [registerRefreshCallback]);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Clients</h3>
-        <button
-          onClick={fetchClients}
-          className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors flex items-center gap-1"
-        >
-          <RefreshIcon className="!w-3 !h-3" />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSyncDNS}
+            disabled={isSyncing}
+            className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors disabled:opacity-50"
+          >
+            {isSyncing ? 'Syncing...' : 'Sync DNS'}
+          </button>
+          <RefreshIcon 
+            onClick={fetchClients}
+            className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+          />
+        </div>
       </div>
 
       {error && (

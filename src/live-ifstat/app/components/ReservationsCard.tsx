@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import { useRefresh } from '../contexts/RefreshContext'
 
 interface Reservation {
   'ip-address': string
@@ -26,10 +28,16 @@ export default function ReservationsCard() {
   const [error, setError] = useState<string>('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [editedNames, setEditedNames] = useState<{[key: string]: string}>({})
+  const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({})
+  const [editingHostname, setEditingHostname] = useState<string | null>(null)
+  const { triggerRefresh, registerRefreshCallback } = useRefresh()
 
   useEffect(() => {
     fetchReservations()
-  }, [])
+    return registerRefreshCallback(fetchReservations)
+  }, [registerRefreshCallback])
+
 
   const fetchReservations = async () => {
     try {
@@ -55,7 +63,8 @@ export default function ReservationsCard() {
         })
 
         if (response.ok) {
-          fetchReservations()
+          await fetchReservations()
+          triggerRefresh()
         } else {
           setError('Failed to delete reservation')
         }
@@ -97,7 +106,8 @@ export default function ReservationsCard() {
       if (response.ok) {
         setOpenDialog(false)
         setNewReservation({ 'ip-address': '', 'hw-address': '', hostname: '' })
-        fetchReservations()
+        await fetchReservations()
+        triggerRefresh()
       } else {
         setError('Failed to add reservation')
       }
@@ -139,7 +149,8 @@ export default function ReservationsCard() {
         setOpenDialog(false)
         setIsEditing(false)
         setNewReservation({ 'ip-address': '', 'hw-address': '', hostname: '' })
-        fetchReservations()
+        await fetchReservations()
+        triggerRefresh()
       } else {
         setError('Failed to update reservation')
       }
@@ -205,14 +216,80 @@ export default function ReservationsCard() {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  const handleNameChange = (ip: string, newName: string) => {
+    setEditedNames(prev => ({
+      ...prev,
+      [ip]: newName
+    }));
+  };
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>, reservation: Reservation) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const editedName = editedNames[reservation['ip-address']];
+      if (!editedName || editedName === reservation.hostname) return;
+
+      try {
+        setSavingHostnames(prev => ({ ...prev, [reservation['ip-address']]: true }));
+
+        // Update DNS hostname for reserved clients
+        const dnsResponse = await fetch('/api/dns-hosts', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: reservation['ip-address'],
+            oldHostname: reservation.hostname,
+            newHostname: editedName,
+            mac: reservation['hw-address']
+          })
+        });
+
+        if (!dnsResponse.ok) {
+          const errorText = await dnsResponse.text();
+          console.error('Failed to update hostname:', errorText);
+          setError('Failed to update hostname');
+          return;
+        }
+
+        await fetchReservations();
+        // Clear editing state after successful update
+        setEditingHostname(null);
+        setEditedNames(prev => {
+          const newState = { ...prev };
+          delete newState[reservation['ip-address']];
+          return newState;
+        });
+      } catch (error) {
+        console.error('Error updating hostname:', error);
+        setError('Failed to update hostname');
+      } finally {
+        setSavingHostnames(prev => ({ ...prev, [reservation['ip-address']]: false }));
+      }
+    }
+  };
+
+  const startHostnameEdit = (ip: string, currentHostname: string) => {
+    setEditingHostname(ip);
+    setEditedNames(prev => ({
+      ...prev,
+      [ip]: currentHostname || ''
+    }));
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DHCP Reservations</h3>
-        <AddIcon 
-          onClick={() => !isEditing && setOpenDialog(!openDialog)}
-          className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
-        />
+        <div className="flex gap-2">
+          <RefreshIcon 
+            onClick={fetchReservations}
+            className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+          />
+          <AddIcon 
+            onClick={() => !isEditing && setOpenDialog(!openDialog)}
+            className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+          />
+        </div>
       </div>
 
       {error && (
@@ -300,7 +377,34 @@ export default function ReservationsCard() {
                   {reservation['ip-address']}
                 </td>
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  {reservation.hostname || 'N/A'}
+                  {editingHostname === reservation['ip-address'] ? (
+                    <input
+                      type="text"
+                      value={editedNames[reservation['ip-address']] ?? ''}
+                      onChange={(e) => handleNameChange(reservation['ip-address'], e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleKeyDown(e, reservation);
+                        } else if (e.key === 'Escape') {
+                          setEditingHostname(null);
+                        }
+                      }}
+                      onBlur={() => setEditingHostname(null)}
+                      className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
+                        savingHostnames[reservation['ip-address']] ? 'opacity-50' : ''
+                      }`}
+                      disabled={savingHostnames[reservation['ip-address']]}
+                      autoFocus
+                      placeholder="N/A"
+                    />
+                  ) : (
+                    <span
+                      onClick={() => startHostnameEdit(reservation['ip-address'], reservation.hostname || '')}
+                      className="cursor-pointer hover:text-blue-500"
+                    >
+                      {reservation.hostname || 'N/A'}
+                    </span>
+                  )}
                 </td>
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <div className="flex gap-1">
