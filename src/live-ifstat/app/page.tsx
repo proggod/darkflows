@@ -40,6 +40,7 @@ import PiholeLists from '@/components/PiholeLists'
 import BandwidthUsage from './components/BandwidthUsage'
 import React from 'react'
 import { useNetworkStats } from '@/hooks/useNetworkStats'
+import SshKeysCard from '@/components/SshKeysCard'
 
 interface NetworkInterface {
   name: string
@@ -67,6 +68,7 @@ const DEFAULT_ITEMS = [
   'weather',
   'processes',
   'sambaShares',
+  'sshKeys',
   'dnsClients',
   'blockClients',
   'routeToSecondary',
@@ -265,6 +267,8 @@ const CombinedDashboard = () => {
         return <SystemSettingsCard />
       case 'blockClients':
         return <BlockClientsCard />
+      case 'sshKeys':
+        return <SshKeysCard />
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -327,6 +331,8 @@ const CombinedDashboard = () => {
         return 'System Settings'
       case 'blockClients':
         return 'Block Clients'
+      case 'sshKeys':
+        return 'SSH Keys'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
