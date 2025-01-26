@@ -19,6 +19,7 @@ interface NetworkConfig {
   PRIMARY_LABEL: string
   SECONDARY_LABEL: string
   CAKE_PARAMS: string
+  CAKE_DEFAULT: string
   [key: string]: BandwidthValue | string
 }
 
@@ -32,7 +33,8 @@ async function parseConfig(): Promise<NetworkConfig> {
       SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
       PRIMARY_LABEL: '',
       SECONDARY_LABEL: '',
-      CAKE_PARAMS: ''
+      CAKE_PARAMS: '',
+      CAKE_DEFAULT: ''
     }
 
     const lines = content.split('\n')
@@ -57,6 +59,11 @@ async function parseConfig(): Promise<NetworkConfig> {
       const cakeMatch = line.match(/^CAKE_PARAMS="([^"]*)"/)
       if (cakeMatch) {
         config.CAKE_PARAMS = cakeMatch[1]
+      }
+
+      const cakeDefaultMatch = line.match(/^CAKE_DEFAULT="([^"]*)"/)
+      if (cakeDefaultMatch) {
+        config.CAKE_DEFAULT = cakeDefaultMatch[1]
       }
     }
 
@@ -102,6 +109,12 @@ async function writeConfig(config: NetworkConfig): Promise<void> {
       const cakeMatch = line.match(/^CAKE_PARAMS="([^"]*)"/)
       if (cakeMatch) {
         return `CAKE_PARAMS="${config.CAKE_PARAMS}"`
+      }
+
+      // Check if line is CAKE_DEFAULT
+      const cakeDefaultMatch = line.match(/^CAKE_DEFAULT="([^"]*)"/)
+      if (cakeDefaultMatch) {
+        return `CAKE_DEFAULT="${config.CAKE_DEFAULT}"`
       }
 
       return line

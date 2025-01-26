@@ -12,6 +12,7 @@ interface NetworkSettings {
   gatewayIp: string;
   subnetMask: string;
   ipPools: IpPool[];
+  cakeDefault?: string;
   error?: string;
 }
 
@@ -20,6 +21,7 @@ export function SystemSettingsCard() {
     gatewayIp: "192.168.1.1",
     subnetMask: "255.255.254.0",
     ipPools: [{ start: "192.168.0.10", end: "192.168.1.200" }],
+    cakeDefault: ""
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isRestartingNetwork, setIsRestartingNetwork] = useState(false);
@@ -34,6 +36,7 @@ export function SystemSettingsCard() {
       const response = await fetch('/api/network-settings');
       if (!response.ok) throw new Error('Failed to fetch settings');
       const data = await response.json();
+      console.log('Fetched settings:', data);
       setSettings(data);
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -228,6 +231,19 @@ export function SystemSettingsCard() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
+                CAKE Default
+              </label>
+              <input
+                type="text"
+                value={settings.cakeDefault || ''}
+                onChange={(e) => setSettings({ ...settings, cakeDefault: e.target.value })}
+                placeholder="CAKE Default Parameters"
+                className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
+              />
             </div>
           </div>
         </div>

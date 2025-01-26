@@ -9,6 +9,7 @@ interface NetworkSettings {
   gatewayIp: string
   subnetMask: string
   ipPools: { start: string; end: string }[]
+  cakeDefault?: string
 }
 
 interface DhcpPool {
@@ -36,11 +37,16 @@ export async function GET() {
     // Read network interface config
     const interfacesConfig = await fs.readFile('/etc/network/interfaces', 'utf-8')
     const dhcpConfig = await fs.readFile('/etc/kea/kea-dhcp4.conf', 'utf-8')
+    const networkConfig = await fs.readFile('/etc/darkflows/d_network.cfg', 'utf-8')
 
     // Parse gateway IP and subnet mask from interfaces file
     const staticMatch = interfacesConfig.match(/iface enp2s0 inet static\s+address ([\d.]+)\s+netmask ([\d.]+)/)
     const gatewayIp = staticMatch ? staticMatch[1] : '192.168.1.1'
     const subnetMask = staticMatch ? staticMatch[2] : '255.255.254.0'
+
+    // Parse CAKE_DEFAULT from network config
+    const cakeDefaultMatch = networkConfig.match(/CAKE_DEFAULT="([^"]*)"/)
+    const cakeDefault = cakeDefaultMatch ? cakeDefaultMatch[1] : ''
 
     // Parse IP pools from DHCP config
     const dhcpJson = JSON.parse(dhcpConfig)
@@ -49,7 +55,7 @@ export async function GET() {
       return { start: start.trim(), end: end.trim() }
     })
 
-    return NextResponse.json({ gatewayIp, subnetMask, ipPools: pools })
+    return NextResponse.json({ gatewayIp, subnetMask, ipPools: pools, cakeDefault })
   } catch (error) {
     console.error('Error reading network settings:', error)
     return NextResponse.json({ error: 'Failed to read network settings' }, { status: 500 })
@@ -69,6 +75,7 @@ export async function POST(request: Request) {
     // Read current configs
     let interfacesConfig = await fs.readFile('/etc/network/interfaces', 'utf-8')
     const dhcpConfig = await fs.readFile('/etc/kea/kea-dhcp4.conf', 'utf-8')
+    let networkConfig = await fs.readFile('/etc/darkflows/d_network.cfg', 'utf-8')
 
     // Update interfaces file
     interfacesConfig = interfacesConfig.replace(
@@ -102,6 +109,15 @@ export async function POST(request: Request) {
         data: settings.gatewayIp
       }
     ]
+
+    // Update CAKE_DEFAULT in network config
+    if (settings.cakeDefault) {
+      networkConfig = networkConfig.replace(
+        /CAKE_DEFAULT="[^"]*"/,
+        `CAKE_DEFAULT="${settings.cakeDefault}"`
+      )
+      await fs.writeFile('/etc/darkflows/d_network.cfg', networkConfig, 'utf-8')
+    }
 
     // Write updated configs
     await fs.writeFile('/etc/network/interfaces', interfacesConfig)

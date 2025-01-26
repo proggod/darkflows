@@ -15,6 +15,7 @@ interface TuningConfig {
   PRIMARY_LABEL: string;
   SECONDARY_LABEL: string;
   CAKE_PARAMS: string;
+  CAKE_DEFAULT: string;
   [key: string]: BandwidthValue | string;
 }
 
@@ -26,7 +27,8 @@ export default function ConnectionTuningNew() {
     SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
     PRIMARY_LABEL: '',
     SECONDARY_LABEL: '',
-    CAKE_PARAMS: ''
+    CAKE_PARAMS: '',
+    CAKE_DEFAULT: ''
   })
   const [loading, setLoading] = useState(false)
   const [activeConnection, setActiveConnection] = useState<string | null>(null)
@@ -149,6 +151,10 @@ export default function ConnectionTuningNew() {
       setLoading(false)
     }
   }
+
+  const loadDefaultCakeParams = () => {
+    handleCakeParamsChange(config.CAKE_DEFAULT);
+  };
 
   const renderConnectionSection = (type: 'PRIMARY' | 'SECONDARY') => {
     const isActive = activeConnection === type
@@ -279,7 +285,7 @@ export default function ConnectionTuningNew() {
                   placeholder="CAKE Parameters"
                 />
                 <button
-                  onClick={() => handleCakeParamsChange("ethernet besteffort wash internet split-gso rtt 50ms")}
+                  onClick={loadDefaultCakeParams}
                   className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-r border border-l-0 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
                 >
                   D
