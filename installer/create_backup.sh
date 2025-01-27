@@ -1,5 +1,6 @@
 #!/bin/bash
-tar zcvf /usr/local/darkflows/installer_packages/darkflows_scripts.tgz --exclude=installer_packages --exclude=.git --exclude=node_modules --exclude=.next /usr/local/darkflows /etc/systemd/system/nextjs-app.service /etc/systemd/system/default_routing.service /etc/darkflows
+mkdir /usr/local/installer_packages
+tar zcvf /usr/local/installer_packages/darkflows_scripts.tgz --exclude=installer_packages --exclude=.git --exclude=node_modules --exclude=.next /etc/kea /usr/local/darkflows /etc/systemd/system/nextjs-app.service /etc/systemd/system/default_routing.service /etc/darkflows
 
 # Paths to the configs
 SAMBA_CONF="/etc/samba/smb.conf"
@@ -18,7 +19,7 @@ sed '/^\[.*-hide\]/,/^$/d' "$SAMBA_CONF_BACKUP" > "$SAMBA_CONF"
 jq 'del(.Dhcp4.subnet4[].reservations)' "$KEA_CONF_BACKUP" > "$KEA_CONF"
 
 # Create the archive
-tar zcvf /usr/local/darkflows/installer_packages/darkflows_configs.tgz \
+tar zcvf /usr/local/installer_packages/darkflows_configs.tgz \
     --exclude=installer_packages \
     --exclude=.git \
     --exclude=node_modules \

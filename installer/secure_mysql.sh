@@ -10,7 +10,7 @@ echo "mariadb-server mysql-server/root_password_again password $ROOT_PASSWORD" |
 # Install MariaDB server without prompting
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y mariadb-server python3-mysqldb
+apt-get -o Dpkg::Options::="--force-confold" --assume-yes install -y mariadb-server python3-mysqldb
 
 # Automate the mysql_secure_installation steps
 mysql -uroot -p"$ROOT_PASSWORD" <<EOF

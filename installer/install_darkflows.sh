@@ -13,7 +13,7 @@ sudo mkdir -p "$INSTALL_DIR"
 # Step 2: Extract the scripts archive (assumed to be in the same directory as this script)
 SCRIPTS_ARCHIVE="$SCRIPT_DIR/darkflows_scripts.tgz"
 echo "Extracting scripts from $SCRIPTS_ARCHIVE to $INSTALL_DIR"
-sudo tar zxvf "$SCRIPTS_ARCHIVE" -C "$INSTALL_DIR"
+sudo tar zxvf "$SCRIPTS_ARCHIVE" -C /
 
 # Step 3: Copy the configs archive (assumed to be in the same directory as this script)
 CONFIGS_ARCHIVE="$SCRIPT_DIR/darkflows_configs.tgz"
