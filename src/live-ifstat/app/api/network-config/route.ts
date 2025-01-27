@@ -136,10 +136,14 @@ export async function GET() {
     return NextResponse.json(config)
   } catch (error) {
     console.error('Error in GET /api/network-config:', error)
-    return NextResponse.json(
-      { error: 'Failed to read network configuration' },
-      { status: 500 }
-    )
+    // Return a default configuration that won't break the UI
+    return NextResponse.json({
+      internalInterface: '',
+      externalInterface: '',
+      dhcpEnabled: false,
+      dhcpRange: { start: '', end: '' },
+      error: 'Failed to read network configuration'
+    }, { status: 500 })
   }
 }
 
@@ -150,9 +154,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Configuration updated successfully' })
   } catch (error) {
     console.error('Error in POST /api/network-config:', error)
-    return NextResponse.json(
-      { error: 'Failed to update configuration' },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      error: 'Failed to update configuration. Please check file permissions and try again.'
+    }, { status: 500 })
   }
 } 

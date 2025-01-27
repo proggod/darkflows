@@ -14,7 +14,7 @@ interface DnsEntry {
 
 export default function DnsHosts() {
   const [entries, setEntries] = useState<DnsEntry[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [newIp, setNewIp] = useState('')
@@ -24,13 +24,26 @@ export default function DnsHosts() {
 
   const fetchEntries = async () => {
     try {
+      setLoading(true)
       const response = await fetch('/api/dns-hosts')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
       const data = await response.json()
-      if (data.error) throw new Error(data.error)
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      if (!Array.isArray(data.entries)) {
+        throw new Error('Invalid data format received')
+      }
       setEntries(data.entries)
-    } catch (error) {
+      setError(null)
+    } catch (error: unknown) {
       console.error('Error fetching DNS entries:', error)
-      setError('Failed to load DNS entries')
+      setError(error instanceof Error ? error.message : 'Failed to load DNS entries')
+      setEntries([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -42,6 +55,7 @@ export default function DnsHosts() {
   const handleSyncDNS = async () => {
     try {
       setIsSyncing(true)
+      setError(null)
       console.log('Starting DNS sync request...')
       
       const response = await fetch('/api/reservations', {
@@ -58,7 +72,7 @@ export default function DnsHosts() {
 
       await fetchEntries()
       triggerRefresh()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error in handleSyncDNS:', error)
       setError(error instanceof Error ? error.message : 'Failed to sync DNS entries')
     } finally {
@@ -68,7 +82,10 @@ export default function DnsHosts() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newIp || !newHostname) return
+    if (!newIp || !newHostname) {
+      setError('IP and hostname are required')
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -82,8 +99,7 @@ export default function DnsHosts() {
       const data = await response.json()
       
       if (!response.ok) {
-        setError(data.error || 'Failed to add DNS entry')
-        return
+        throw new Error(data.error || 'Failed to add DNS entry')
       }
       
       setNewIp('')
@@ -91,9 +107,9 @@ export default function DnsHosts() {
       setShowAdd(false)
       await fetchEntries()
       triggerRefresh()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error adding DNS entry:', error)
-      setError('Failed to add DNS entry')
+      setError(error instanceof Error ? error.message : 'Failed to add DNS entry')
     } finally {
       setLoading(false)
     }
@@ -112,15 +128,14 @@ export default function DnsHosts() {
       const data = await response.json()
       
       if (!response.ok) {
-        setError(data.error || 'Failed to delete DNS entry')
-        return
+        throw new Error(data.error || 'Failed to delete DNS entry')
       }
       
       await fetchEntries()
       triggerRefresh()
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error deleting DNS entry:', error)
-      setError('Failed to delete DNS entry')
+      setError(error instanceof Error ? error.message : 'Failed to delete DNS entry')
     } finally {
       setLoading(false)
     }
@@ -134,88 +149,22 @@ export default function DnsHosts() {
           <div className="flex gap-2">
             <button
               onClick={handleSyncDNS}
-              disabled={isSyncing}
+              disabled={isSyncing || loading}
               className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors disabled:opacity-50"
             >
               {isSyncing ? 'Syncing...' : 'Sync DNS'}
             </button>
             <RefreshIcon 
               onClick={fetchEntries}
-              className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+              className={`w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25 ${loading ? 'opacity-50' : ''}`}
             />
             <AddIcon
               onClick={() => {
                 setError(null)
                 setShowAdd(true)
               }}
-              className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+              className={`w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25 ${loading ? 'opacity-50' : ''}`}
             />
-          </div>
-        </div>
-        
-        <div className="flex-1 min-h-0">
-          <div className="h-full overflow-y-auto">
-            {showAdd && (
-              <form onSubmit={handleAdd} className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={newIp}
-                  onChange={(e) => setNewIp(e.target.value)}
-                  placeholder="IP Address"
-                  className="flex-1 px-2 py-1 text-xs rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                />
-                <input
-                  type="text"
-                  value={newHostname}
-                  onChange={(e) => setNewHostname(e.target.value)}
-                  placeholder="Hostname"
-                  className="flex-1 px-2 py-1 text-xs rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !newIp || !newHostname}
-                  className="w-7 h-7 flex items-center justify-center bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <CheckIcon fontSize="small" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAdd(false)
-                    setError(null)
-                  }}
-                  className="w-7 h-7 flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
-                >
-                  <CloseIcon fontSize="small" />
-                </button>
-              </form>
-            )}
-            
-            <div className="space-y-1 pr-2">
-              {entries.map((entry) => (
-                <div key={entry.ip} className="bg-white dark:bg-gray-700 rounded px-2 py-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-900 dark:text-gray-100">
-                      {entry.ip}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {entry.hostnames.map((hostname) => (
-                      <div key={hostname} className="flex items-center gap-1 bg-gray-100 dark:bg-gray-600 rounded px-1.5 py-0.5">
-                        <span className="text-xs text-gray-700 dark:text-gray-300">{hostname}</span>
-                        <button
-                          onClick={() => handleDelete(hostname)}
-                          disabled={loading}
-                          className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50 ml-1"
-                        >
-                          <CloseIcon style={{ fontSize: '14px' }} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -223,6 +172,106 @@ export default function DnsHosts() {
           <div className="mt-2 text-xs text-red-600 dark:text-red-400 px-1">
             {error}
           </div>
+        )}
+
+        {loading && entries.length === 0 ? (
+          <div className="text-sm text-gray-600 dark:text-gray-400 p-4 text-center">
+            Loading DNS entries...
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="text-sm text-gray-600 dark:text-gray-400 p-4 text-center">
+            No DNS entries found
+          </div>
+        ) : (
+          <div className="overflow-auto flex-grow">
+            <table className="min-w-full">
+              <thead>
+                <tr>
+                  <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider py-2">
+                    IP Address
+                  </th>
+                  <th className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider py-2">
+                    Hostnames
+                  </th>
+                  <th className="text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider py-2">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry, index) => (
+                  <tr key={`${entry.ip}-${index}`} className="hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <td className="text-xs text-gray-900 dark:text-gray-100 py-2">
+                      {entry.ip}
+                    </td>
+                    <td className="text-xs text-gray-900 dark:text-gray-100 py-2">
+                      {entry.hostnames.join(', ')}
+                    </td>
+                    <td className="text-right">
+                      {entry.hostnames.map(hostname => (
+                        <button
+                          key={hostname}
+                          onClick={() => handleDelete(hostname)}
+                          disabled={loading}
+                          className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 ml-2"
+                          title="Delete hostname"
+                        >
+                          <CloseIcon className="w-2 h-2" />
+                        </button>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showAdd && (
+          <form onSubmit={handleAdd} className="mt-4 space-y-2">
+            <div>
+              <input
+                type="text"
+                value={newIp}
+                onChange={(e) => setNewIp(e.target.value)}
+                placeholder="IP Address"
+                className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <input
+                type="text"
+                value={newHostname}
+                onChange={(e) => setNewHostname(e.target.value)}
+                placeholder="Hostname"
+                className="w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                disabled={loading}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdd(false)
+                  setNewIp('')
+                  setNewHostname('')
+                  setError(null)
+                }}
+                className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                disabled={loading || !newIp || !newHostname}
+              >
+                {loading ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>

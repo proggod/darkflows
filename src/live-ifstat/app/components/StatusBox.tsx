@@ -25,17 +25,21 @@ export default function StatusBox() {
   const [status, setStatus] = useState<StatusData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // Fetch device config first
     const fetchDeviceLabels = async () => {
       try {
         const response = await fetch('/api/devices')
+        if (!response.ok) {
+          throw new Error('Failed to fetch device labels')
+        }
         const data = await response.json()
         const labels: Record<string, string> = {}
         
         // Process devices and create label mapping
-        data.devices.forEach((device: NetworkDevice) => {
+        data.devices?.forEach((device: NetworkDevice) => {
           labels[device.name] = device.label || device.name
         })
         
@@ -45,6 +49,7 @@ export default function StatusBox() {
         setDeviceLabels(labels)
       } catch (error) {
         console.error('Failed to fetch device labels:', error)
+        // Don't set error state here as it's not critical
       }
     }
 
@@ -54,16 +59,25 @@ export default function StatusBox() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
+        setIsLoading(true)
         const response = await fetch('/api/status')
+        if (!response.ok) {
+          throw new Error('Failed to fetch status')
+        }
         const data = await response.json()
         if (data.error) {
           setError(data.error)
+        } else if (!data.interfaces || typeof data.interfaces !== 'object') {
+          throw new Error('Invalid status data format')
         } else {
           setStatus(data)
+          setError(null)
         }
       } catch (error) {
         console.error('Failed to fetch status:', error)
-        setError('Failed to fetch status')
+        setError(error instanceof Error ? error.message : 'Failed to fetch status')
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -78,11 +92,30 @@ export default function StatusBox() {
   }, [])
 
   if (error) {
-    return <div className="text-red-600 dark:text-red-400 p-4">Error: {error}</div>
+    return (
+      <div className="p-4">
+        <div className="text-red-600 dark:text-red-400 mb-2">Error: {error}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          Last updated: {status ? new Date(status.timestamp).toLocaleTimeString() : 'Never'}
+        </div>
+      </div>
+    )
   }
 
-  if (!status) {
-    return <div className="text-gray-700 dark:text-gray-300 p-4">Loading status...</div>
+  if (isLoading && !status) {
+    return (
+      <div className="p-4">
+        <div className="text-gray-700 dark:text-gray-300">Loading status...</div>
+      </div>
+    )
+  }
+
+  if (!status || !status.interfaces) {
+    return (
+      <div className="p-4">
+        <div className="text-gray-700 dark:text-gray-300">No status data available</div>
+      </div>
+    )
   }
 
   const formatMemory = (bytes: number) => (bytes / (1024 * 1024)).toFixed(2)

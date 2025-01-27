@@ -14,27 +14,35 @@ interface DnsEntry {
 
 // Helper to parse the list output into structured data
 function parseListOutput(output: string): DnsEntry[] {
-  return output.split('\n')
-    .filter(line => line.trim())
-    .map(line => {
-      const [ip, hostnames] = line.split(' -> ')
-      return {
-        ip,
-        hostnames: hostnames.split(', ')
-      }
-    })
+  try {
+    return output.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        const [ip, hostnames] = line.split(' -> ')
+        return {
+          ip,
+          hostnames: hostnames ? hostnames.split(', ') : []
+        }
+      })
+  } catch (error) {
+    console.error('Error parsing list output:', error)
+    return []
+  }
 }
 
 // GET handler to list all DNS entries
 export async function GET() {
   try {
-    const { stdout } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`)
+    const { stdout, stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`)
+    if (stderr) {
+      console.error('Script stderr:', stderr)
+    }
     const entries = parseListOutput(stdout)
     return NextResponse.json({ entries })
   } catch (error) {
     console.error('Error in GET:', error)
-    const message = error instanceof Error ? error.message : 'Failed to list DNS entries'
-    return NextResponse.json({ error: message }, { status: 500 })
+    // Return an empty list that won't break the UI
+    return NextResponse.json({ entries: [], error: 'Failed to list DNS entries' }, { status: 500 })
   }
 }
 
@@ -47,7 +55,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'IP and hostname are required' }, { status: 400 })
     }
 
-    await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`)
+    const { stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`)
+    if (stderr) {
+      console.error('Script stderr:', stderr)
+      return NextResponse.json({ error: stderr }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in POST:', error)
@@ -65,7 +77,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Hostname is required' }, { status: 400 })
     }
 
-    await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`)
+    const { stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`)
+    if (stderr) {
+      console.error('Script stderr:', stderr)
+      return NextResponse.json({ error: stderr }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error in DELETE:', error)
@@ -79,37 +95,60 @@ export async function PUT(request: Request) {
     const { ip, newHostname, mac } = await request.json();
     
     // Get current DNS entries to check for duplicates
-    const { stdout } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`);
+    const { stdout, stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`);
+    if (stderr) {
+      console.error('Script stderr:', stderr)
+    }
     const entries = parseListOutput(stdout);
     
     // Remove all hostnames for this IP
     const ipEntry = entries.find(e => e.ip === ip);
     if (ipEntry) {
       for (const hostname of ipEntry.hostnames) {
-        await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`);
+        try {
+          const { stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`);
+          if (stderr) {
+            console.error('Script stderr:', stderr)
+          }
+        } catch (error) {
+          console.error('Error removing hostname:', error)
+        }
       }
     }
     
     // Add new hostname
-    await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${newHostname}`);
+    const { stderr: addStderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${newHostname}`);
+    if (addStderr) {
+      console.error('Script stderr:', addStderr)
+      return NextResponse.json({ error: addStderr }, { status: 500 })
+    }
     
     // If we have a MAC address, update the DHCP reservation too
     if (mac) {
-      const config = await readConfig();
-      const reservations = config.Dhcp4.subnet4[0].reservations;
-      
-      // Find and update the matching reservation
-      const reservation = reservations.find(r => 
-        r['ip-address'] === ip && r['hw-address'] === mac
-      );
-      
-      if (reservation) {
-        reservation.hostname = newHostname;
-        await writeConfig(config);
+      try {
+        const config = await readConfig();
+        const reservations = config.Dhcp4.subnet4[0].reservations;
+        
+        // Find and update the matching reservation
+        const reservation = reservations.find(r => 
+          r['ip-address'] === ip && r['hw-address'] === mac
+        );
+        
+        if (reservation) {
+          reservation.hostname = newHostname;
+          await writeConfig(config);
+        }
+      } catch (error) {
+        console.error('Error updating DHCP reservation:', error)
       }
     }
     
-    await syncAllSystems();
+    try {
+      await syncAllSystems();
+    } catch (error) {
+      console.error('Error syncing systems:', error)
+    }
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating hostname:', error);

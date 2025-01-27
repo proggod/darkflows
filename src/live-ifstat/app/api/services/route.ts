@@ -28,38 +28,51 @@ export async function GET() {
     const hiddenServices = await getHiddenServices()
 
     // Get all services and their enabled status
-    const { stdout: unitFilesOutput } = await execAsync('systemctl list-unit-files --type=service')
-    const { stdout: runningOutput } = await execAsync('systemctl list-units --type=service --state=running')
+    let unitFilesOutput = '', runningOutput = ''
+    try {
+      const unitFiles = await execAsync('systemctl list-unit-files --type=service')
+      unitFilesOutput = unitFiles.stdout
+    } catch (error) {
+      console.error('Error getting unit files:', error)
+      unitFilesOutput = ''
+    }
+
+    try {
+      const running = await execAsync('systemctl list-units --type=service --state=running')
+      runningOutput = running.stdout
+    } catch (error) {
+      console.error('Error getting running services:', error)
+      runningOutput = ''
+    }
     
     // Parse unit files output to get enabled status
     const unitFileLines = unitFilesOutput.split('\n')
     const startIndex = unitFileLines.findIndex(line => line.includes('UNIT FILE') && line.includes('STATE'))
     const endIndex = unitFileLines.findIndex((line, i) => i > startIndex && line.trim() === '')
     
-    if (startIndex === -1 || endIndex === -1) {
-      throw new Error('Invalid systemctl output format')
-    }
-
     // Create a map of service names to their enabled status
     const services = new Map<string, ServiceData>()
-    unitFileLines.slice(startIndex + 1, endIndex)
-      .filter(line => line.trim())
-      .forEach(line => {
-        const [unitFile, state] = line.trim().split(/\s+/)
-        // Only include enabled or disabled services and exclude hidden services
-        if ((state === 'enabled' || state === 'disabled')) {
-          // Remove .service suffix if present
-          const name = unitFile.replace(/\.service$/, '')
-          // Skip if service is in the hidden list, starts with systemd-, or ends with @
-          if (!hiddenServices.has(name) && !name.startsWith('systemd-') && !name.endsWith('@')) {
-            services.set(name, {
-              name,
-              enabled: state,
-              running: false
-            })
+    
+    if (startIndex !== -1 && endIndex !== -1) {
+      unitFileLines.slice(startIndex + 1, endIndex)
+        .filter(line => line.trim())
+        .forEach(line => {
+          const [unitFile, state] = line.trim().split(/\s+/)
+          // Only include enabled or disabled services and exclude hidden services
+          if ((state === 'enabled' || state === 'disabled')) {
+            // Remove .service suffix if present
+            const name = unitFile.replace(/\.service$/, '')
+            // Skip if service is in the hidden list, starts with systemd-, or ends with @
+            if (!hiddenServices.has(name) && !name.startsWith('systemd-') && !name.endsWith('@')) {
+              services.set(name, {
+                name,
+                enabled: state,
+                running: false
+              })
+            }
           }
-        }
-      })
+        })
+    }
 
     // Parse running services output to mark which services are running
     const runningLines = runningOutput.split('\n')
@@ -85,7 +98,7 @@ export async function GET() {
     return NextResponse.json(servicesList)
   } catch (error) {
     console.error('Error fetching services:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    // Return an empty list that won't break the UI
+    return NextResponse.json([], { status: 500 })
   }
 } 

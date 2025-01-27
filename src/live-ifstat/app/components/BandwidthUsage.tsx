@@ -73,6 +73,7 @@ export default function BandwidthUsage() {
   const [bandwidthData, setBandwidthData] = useState<{ [ip: string]: BandwidthStats }>({});
   const [hostnames, setHostnames] = useState<{ [ip: string]: string }>({});
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [sortField, setSortField] = useState<SortField>('total');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedIP, setSelectedIP] = useState<string | null>(null);
@@ -81,10 +82,18 @@ export default function BandwidthUsage() {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       const [bandwidthResponse, dnsResponse] = await Promise.all([
         fetch('/api/bandwidth'),
         fetch('/api/dns-clients')
       ]);
+
+      if (!bandwidthResponse.ok) {
+        throw new Error(`Bandwidth API error: ${bandwidthResponse.status}`);
+      }
+      if (!dnsResponse.ok) {
+        throw new Error(`DNS API error: ${dnsResponse.status}`);
+      }
 
       const bandwidthData: ApiResponse = await bandwidthResponse.json();
       const dnsClients: DnsClient[] = await dnsResponse.json();
@@ -95,14 +104,22 @@ export default function BandwidthUsage() {
         // Update hostnames
         const newHostnames: { [ip: string]: string } = {};
         dnsClients.forEach(client => {
-          newHostnames[client.ip] = client.name;
+          newHostnames[client.ip] = client.name || client.ip;
         });
         setHostnames(newHostnames);
         setError(null);
+      } else if (bandwidthData.status === 'error') {
+        throw new Error('Bandwidth service reported an error');
+      } else {
+        setBandwidthData({});
       }
-    } catch (err) {
-      setError('Error fetching data');
-      console.error(err);
+    } catch (err: unknown) {
+      console.error('Error fetching data:', err);
+      setError(err instanceof Error ? err.message : 'Error fetching data');
+      setBandwidthData({});
+      setHostnames({});
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -119,9 +136,9 @@ export default function BandwidthUsage() {
         throw new Error('Invalid data format received');
       }
       setDetailedStats(data);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error fetching detailed stats:', err);
-      setError('Error fetching connection details');
+      setError(err instanceof Error ? err.message : 'Error fetching connection details');
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +146,7 @@ export default function BandwidthUsage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 2000);
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -200,6 +217,30 @@ export default function BandwidthUsage() {
       </span>
     );
   };
+
+  if (loading && Object.keys(bandwidthData).length === 0) {
+    return (
+      <div className="text-gray-600 dark:text-gray-400 p-4">
+        Loading bandwidth data...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-600 dark:text-red-400 p-4">
+        Error: {error}
+      </div>
+    );
+  }
+
+  if (Object.keys(bandwidthData).length === 0) {
+    return (
+      <div className="text-gray-600 dark:text-gray-400 p-4">
+        No bandwidth data available
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">

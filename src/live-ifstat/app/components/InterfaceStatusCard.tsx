@@ -89,7 +89,7 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
             <div>Backlog</div>
             <div>Memory</div>
           </div>
-          {Object.entries(status.interfaces).map(([iface, stats]) => (
+          {status?.interfaces && Object.entries(status.interfaces).map(([iface, stats]) => (
             <div key={iface} className="grid grid-cols-4 gap-2 text-[10px] py-1 px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50">
               <div className="font-medium text-gray-900 dark:text-gray-100">{deviceLabels[iface] || iface}</div>
               <div>
