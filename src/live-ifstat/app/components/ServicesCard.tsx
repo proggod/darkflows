@@ -1,26 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Select, MenuItem, Dialog, DialogTitle, DialogContent } from '@mui/material'
 
 interface Service {
   name: string
   enabled: string
   running: boolean
 }
-
-interface TimeRange {
-  label: string
-  minutes: number
-}
-
-const TIME_RANGES: TimeRange[] = [
-  { label: '5 minutes', minutes: 5 },
-  { label: '10 minutes', minutes: 10 },
-  { label: '1 hour', minutes: 60 },
-  { label: '2 hours', minutes: 120 },
-  { label: '1 day', minutes: 1440 }
-]
 
 export default function ServicesCard() {
   const [services, setServices] = useState<Service[]>([])
@@ -115,22 +101,6 @@ export default function ServicesCard() {
     setShowLogs(!showLogs)
     if (!showLogs && selectedService) {
       await fetchServiceLogs(selectedService)
-    }
-  }
-
-  const handleCloseModal = () => {
-    setSelectedService(null)
-    setServiceStatus('')
-    setStatusError('')
-    setShowLogs(false)
-    setLogs('')
-    setLogsError('')
-  }
-
-  const handleTimeRangeChange = (minutes: number) => {
-    setTimeRange(minutes)
-    if (selectedService) {
-      fetchServiceLogs(selectedService)
     }
   }
 
