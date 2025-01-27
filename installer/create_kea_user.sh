@@ -18,14 +18,25 @@ GRANT ALL PRIVILEGES ON $DATABASE_NAME.* TO '$DB_USER'@'localhost' IDENTIFIED BY
 FLUSH PRIVILEGES;
 EOF
 
+# Source network configuration
+source /etc/darkflows/d_network.cfg || { echo "Failed to source network config"; exit 1; }
+
+
 # Update Kea DHCP configuration file
 KEA_CONF="/etc/kea/kea-dhcp4.conf"
-sed -i "s|\"name\": \"kea\",|\"name\": \"$DATABASE_NAME\",|" $KEA_CONF
-sed -i "s|\"user\": \"keadbuser\",|\"user\": \"$DB_USER\",|" $KEA_CONF
-sed -i "s|\"password\": \"kea34fd\$3\",|\"password\": \"$DB_PASSWORD\",|" $KEA_CONF
+sed -i "/\"lease-database\": {/,/}/ {
+    s/\"name\": \".*\"/\"name\": \"$DATABASE_NAME\"/;
+    s/\"user\": \".*\"/\"user\": \"$DB_USER\"/;
+    s/\"password\": \".*\"/\"password\": \"$DB_PASSWORD\"/;
+}" $KEA_CONF
+
+sed -i "/\"interfaces-config\": {/,/}/ {
+    /\"interfaces\": \[/,/\]/ s/\"enp2s0\"/\"$INTERNAL_INTERFACE\"/
+}" $KEA_CONF
 
 # Notify the user
 echo "MySQL database '$DATABASE_NAME' and user '$DB_USER' have been created."
 echo "Updated Kea DHCP configuration at $KEA_CONF"
+echo "Network interface set to: $INTERNAL_INTERFACE"
 echo "Generated password: $DB_PASSWORD (save this somewhere secure)"
 

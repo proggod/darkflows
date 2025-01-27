@@ -2,6 +2,7 @@
 DARKFLOWS_DIR="/usr/local/darkflows"
 PACKAGE_DIR="/usr/local/installer_packages"
 rm $PACKAGE_DIR/*
+echo cp $DARKFLOWS_DIR/installer/install_darkflows.sh $PACKAGE_DIR/
 cp $DARKFLOWS_DIR/installer/install_darkflows.sh $PACKAGE_DIR/
 $DARKFLOWS_DIR/installer/create_backup.sh
 cd $PACKAGE_DIR
