@@ -58,7 +58,7 @@ interface IfstatData {
 
 const DEFAULT_ITEMS = [
   'systemMonitor',
-  'interfaceStatus',
+  'interfaceStatus', // Shows CAKE status including ifb0
   'pingPrimary',
   'pingSecondary',
   'speedTest',

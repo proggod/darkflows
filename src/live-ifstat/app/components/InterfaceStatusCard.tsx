@@ -41,6 +41,7 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
         // Add special case for ifb0
         labels['ifb0'] = 'InBound'
         
+        console.log('Device labels:', labels)
         setDeviceLabels(labels)
       } catch (error) {
         console.error('Failed to fetch device labels:', error)
@@ -55,6 +56,7 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
       try {
         const response = await fetch('/api/status')
         const data = await response.json()
+        console.log('Status data:', data)
         setStatus(data)
       } catch (error) {
         console.error('Failed to fetch cake status:', error)
@@ -78,29 +80,36 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
     )
   }
 
+  console.log('Rendering with status:', status)
+  console.log('Device labels at render:', deviceLabels)
+  console.log('Interfaces in status:', status.interfaces)
+
   return (
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
       <div className="flex flex-col h-full">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">{title}</h3>
-        <div className="flex-1 space-y-0.5 overflow-y-auto">
+        <div className="flex-1 space-y-0.5 overflow-y-auto min-h-[100px]">
           <div className="grid grid-cols-4 gap-2 text-[10px] font-medium text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-1 px-1 sticky top-0 bg-gray-50 dark:bg-gray-800">
             <div>Interface</div>
             <div>Status</div>
             <div>Backlog</div>
             <div>Memory</div>
           </div>
-          {status?.interfaces && Object.entries(status.interfaces).map(([iface, stats]) => (
-            <div key={iface} className="grid grid-cols-4 gap-2 text-[10px] py-1 px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50">
-              <div className="font-medium text-gray-900 dark:text-gray-100">{deviceLabels[iface] || iface}</div>
-              <div>
-                <span className={`px-1.5 py-0.5 rounded ${stats.new_drops > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'}`}>
-                  {stats.new_drops > 0 ? `${stats.new_drops} drops` : 'OK'}
-                </span>
+          {status?.interfaces && Object.entries(status.interfaces).map(([iface, stats]) => {
+            console.log('Rendering interface:', iface, stats);
+            return (
+              <div key={iface} className="grid grid-cols-4 gap-2 text-[10px] py-1 px-1 hover:bg-gray-100 dark:hover:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{deviceLabels[iface] || iface}</div>
+                <div>
+                  <span className={`px-1.5 py-0.5 rounded ${stats.new_drops > 0 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'}`}>
+                    {stats.new_drops > 0 ? `${stats.new_drops} drops` : 'OK'}
+                  </span>
+                </div>
+                <div className="text-gray-900 dark:text-gray-100">{stats.backlog}</div>
+                <div className="text-gray-900 dark:text-gray-100">{(stats.memory / 1024).toFixed(1)} KB</div>
               </div>
-              <div className="text-gray-900 dark:text-gray-100">{stats.backlog}</div>
-              <div className="text-gray-900 dark:text-gray-100">{(stats.memory / 1024).toFixed(1)} KB</div>
-            </div>
-          ))}
+            )
+          })}
         </div>
         <div className="text-[10px] text-gray-500 mt-1 px-1">
           Last updated: {new Date(status.timestamp).toLocaleString()}

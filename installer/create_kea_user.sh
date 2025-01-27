@@ -34,6 +34,15 @@ sed -i "/\"interfaces-config\": {/,/}/ {
     /\"interfaces\": \[/,/\]/ s/\"enp2s0\"/\"$INTERNAL_INTERFACE\"/
 }" $KEA_CONF
 
+sed -i '/^\[Unit\]/a After=mariadb.service\nRequires=mariadb.service' /usr/lib/systemd/system/kea-dhcp4-server.service
+
+
+# Reload systemd configuration
+systemctl daemon-reload
+
+# Restart service
+systemctl restart kea-dhcp4-server.service
+
 # Notify the user
 echo "MySQL database '$DATABASE_NAME' and user '$DB_USER' have been created."
 echo "Updated Kea DHCP configuration at $KEA_CONF"

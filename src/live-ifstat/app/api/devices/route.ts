@@ -65,6 +65,12 @@ export async function GET() {
   try {
     const configDevices = await parseNetworkConfig()
     
+    // Add ifb0 interface
+    configDevices['ifb0'] = {
+      type: 'internal',
+      label: 'InBound'
+    }
+    
     const devices = Object.entries(configDevices).map(([name, config]) => ({
       name,
       ...config

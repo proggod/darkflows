@@ -77,15 +77,15 @@ if [ ${#HAS_IP[@]} -ge 2 ]; then
     SECONDARY_INTERFACE=${HAS_IP[1]}
 else
     echo "Warning: At least two interfaces with IP addresses are required."
-    PRIMARY_INTERFACE="unknown"
-    SECONDARY_INTERFACE="unknown"
+    PRIMARY_INTERFACE=""
+    SECONDARY_INTERFACE=""
 fi
 
 if [ ${#NO_IP[@]} -ge 1 ]; then
     INTERNAL_INTERFACE=${NO_IP[0]}
 else
     echo "Warning: At least one interface without IP address is required."
-    INTERNAL_INTERFACE="unknown"
+    INTERNAL_INTERFACE=""
 fi
 
 # Create /etc/darkflows/d_network.cfg
