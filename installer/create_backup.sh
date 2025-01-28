@@ -29,6 +29,8 @@ tar zcvf /usr/local/installer_packages/darkflows_configs.tgz \
     --exclude=.next \
     /etc/kea /etc/lighttpd /etc/darkflows /root/.ssh/authorized_keys /etc/ssh/sshd_config  /var/www/html/index.php /etc/samba /etc/darkflows
 
+mkdir /usr/local/darkflows/configs/
+cp /usr/local/installer_packages/darkflows_configs.tgz /usr/local/darkflows/configs/
 # Remove filtered temporary files
 rm -f "$SAMBA_CONF"
 rm -f "$KEA_CONF"
