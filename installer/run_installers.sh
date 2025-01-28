@@ -1,4 +1,5 @@
 #!/bin/bash
+chmod a+x /usr/local/darkflows/installer/*.sh
 /usr/local/darkflows/installer/change_passwords.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log
 /usr/local/darkflows/installer/change_variables.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log
 /usr/local/darkflows/installer/install_packages.sh 2>&1 | tee -a /dev/tty1 /tmp/installer.log

@@ -2,9 +2,16 @@
 
 echo "start"
 
-# Get list of network interfaces excluding loopback
-#INTERFACES=$(ip link show | awk '/^[0-9]+: [^lo]/ {print $2}' | sed 's/:$//')
-INTERFACES=$(ip link show | awk '/^[0-9]+: [^lo]/ {iface=$2; if (!match(iface, /^ifb[0-9]+:/)) print iface}' | sed 's/:$//')
+# Get list of network interfaces excluding loopback and wireless interfaces
+INTERFACES=$(ip link show | awk '/^[0-9]+: [^lo]/ {iface=$2; gsub(/:/,"",iface); if (!match(iface, /^ifb[0-9]+$/)) print iface}')
+
+# Exclude wireless interfaces
+for IFACE in $INTERFACES; do
+    if [ -d "/sys/class/net/$IFACE/wireless" ]; then
+        echo "Excluding wireless interface: $IFACE"
+        INTERFACES=$(echo "$INTERFACES" | sed "s/$IFACE//")
+    fi
+done
 
 echo "copying file"
 
@@ -45,8 +52,8 @@ done
 
 echo "checking ip"
 
-# Assign static IP to the interface without IP
-if [ ${#NO_IP[@]} -eq 1 ]; then
+# Assign static IP to the first interface without IP
+if [ ${#NO_IP[@]} -ge 1 ]; then
     IFACE=${NO_IP[0]}
     # Backup the interfaces file again
     cp /etc/network/interfaces /etc/network/interfaces.backup2
@@ -55,19 +62,31 @@ if [ ${#NO_IP[@]} -eq 1 ]; then
     echo "auto $IFACE" >> /etc/network/interfaces
     echo "iface $IFACE inet static" >> /etc/network/interfaces
     echo "    address 192.168.58.1" >> /etc/network/interfaces
-    echo "    netmask 255.255.254.0" >> /etc/network/interfaces
+    echo "    netmask 255.255.255.0" >> /etc/network/interfaces
     # Restart networking service
     echo "restarting network again"
     systemctl restart networking
     echo "Static IP assigned to $IFACE and networking restarted."
 else
-    echo "Error: There are $((${#NO_IP[@]})) interfaces without IP addresses. Expected only one."
+    echo "No interfaces without IP addresses to assign static IP."
 fi
 
 # Identify primary, secondary, and internal interfaces
-PRIMARY_INTERFACE=${HAS_IP[0]}
-SECONDARY_INTERFACE=${HAS_IP[1]}
-INTERNAL_INTERFACE=${NO_IP[0]}
+if [ ${#HAS_IP[@]} -ge 2 ]; then
+    PRIMARY_INTERFACE=${HAS_IP[0]}
+    SECONDARY_INTERFACE=${HAS_IP[1]}
+else
+    echo "Warning: At least two interfaces with IP addresses are required."
+    PRIMARY_INTERFACE=""
+    SECONDARY_INTERFACE=""
+fi
+
+if [ ${#NO_IP[@]} -ge 1 ]; then
+    INTERNAL_INTERFACE=${NO_IP[0]}
+else
+    echo "Warning: At least one interface without IP address is required."
+    INTERNAL_INTERFACE=""
+fi
 
 # Create /etc/darkflows/d_network.cfg
 echo "# /etc/darkflows/d_network.cfg" > /etc/darkflows/d_network.cfg
@@ -92,5 +111,4 @@ echo "INTERNAL_INGRESS_BANDWIDTH=\"2.5gbit\"" >> /etc/darkflows/d_network.cfg
 echo "INTERNAL_LABEL=\"Internal\"" >> /etc/darkflows/d_network.cfg
 
 echo "Configuration file /etc/darkflows/d_network.cfg created successfully."
-
 

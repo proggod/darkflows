@@ -40,7 +40,7 @@ export async function GET() {
     const networkConfig = await fs.readFile('/etc/darkflows/d_network.cfg', 'utf-8')
 
     // Parse gateway IP and subnet mask from interfaces file
-    const staticMatch = interfacesConfig.match(/iface enp2s0 inet static\s+address ([\d.]+)\s+netmask ([\d.]+)/)
+    const staticMatch = interfacesConfig.match(/iface\s+\w+\s+inet\s+static\s+address\s+([\d.]+)\s+netmask\s+([\d.]+)/)
     const gatewayIp = staticMatch ? staticMatch[1] : '192.168.1.1'
     const subnetMask = staticMatch ? staticMatch[2] : '255.255.254.0'
 
@@ -77,9 +77,9 @@ export async function POST(request: Request) {
     const dhcpConfig = await fs.readFile('/etc/kea/kea-dhcp4.conf', 'utf-8')
     let networkConfig = await fs.readFile('/etc/darkflows/d_network.cfg', 'utf-8')
 
-    // Update interfaces file
+    // Update interfaces file - match any interface name with static configuration
     interfacesConfig = interfacesConfig.replace(
-      /(iface enp2s0 inet static\s+address) [\d.]+ *\n *netmask [\d.]+/,
+      /(iface\s+\w+\s+inet\s+static\s+address)\s+[\d.]+\s+netmask\s+[\d.]+/,
       `$1 ${settings.gatewayIp}\n  netmask ${settings.subnetMask}`
     )
 
