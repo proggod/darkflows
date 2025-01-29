@@ -19,7 +19,8 @@ interface PingStatus {
 }
 
 interface NetworkConfig {
-  // Add any necessary properties for network config
+  SECONDARY_INTERFACE: string;
+  [key: string]: string;
 }
 
 interface PingDataContextType {

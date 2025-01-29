@@ -141,7 +141,7 @@ const CombinedDashboard = () => {
     }
 
     loadSavedState()
-  }, [])
+  }, [networkConfig?.SECONDARY_INTERFACE])
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
@@ -305,7 +305,7 @@ const CombinedDashboard = () => {
     .filter(id => !hiddenItems.has(id))
     .filter(id => {
       if (id === 'pingSecondary') {
-        return networkConfig?.SECONDARY_INTERFACE;
+        return networkConfig?.SECONDARY_INTERFACE !== "";
       }
       return true;
     });
@@ -361,14 +361,6 @@ const CombinedDashboard = () => {
         return id
     }
   }
-
-  // Filter out pingSecondary if there's no secondary interface
-  const dashboardItems = DEFAULT_ITEMS.filter(item => {
-    if (item === 'pingSecondary') {
-      return networkConfig?.SECONDARY_INTERFACE !== ""
-    }
-    return true
-  })
 
   return (
     <>

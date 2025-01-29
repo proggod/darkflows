@@ -27,12 +27,6 @@ ChartJS.register(
   Filler
 )
 
-interface NetworkDevice {
-  name: string;
-  type?: 'primary' | 'secondary' | 'internal';
-  label?: string;
-}
-
 type ServerType = 'PRIMARY' | 'SECONDARY'
 
 const PingStats = ({ data, dataKey, hasPacketLoss }: { 
@@ -64,7 +58,6 @@ const PingStatsCard = ({
   const [currentPing, setCurrentPing] = useState<number>(0)
   const [rollingAvg, setRollingAvg] = useState<number>(0)
   const [packetLoss, setPacketLoss] = useState<boolean>(false)
-  const [devices, setDevices] = useState<NetworkDevice[]>([])
   const { pingData: sharedPingData } = usePingData()
 
   useEffect(() => {
@@ -139,8 +132,7 @@ const PingStatsCard = ({
     }
   };
 
-  // Get the label for the connection type
-  const deviceLabel = devices.find(device => device.type?.toUpperCase() === server)?.label || server;
+  const deviceLabel = server;
 
   return (
     <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200">
