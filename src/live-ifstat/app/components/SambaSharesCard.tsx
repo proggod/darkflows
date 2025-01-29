@@ -54,6 +54,19 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
     }
   }, [share])
 
+  useEffect(() => {
+    if (!open) {
+      if (!share) {
+        setName('')
+        setPath('')
+        setValidUsers([])
+        setReadOnly(true)
+        setBrowseable(true)
+        setGuestOk(false)
+      }
+    }
+  }, [open, share])
+
   const handleSave = () => {
     onSave({
       name,
@@ -65,22 +78,32 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
     })
   }
 
+  const handleClose = () => {
+    setName('')
+    setPath('')
+    setValidUsers([])
+    setReadOnly(true)
+    setBrowseable(true)
+    setGuestOk(false)
+    onClose()
+  }
+
   return (
     <>
       <Dialog 
         open={open} 
-        onClose={onClose}
+        onClose={handleClose}
         maxWidth="sm"
         fullWidth
         PaperProps={{
           className: 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
         }}
       >
-        <DialogTitle className="text-gray-900 dark:text-gray-100 text-xs font-semibold border-b border-gray-200 dark:border-gray-700">
+        <DialogTitle className="text-gray-900 dark:text-gray-100 text-xs font-semibold border-b border-gray-200 dark:border-gray-700 py-3">
           {share ? 'Edit Share' : 'Add Share'}
         </DialogTitle>
-        <DialogContent>
-          <div className="mt-6 space-y-3">
+        <DialogContent className="mt-4 !p-6">
+          <div className="space-y-4">
             <TextField
               label="Share Name"
               fullWidth
@@ -88,23 +111,12 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
               onChange={(e) => setName(e.target.value)}
               disabled={!!share}
               size="small"
-              InputLabelProps={{
-                className: 'text-gray-600 dark:text-gray-400 text-xs',
-                sx: { 
-                  '&.MuiInputLabel-shrink': { top: 2 },
-                  '&:not(.MuiInputLabel-shrink)': { top: -2 }
-                }
-              }}
-              InputProps={{
-                className: 'text-gray-900 dark:text-gray-100 text-xs',
-                sx: { height: '28px' }
-              }}
-              sx={{ 
-                '& .MuiOutlinedInput-root': { height: '28px' },
-                '& .MuiOutlinedInput-input': { 
-                  height: '28px',
-                  lineHeight: '28px',
-                  padding: '0 8px'
+              slotProps={{
+                input: {
+                  className: 'text-gray-900 dark:text-gray-100 text-xs'
+                },
+                inputLabel: {
+                  className: 'text-gray-600 dark:text-gray-400 text-xs bg-white dark:bg-gray-800'
                 }
               }}
             />
@@ -114,21 +126,20 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
                 label="Path"
                 fullWidth
                 value={path}
-                InputProps={{
-                  readOnly: true,
-                  className: 'text-gray-900 dark:text-gray-100 text-xs',
-                  sx: { height: '28px' }
-                }}
-                sx={{ 
-                  '& .MuiOutlinedInput-input': { 
-                    cursor: 'default',
-                    backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                size="small"
+                slotProps={{
+                  input: {
+                    className: 'text-gray-900 dark:text-gray-100 text-xs bg-gray-50 dark:bg-gray-700/50',
+                    readOnly: true
+                  },
+                  inputLabel: {
+                    className: 'text-gray-600 dark:text-gray-400 text-xs bg-white dark:bg-gray-800'
                   }
                 }}
               />
               <button
                 onClick={() => setShowFileBrowser(true)}
-                className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+                className="px-3 h-8 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors whitespace-nowrap"
               >
                 Browse
               </button>
@@ -140,9 +151,17 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
               onChange={(e) => setValidUsers(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
               input={
                 <OutlinedInput 
-                  label="Valid Users" 
-                  className="text-xs"
-                  sx={{ height: '28px' }}
+                  label="Valid Users"
+                  className="text-gray-900 dark:text-gray-100"
+                  sx={{
+                    height: '32px',
+                    '& .MuiSelect-select': {
+                      color: 'inherit'
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: 'currentColor'
+                    }
+                  }}
                 />
               }
               renderValue={(selected) => selected.join(', ')}
@@ -150,47 +169,180 @@ function ShareDialog({ open, onClose, onSave, share, users }: ShareDialogProps) 
               fullWidth
               className="text-gray-900 dark:text-gray-100 text-xs"
               sx={{ 
-                '& .MuiOutlinedInput-root': { height: '28px' },
-                '& .MuiSelect-select': { paddingTop: 0, paddingBottom: 0 }
+                fontSize: '0.75rem',
+                color: 'inherit',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(156, 163, 175, 0.4)'
+                },
+                '& .MuiSelect-select': {
+                  padding: '7px 14px',
+                  minHeight: '18px !important',
+                  color: 'inherit'
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'var(--text-color)'
+                }
               }}
               MenuProps={{
                 PaperProps: {
-                  sx: { 
-                    '& .MuiMenuItem-root': { 
-                      minHeight: '24px',
-                      padding: '2px 8px'
+                  className: 'dark:bg-gray-800',
+                  sx: {
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.75rem',
+                      padding: '6px 14px',
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        '&.dark': {
+                          backgroundColor: 'rgba(59, 130, 246, 0.15)'
+                        }
+                      },
+                      '&:hover': {
+                        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                        '&.dark': {
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                        }
+                      }
+                    },
+                    '& .MuiCheckbox-root': {
+                      color: 'rgb(107 114 128)',
+                      '&.Mui-checked': {
+                        color: 'rgb(59 130 246)'
+                      }
                     }
                   }
                 }
               }}
             >
               {users.map((user) => (
-                <MenuItem key={user} value={user} className="text-xs">
-                  <Checkbox checked={validUsers.indexOf(user) > -1} size="small" sx={{ padding: '2px' }} />
-                  <ListItemText primary={user} className="text-xs" primaryTypographyProps={{ className: 'text-xs ml-1' }} />
+                <MenuItem key={user} value={user} className="text-gray-900 dark:text-gray-100 text-xs">
+                  <Checkbox 
+                    checked={validUsers.indexOf(user) > -1} 
+                    size="small" 
+                    sx={{ 
+                      padding: '4px',
+                      '& .MuiSvgIcon-root': { 
+                        fontSize: '0.875rem'
+                      },
+                      '&.Mui-checked': {
+                        color: 'rgb(59 130 246)'
+                      },
+                      color: 'rgb(107 114 128)'
+                    }} 
+                  />
+                  <ListItemText 
+                    primary={user} 
+                    primaryTypographyProps={{ 
+                      className: 'text-xs ml-1 text-gray-900 dark:text-gray-100'
+                    }} 
+                  />
                 </MenuItem>
               ))}
             </Select>
 
             <div className="space-y-2">
               <FormControlLabel
-                control={<Switch checked={!readOnly} onChange={(e) => setReadOnly(!e.target.checked)} size="small" />}
+                control={
+                  <Switch 
+                    checked={!readOnly} 
+                    onChange={(e) => setReadOnly(!e.target.checked)} 
+                    size="small"
+                    sx={{
+                      '& .MuiSwitch-thumb': { 
+                        width: 12, 
+                        height: 12,
+                        backgroundColor: 'white'
+                      },
+                      '& .MuiSwitch-track': {
+                        backgroundColor: 'rgb(156 163 175) !important'
+                      },
+                      '& .Mui-checked': {
+                        '& + .MuiSwitch-track': {
+                          backgroundColor: 'rgb(59 130 246) !important',
+                          opacity: '0.5 !important'
+                        }
+                      },
+                      '& .MuiSwitch-switchBase': {
+                        padding: '7px',
+                        '&.Mui-checked': {
+                          color: '#3b82f6 !important'
+                        }
+                      }
+                    }}
+                  />
+                }
                 label={<span className="text-gray-900 dark:text-gray-100 text-xs">Writable</span>}
+                className="m-0"
               />
               <FormControlLabel
-                control={<Switch checked={browseable} onChange={(e) => setBrowseable(e.target.checked)} size="small" />}
+                control={
+                  <Switch 
+                    checked={browseable} 
+                    onChange={(e) => setBrowseable(e.target.checked)} 
+                    size="small"
+                    sx={{
+                      '& .MuiSwitch-thumb': { 
+                        width: 12, 
+                        height: 12,
+                        backgroundColor: 'white'
+                      },
+                      '& .MuiSwitch-track': {
+                        backgroundColor: 'rgb(156 163 175) !important'
+                      },
+                      '& .Mui-checked': {
+                        '& + .MuiSwitch-track': {
+                          backgroundColor: 'rgb(59 130 246) !important',
+                          opacity: '0.5 !important'
+                        }
+                      },
+                      '& .MuiSwitch-switchBase': {
+                        padding: '7px',
+                        '&.Mui-checked': {
+                          color: '#3b82f6 !important'
+                        }
+                      }
+                    }}
+                  />
+                }
                 label={<span className="text-gray-900 dark:text-gray-100 text-xs">Browseable</span>}
               />
               <FormControlLabel
-                control={<Switch checked={guestOk} onChange={(e) => setGuestOk(e.target.checked)} size="small" />}
+                control={
+                  <Switch 
+                    checked={guestOk} 
+                    onChange={(e) => setGuestOk(e.target.checked)} 
+                    size="small"
+                    sx={{
+                      '& .MuiSwitch-thumb': { 
+                        width: 12, 
+                        height: 12,
+                        backgroundColor: 'white'
+                      },
+                      '& .MuiSwitch-track': {
+                        backgroundColor: 'rgb(156 163 175) !important'
+                      },
+                      '& .Mui-checked': {
+                        '& + .MuiSwitch-track': {
+                          backgroundColor: 'rgb(59 130 246) !important',
+                          opacity: '0.5 !important'
+                        }
+                      },
+                      '& .MuiSwitch-switchBase': {
+                        padding: '7px',
+                        '&.Mui-checked': {
+                          color: '#3b82f6 !important'
+                        }
+                      }
+                    }}
+                  />
+                }
                 label={<span className="text-gray-900 dark:text-gray-100 text-xs">Allow Guest Access</span>}
               />
             </div>
           </div>
         </DialogContent>
-        <DialogActions className="p-4">
+        <DialogActions className="p-4 border-t border-gray-200 dark:border-gray-700">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
           >
             Cancel
@@ -283,8 +435,8 @@ function UserDialog({ open, onClose, onSave, user, groups }: UserDialogProps) {
       <DialogTitle className="text-gray-900 dark:text-gray-100 text-xs font-semibold border-b border-gray-200 dark:border-gray-700">
         {user ? 'Edit User' : 'Add User'}
       </DialogTitle>
-      <DialogContent className="mt-8">
-        <div className="space-y-3">
+      <DialogContent className="mt-4 !p-6">
+        <div className="space-y-4">
           {formError && (
             <div className="text-red-600 dark:text-red-400 text-xs">
               {formError}
@@ -298,17 +450,13 @@ function UserDialog({ open, onClose, onSave, user, groups }: UserDialogProps) {
             disabled={!!user}
             size="small"
             required
-            InputLabelProps={{
-              className: 'text-gray-600 dark:text-gray-400 text-xs',
-              sx: { '&.MuiInputLabel-shrink': { top: 2 } }
-            }}
-            InputProps={{
-              className: 'text-gray-900 dark:text-gray-100 text-xs',
-              sx: { height: '28px' }
-            }}
-            sx={{ 
-              '& .MuiOutlinedInput-root': { height: '28px' },
-              '& .MuiOutlinedInput-input': { paddingTop: 0, paddingBottom: 0 }
+            slotProps={{
+              input: {
+                className: 'text-gray-900 dark:text-gray-100 text-xs'
+              },
+              inputLabel: {
+                className: 'text-gray-600 dark:text-gray-400 text-xs bg-white dark:bg-gray-800'
+              }
             }}
           />
           
@@ -320,17 +468,13 @@ function UserDialog({ open, onClose, onSave, user, groups }: UserDialogProps) {
             onChange={(e) => setPassword(e.target.value)}
             size="small"
             required={!user}
-            InputLabelProps={{
-              className: 'text-gray-600 dark:text-gray-400 text-xs',
-              sx: { '&.MuiInputLabel-shrink': { top: 2 } }
-            }}
-            InputProps={{
-              className: 'text-gray-900 dark:text-gray-100 text-xs',
-              sx: { height: '28px' }
-            }}
-            sx={{ 
-              '& .MuiOutlinedInput-root': { height: '28px' },
-              '& .MuiOutlinedInput-input': { paddingTop: 0, paddingBottom: 0 }
+            slotProps={{
+              input: {
+                className: 'text-gray-900 dark:text-gray-100 text-xs'
+              },
+              inputLabel: {
+                className: 'text-gray-600 dark:text-gray-400 text-xs bg-white dark:bg-gray-800'
+              }
             }}
           />
 
@@ -340,29 +484,23 @@ function UserDialog({ open, onClose, onSave, user, groups }: UserDialogProps) {
             onChange={(e) => setSelectedGroups(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
             input={
               <OutlinedInput 
-                label="Groups" 
-                className="text-xs"
-                sx={{ height: '28px' }}
+                label="Groups"
+                className="text-gray-900 dark:text-gray-100"
+                sx={{
+                  height: '32px',
+                  '& .MuiSelect-select': {
+                    color: 'inherit'
+                  },
+                  '& .MuiSvgIcon-root': {
+                    color: 'currentColor'
+                  }
+                }}
               />
             }
             renderValue={(selected) => selected.join(', ')}
             size="small"
             fullWidth
             className="text-gray-900 dark:text-gray-100 text-xs"
-            sx={{ 
-              '& .MuiOutlinedInput-root': { height: '28px' },
-              '& .MuiSelect-select': { paddingTop: 0, paddingBottom: 0 }
-            }}
-            MenuProps={{
-              PaperProps: {
-                sx: { 
-                  '& .MuiMenuItem-root': { 
-                    minHeight: '24px',
-                    padding: '2px 8px'
-                  }
-                }
-              }
-            }}
           >
             {groups.map((group) => (
               <MenuItem key={group} value={group} className="text-xs">
@@ -435,26 +573,24 @@ function GroupDialog({ open, onClose, onSave }: GroupDialogProps) {
       <DialogTitle className="text-gray-900 dark:text-gray-100 text-xs font-semibold border-b border-gray-200 dark:border-gray-700">
         Add Group
       </DialogTitle>
-      <DialogContent className="mt-8">
-        <TextField
-          label="Group Name"
-          fullWidth
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          size="small"
-          InputLabelProps={{
-            className: 'text-gray-600 dark:text-gray-400 text-xs',
-            sx: { '&.MuiInputLabel-shrink': { top: 2 } }
-          }}
-          InputProps={{
-            className: 'text-gray-900 dark:text-gray-100 text-xs',
-            sx: { height: '28px' }
-          }}
-          sx={{ 
-            '& .MuiOutlinedInput-root': { height: '28px' },
-            '& .MuiOutlinedInput-input': { paddingTop: 0, paddingBottom: 0 }
-          }}
-        />
+      <DialogContent className="mt-4 !p-6">
+        <div className="space-y-4">
+          <TextField
+            label="Group Name"
+            fullWidth
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            size="small"
+            slotProps={{
+              input: {
+                className: 'text-gray-900 dark:text-gray-100 text-xs'
+              },
+              inputLabel: {
+                className: 'text-gray-600 dark:text-gray-400 text-xs bg-white dark:bg-gray-800'
+              }
+            }}
+          />
+        </div>
       </DialogContent>
       <DialogActions className="p-4">
         <button
