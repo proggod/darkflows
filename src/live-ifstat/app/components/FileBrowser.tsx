@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
+import FolderIcon from '@mui/icons-material/Folder'
 
 interface FileBrowserProps {
   onSelect: (path: string) => void
@@ -133,7 +134,7 @@ export default function FileBrowser({ onSelect, initialPath = '/', onClose, open
           >
             Parent Directory
           </Button>
-          <div className="text-sm text-gray-600 dark:text-gray-300 flex-grow truncate">
+          <div className="text-xs text-gray-900 dark:text-gray-100 flex-grow truncate">
             {currentPath}
           </div>
         </div>
@@ -149,33 +150,27 @@ export default function FileBrowser({ onSelect, initialPath = '/', onClose, open
             Loading...
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {entries.map((entry) => (
-              <div
-                key={entry.path}
-                onClick={() => handleNavigate(entry)}
-                className={`
-                  p-2 rounded cursor-pointer text-sm
-                  ${entry.isDirectory ? 
-                    'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40' : 
-                    'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700'}
-                `}
-              >
-                <div className="flex items-center gap-2">
-                  {entry.isDirectory ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                      <polyline points="13 2 13 9 20 9"></polyline>
-                    </svg>
-                  )}
-                  <span className="truncate">{entry.name}</span>
-                </div>
-              </div>
-            ))}
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-1">
+              {currentPath !== '/' && (
+                <button
+                  onClick={handleParentDirectory}
+                  className="w-full px-3 py-1.5 text-left text-xs text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center gap-2"
+                >
+                  <span>..</span>
+                </button>
+              )}
+              {entries.map((entry) => (
+                <button
+                  key={entry.path}
+                  onClick={() => handleNavigate(entry)}
+                  className="w-full px-3 py-1.5 text-left text-xs text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center gap-2"
+                >
+                  <FolderIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  <span>{entry.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </DialogContent>

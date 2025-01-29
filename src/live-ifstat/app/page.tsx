@@ -41,6 +41,7 @@ import BandwidthUsage from './components/BandwidthUsage'
 import React from 'react'
 import { useNetworkStats } from '@/hooks/useNetworkStats'
 import SshKeysCard from '@/components/SshKeysCard'
+import { usePingData } from '@/contexts/PingDataContext'
 
 interface NetworkInterface {
   name: string
@@ -84,6 +85,7 @@ const CombinedDashboard = () => {
   const { networkStats } = useNetworkStats()
   const { isEditMode } = useEditMode()
   const { isDarkMode } = useTheme()
+  const { networkConfig } = usePingData()
   
   const [items, setItems] = useState<string[]>(DEFAULT_ITEMS)
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set())
@@ -92,6 +94,14 @@ const CombinedDashboard = () => {
   useEffect(() => {
     const loadSavedState = () => {
       try {
+        // Force reset if network config changes
+        if (!networkConfig?.SECONDARY_INTERFACE) {
+          localStorage.removeItem('betaDashboardOrder')
+          localStorage.removeItem('betaDashboardHidden')
+          setItems(DEFAULT_ITEMS.filter(item => item !== 'pingSecondary'))
+          setHiddenItems(new Set())
+          return
+        }
         const savedOrder = localStorage.getItem('betaDashboardOrder')
         const savedHidden = localStorage.getItem('betaDashboardHidden')
         
@@ -131,7 +141,7 @@ const CombinedDashboard = () => {
     }
 
     loadSavedState()
-  }, [])
+  }, [networkConfig?.SECONDARY_INTERFACE])
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
@@ -234,9 +244,12 @@ const CombinedDashboard = () => {
       case 'interfaceStatus':
         return <InterfaceStatusCard />
       case 'pingPrimary':
-        return <PingStatsCard server="PRIMARY" color={isDarkMode ? '#2563eb' : '#3b82f6'} />
+        return <PingStatsCard color="#3b82f6" server="PRIMARY" />
       case 'pingSecondary':
-        return <PingStatsCard server="SECONDARY" color={isDarkMode ? '#0891b2' : '#06b6d4'} />
+        if (!networkConfig?.SECONDARY_INTERFACE) {
+          return null;
+        }
+        return <PingStatsCard color="#10b981" server="SECONDARY" />
       case 'speedTest':
         return <SpeedTestNew />
       case 'connectionTuning':
@@ -288,7 +301,15 @@ const CombinedDashboard = () => {
     }
   }
 
-  const visibleItems = items.filter(id => !hiddenItems.has(id))
+  const visibleItems = items
+    .filter(id => !hiddenItems.has(id))
+    .filter(id => {
+      if (id === 'pingSecondary') {
+        return networkConfig?.SECONDARY_INTERFACE !== "";
+      }
+      return true;
+    });
+
   const hiddenItemsList = items.filter(id => hiddenItems.has(id))
 
   const getComponentLabel = (id: string) => {
@@ -299,8 +320,6 @@ const CombinedDashboard = () => {
         return 'Cake Status'
       case 'pingPrimary':
         return 'Primary Ping Stats'
-      case 'pingSecondary':
-        return 'Secondary Ping Stats'
       case 'speedTest':
         return 'Speed Test'
       case 'connectionTuning':

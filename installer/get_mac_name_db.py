@@ -16,12 +16,26 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
 }
 
-def create_database_and_table():
+def create_database_and_users():
     try:
         conn = MySQLdb.connect(**DB_CONFIG)
         cursor = conn.cursor()
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DATABASE_NAME}")
-        print(f"Database '{DATABASE_NAME}' checked/created")
+        
+        # Drop database if it exists
+        cursor.execute(f"DROP DATABASE IF EXISTS {DATABASE_NAME}")
+        print(f"Database '{DATABASE_NAME}' dropped if it existed")
+        
+        # Create fresh database
+        cursor.execute(f"CREATE DATABASE {DATABASE_NAME}")
+        print(f"Database '{DATABASE_NAME}' created fresh")
+        
+        # Create kea user if it doesn't exist and grant permissions
+        cursor.execute("CREATE USER IF NOT EXISTS 'kea'@'localhost'")
+        cursor.execute(f"GRANT ALL PRIVILEGES ON {DATABASE_NAME}.* TO 'kea'@'localhost'")
+        cursor.execute("FLUSH PRIVILEGES")
+        print("Kea user checked/created and permissions granted")
+        
+        # Create and set up table
         cursor.execute(f"USE {DATABASE_NAME}")
         create_table_query = f"""
         CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
@@ -30,7 +44,8 @@ def create_database_and_table():
         )
         """
         cursor.execute(create_table_query)
-        print(f"Table '{TABLE_NAME}' checked/created")
+        print(f"Table '{TABLE_NAME}' created")
+        
     except Error as e:
         print(f"MySQL Error: {e}")
     finally:
@@ -68,9 +83,7 @@ def update_database(oui_entries):
     try:
         conn = MySQLdb.connect(**DB_CONFIG, db=DATABASE_NAME)
         cursor = conn.cursor()
-        cursor.execute(f"TRUNCATE TABLE {TABLE_NAME}")
-        print("Table cleared")
-
+        
         BATCH_SIZE = 1000
         total = len(oui_entries)
         
@@ -94,7 +107,7 @@ def update_database(oui_entries):
             conn.close()
 
 if __name__ == "__main__":
-    create_database_and_table()
+    create_database_and_users()
     oui_data = download_and_parse_oui()
     if oui_data:
         update_database(oui_data)
