@@ -1,0 +1,13 @@
+'use client'
+
+import PingChart from './PingChart'
+import PingStats from './PingStats'
+
+export default function PingMonitor() {
+  return (
+    <div className="bg-yellow-100 dark:bg-yellow-900 rounded-lg shadow-lg">
+      <PingChart />
+      <PingStats />
+    </div>
+  )
+} 

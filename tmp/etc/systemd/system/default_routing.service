@@ -1,0 +1,13 @@
+[Unit]
+Description=Setup Default Routing
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/darkflows/bin/setup_default_routing.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+

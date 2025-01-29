@@ -1,0 +1,38 @@
+.weather-widget {
+    font-family: Arial, sans-serif;
+    background: #1e1e1e;
+    color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 600px;
+    margin: auto;
+    text-align: center;
+  }
+  
+  .current-weather {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  
+  .weather-icon {
+    font-size: 64px;
+  }
+  
+  .weather-details {
+    flex-grow: 1;
+    margin-left: 20px;
+  }
+  
+  .weather-details h2 {
+    font-size: 48px;
+    margin: 0;
+  }
+  
+  .weather-details p {
+    margin: 5px 0;
+  }
+  
+  /* Additional styles for hourly and daily forecasts */
+  
