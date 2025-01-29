@@ -27,12 +27,14 @@ interface PingDataContextType {
   pingData: PingStatus | null
   error: string | null
   networkConfig: NetworkConfig | null
+  isLoading: boolean
 }
 
 const PingDataContext = createContext<PingDataContextType>({
   pingData: null,
   error: null,
-  networkConfig: null
+  networkConfig: null,
+  isLoading: true
 })
 
 export function usePingData() {
@@ -43,19 +45,26 @@ export function PingDataProvider({ children }: { children: ReactNode }) {
   const [pingData, setPingData] = useState<PingStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [networkConfig, setNetworkConfig] = useState<NetworkConfig | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchNetworkConfig = async () => {
       try {
-        const response = await fetch('/api/network-config')
-        const config = await response.json()
-        setNetworkConfig(config)
+        const response = await fetch('/api/network-config');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setNetworkConfig(data);
       } catch (error) {
-        console.error('Failed to fetch network config:', error)
+        console.error('Failed to fetch network config:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-    fetchNetworkConfig()
-  }, [])
+    };
+
+    fetchNetworkConfig();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -86,6 +95,7 @@ export function PingDataProvider({ children }: { children: ReactNode }) {
       pingData, 
       error,
       networkConfig,
+      isLoading
     }}>
       {children}
     </PingDataContext.Provider>

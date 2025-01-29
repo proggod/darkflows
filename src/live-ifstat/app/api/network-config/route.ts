@@ -18,6 +18,9 @@ interface NetworkConfig {
   SECONDARY_INGRESS_BANDWIDTH: BandwidthValue
   PRIMARY_LABEL: string
   SECONDARY_LABEL: string
+  PRIMARY_INTERFACE: string
+  SECONDARY_INTERFACE: string
+  INTERNAL_INTERFACE: string
   CAKE_PARAMS: string
   CAKE_DEFAULT: string
   [key: string]: BandwidthValue | string
@@ -33,12 +36,24 @@ async function parseConfig(): Promise<NetworkConfig> {
       SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
       PRIMARY_LABEL: '',
       SECONDARY_LABEL: '',
+      PRIMARY_INTERFACE: '',
+      SECONDARY_INTERFACE: '',
+      INTERNAL_INTERFACE: '',
       CAKE_PARAMS: '',
-      CAKE_DEFAULT: ''
+      CAKE_DEFAULT: '',
     }
 
     const lines = content.split('\n')
     for (const line of lines) {
+      // Parse interface settings
+      const interfaceMatch = line.match(/^(\w+)_INTERFACE="([^"]*)"/)
+      if (interfaceMatch) {
+        const [, type, value] = interfaceMatch
+        const key = `${type}_INTERFACE`
+        config[key] = value
+        continue
+      }
+
       const bandwidthMatch = line.match(/^(\w+)_(\w+)_BANDWIDTH="([^"]*)"/)
       if (bandwidthMatch) {
         const [, type, direction, value] = bandwidthMatch
@@ -132,18 +147,14 @@ async function writeConfig(config: NetworkConfig): Promise<void> {
 
 export async function GET() {
   try {
-    const config = await parseConfig()
-    return NextResponse.json(config)
+    const config = await parseConfig();
+    return NextResponse.json(config);
   } catch (error) {
-    console.error('Error in GET /api/network-config:', error)
-    // Return a default configuration that won't break the UI
-    return NextResponse.json({
-      internalInterface: '',
-      externalInterface: '',
-      dhcpEnabled: false,
-      dhcpRange: { start: '', end: '' },
-      error: 'Failed to read network configuration'
-    }, { status: 500 })
+    console.error('Error reading network config:', error);
+    return NextResponse.json({ 
+      error: 'Failed to read network config',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 

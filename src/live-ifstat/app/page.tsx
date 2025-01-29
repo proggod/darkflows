@@ -85,7 +85,7 @@ const CombinedDashboard = () => {
   const { networkStats } = useNetworkStats()
   const { isEditMode } = useEditMode()
   const { isDarkMode } = useTheme()
-  const { networkConfig } = usePingData()
+  const { networkConfig, isLoading: isPingDataLoading } = usePingData()
   
   const [items, setItems] = useState<string[]>(DEFAULT_ITEMS)
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set())
@@ -177,6 +177,32 @@ const CombinedDashboard = () => {
       .catch(() => console.error('Failed to load devices'))
   }, [])
 
+  // Add this effect to fetch and check version
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch('/api/version');
+        const { version } = await response.json();
+        
+        const savedVersion = localStorage.getItem('betaDashboardVersion');
+        
+        if (!savedVersion || savedVersion !== version) {
+          // Version mismatch or first run - reset dashboard
+          console.log('Version mismatch or first run - resetting dashboard layout');
+          localStorage.removeItem('betaDashboardOrder');
+          localStorage.removeItem('betaDashboardHidden');
+          localStorage.setItem('betaDashboardVersion', version);
+          setItems(DEFAULT_ITEMS);
+          setHiddenItems(new Set());
+        }
+      } catch (error) {
+        console.error('Failed to check version:', error);
+      }
+    };
+
+    checkVersion();
+  }, []);
+
   const colors = [
     { light: '#10b981', dark: '#059669' }, // green
     { light: '#3b82f6', dark: '#2563eb' }, // blue
@@ -246,6 +272,9 @@ const CombinedDashboard = () => {
       case 'pingPrimary':
         return <PingStatsCard color="#3b82f6" server="PRIMARY" />
       case 'pingSecondary':
+        if (isPingDataLoading) {
+          return <div>Loading...</div>;
+        }
         if (!networkConfig?.SECONDARY_INTERFACE) {
           return null;
         }
@@ -305,7 +334,8 @@ const CombinedDashboard = () => {
     .filter(id => !hiddenItems.has(id))
     .filter(id => {
       if (id === 'pingSecondary') {
-        return networkConfig?.SECONDARY_INTERFACE !== "";
+        return networkConfig?.SECONDARY_INTERFACE !== undefined && 
+               networkConfig?.SECONDARY_INTERFACE !== "";
       }
       return true;
     });
