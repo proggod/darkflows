@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
+import { promises as fs } from 'fs';
 import { readConfig } from '@/lib/config';
 
 // interface LeaseData {
@@ -10,13 +11,36 @@ import { readConfig } from '@/lib/config';
 //   state: number;
 // }
 
+const KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf';
+
+interface KeaConfig {
+  Dhcp4: {
+    'lease-database': {
+      type: string;
+      name: string;
+      user: string;
+      password: string;
+      host: string;
+    };
+  };
+}
+
+async function getKeaConfig(): Promise<KeaConfig> {
+  const content = await fs.readFile(KEA_CONFIG_PATH, 'utf-8');
+  return JSON.parse(content);
+}
+
 export async function GET() {
   let connection;
   try {
+    const keaConfig = await getKeaConfig();
+    const dbConfig = keaConfig.Dhcp4['lease-database'];
+
     connection = await mysql.createConnection({
-      socketPath: process.env.DATABASE_SOCKET,
-      user: 'root',
-      database: 'kea'
+      socketPath: '/var/run/mysqld/mysqld.sock',
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.name
     });
 
     const [leases] = await connection.execute<mysql.RowDataPacket[]>(`

@@ -10,13 +10,20 @@ const KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf';
 
 interface KeaConfig {
   Dhcp4: {
-    subnet4: [{
-      reservations: {
-        'ip-address': string;
+    'lease-database': {
+      type: string;
+      name: string;
+      user: string;
+      password: string;
+      host: string;
+    };
+    subnet4: Array<{
+      reservations: Array<{
         'hw-address': string;
+        'ip-address': string;
         hostname?: string;
-      }[];
-    }];
+      }>;
+    }>;
   };
 }
 
@@ -24,11 +31,8 @@ interface KeaConfig {
 let sqliteDb: Database;
 async function getSqliteDb(): Promise<Database> {
   if (!sqliteDb) {
-    if (!process.env.PIHOLE_DB_PATH) {
-      throw new Error('PIHOLE_DB_PATH environment variable is required');
-    }
     sqliteDb = await open({
-      filename: process.env.PIHOLE_DB_PATH,
+      filename: '/etc/pihole/pihole-FTL.db',
       driver: sqlite3.Database
     });
   }
@@ -40,26 +44,20 @@ interface DnsQuery {
   ip: string;
 }
 
-async function readKeaConfig(): Promise<KeaConfig> {
-  try {
-    const content = await fs.readFile(KEA_CONFIG_PATH, 'utf-8');
-    // Remove any trailing commas before parsing
-    const cleanContent = content
-      .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas before } or ]
-      .replace(/,(\s*})/g, '}')       // Remove trailing commas before }
-      .replace(/,(\s*\])/g, ']');     // Remove trailing commas before ]
-    return JSON.parse(cleanContent);
-  } catch (error) {
-    console.error('Error parsing Kea config:', error);
-    throw error;
-  }
+async function getKeaConfig(): Promise<KeaConfig> {
+  const content = await fs.readFile(KEA_CONFIG_PATH, 'utf-8');
+  return JSON.parse(content);
 }
 
 async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved: boolean, mac?: string }>> {
+  const keaConfig = await getKeaConfig();
+  const dbConfig = keaConfig.Dhcp4['lease-database'];
+  
   const connection = await mysql.createConnection({
-    socketPath: process.env.DATABASE_SOCKET,
-    user: 'root',
-    database: 'kea'
+    socketPath: '/var/run/mysqld/mysqld.sock',
+    user: dbConfig.user,
+    password: dbConfig.password,
+    database: dbConfig.name
   });
 
   try {
@@ -89,7 +87,7 @@ async function getKeaHostnames(): Promise<Map<string, { name: string, isReserved
     `);
 
     // Get static reservations from Kea config
-    const keaConfig = await readKeaConfig();
+    const keaConfig = await getKeaConfig();
     const staticReservations = keaConfig.Dhcp4.subnet4[0].reservations;
 
     const hostnameMap = new Map<string, { name: string, isReserved: boolean, mac?: string }>();

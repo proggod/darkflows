@@ -43,6 +43,10 @@ systemctl daemon-reload
 # Restart service
 systemctl restart kea-dhcp4-server.service
 
+echo "downloading mac address db"
+python3 /usr/local/darkflows/installer/get_mac_name_db.py
+
+
 # Notify the user
 echo "MySQL database '$DATABASE_NAME' and user '$DB_USER' have been created."
 echo "Updated Kea DHCP configuration at $KEA_CONF"

@@ -68,21 +68,6 @@ const PingStatsCard = ({
   const { pingData: sharedPingData } = usePingData()
 
   useEffect(() => {
-    // Fetch devices first
-    const fetchDevices = async () => {
-      try {
-        const response = await fetch('/api/devices');
-        const data = await response.json();
-        setDevices(data.devices || []);
-      } catch (error) {
-        console.error('Failed to fetch devices:', error);
-      }
-    };
-
-    fetchDevices();
-  }, [])
-
-  useEffect(() => {
     if (sharedPingData?.servers[server]) {
       const serverData = sharedPingData.servers[server]
       const samples = JSON.parse(serverData.samples)
