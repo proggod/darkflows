@@ -65,55 +65,49 @@ async function getOSInfo() {
 }
 
 async function getNetworkInterfaces() {
-  // We'll use `ip link` to list interfaces, then `ethtool` to get speed if available
-  const { stdout } = await execAsync('ip link')
-  // ip link output looks like:
-  // 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 ...
-  // 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ...
-  const lines = stdout.trim().split('\n')
-  
-  const interfaces: { name: string, speed?: string }[] = []
-  for (const line of lines) {
-    const match = line.match(/^\d+: ([^:]+):/)
-    if (match && match[1] !== 'lo') {
-      interfaces.push({ name: match[1] })
+  try {
+    const { stdout } = await execAsync('ip link')
+    const lines = stdout.trim().split('\n')
+    
+    const interfaces: { name: string, speed?: string }[] = []
+    for (const line of lines) {
+      const match = line.match(/^\d+: ([^:]+):/)
+      if (match && match[1] !== 'lo') {
+        interfaces.push({ name: match[1] })
+      }
     }
-  }
 
-  // Attempt to get speeds with `ethtool`
-  for (const iface of interfaces) {
-    try {
-      const { stdout } = await execAsync(`ethtool ${iface.name}`)
-      // ethtool output might contain: "Speed: 1000Mb/s"
-      const speedLine = stdout.split('\n').find(l => l.includes('Speed:'))
-      if (speedLine) {
-        iface.speed = speedLine.split(':')[1].trim()
-      } else {
+    // Attempt to get speeds with `ethtool`
+    for (const iface of interfaces) {
+      try {
+        const { stdout } = await execAsync(`ethtool ${iface.name}`)
+        const speedLine = stdout.split('\n').find(l => l.includes('Speed:'))
+        iface.speed = speedLine ? speedLine.split(':')[1].trim() : 'Unknown'
+      } catch {
         iface.speed = 'Unknown'
       }
-    } catch {
-      iface.speed = 'Unknown'
     }
-  }
 
-  return interfaces
+    return interfaces
+  } catch (error) {
+    console.error('Failed to get network interfaces:', error)
+    return []
+  }
 }
 
 async function getDiskUsage() {
   try {
     const { stdout } = await execAsync('df -h /')
     const lines = stdout.trim().split('\n')
-    // Get the last line which contains root partition info
     const rootInfo = lines[lines.length - 1].split(/\s+/)
-    // Parse percentage without the % sign
     const usedPercent = parseInt(rootInfo[4].replace('%', ''), 10)
-    // Get total and available space in GB
     const totalGB = parseFloat(rootInfo[1].replace('G', ''))
     const availableGB = parseFloat(rootInfo[3].replace('G', ''))
+    
     return {
-      usedPercent,
-      totalGB,
-      availableGB
+      usedPercent: isNaN(usedPercent) ? 0 : usedPercent,
+      totalGB: isNaN(totalGB) ? 0 : totalGB,
+      availableGB: isNaN(availableGB) ? 0 : availableGB
     }
   } catch (error) {
     console.error('Failed to get disk usage:', error)
@@ -137,7 +131,7 @@ async function getUptime() {
 
 export async function GET() {
   try {
-    const [totalMemMB, cpuInfo, osInfo, netIfaces, diskInfo, uptime] = await Promise.all([
+    const [totalMemMB, cpuInfo, osInfo, interfaces, diskUsage, uptime] = await Promise.allSettled([
       getMemoryInfo(),
       getCPUInfo(),
       getOSInfo(),
@@ -147,28 +141,28 @@ export async function GET() {
     ])
 
     // Calculate memory usage percentage
-    const memoryUsagePercent = Math.round((totalMemMB - await getMemoryInfo()) / totalMemMB * 100)
+    const memoryUsagePercent = Math.round((totalMemMB.status === 'fulfilled' ? totalMemMB.value : 0 - await getMemoryInfo()) / (totalMemMB.status === 'fulfilled' ? totalMemMB.value : 0) * 100)
 
     const data = {
       systemStats: {
-        name: `${osInfo.name} Server`,
+        name: `${osInfo.status === 'fulfilled' ? osInfo.value.name : 'Unknown OS'} Server`,
         cpu: 45, // You'll need to implement real CPU usage monitoring
         memory: memoryUsagePercent,
-        disk: diskInfo.usedPercent,
+        disk: diskUsage.status === 'fulfilled' ? diskUsage.value.usedPercent : 0,
         network: 125.3, // You'll need to implement real network monitoring
         agentVersion: '1.0.0',
         hasNotification: false
       },
       serverInfo: {
-        totalMemMB,
-        cpus: cpuInfo.cpus,
-        cpuModel: cpuInfo.model,
-        osName: osInfo.name,
-        osVersion: osInfo.version,
-        interfaces: netIfaces,
-        uptime,
-        diskTotal: diskInfo.totalGB,
-        diskAvailable: diskInfo.availableGB
+        totalMemMB: totalMemMB.status === 'fulfilled' ? totalMemMB.value : 0,
+        cpus: cpuInfo.status === 'fulfilled' ? cpuInfo.value.cpus : 0,
+        cpuModel: cpuInfo.status === 'fulfilled' ? cpuInfo.value.model : '',
+        osName: osInfo.status === 'fulfilled' ? osInfo.value.name : 'Unknown OS',
+        osVersion: osInfo.status === 'fulfilled' ? osInfo.value.version : '',
+        interfaces: interfaces.status === 'fulfilled' ? interfaces.value : [],
+        uptime: uptime.status === 'fulfilled' ? uptime.value : 'Unknown',
+        diskTotal: diskUsage.status === 'fulfilled' ? diskUsage.value.totalGB : 0,
+        diskAvailable: diskUsage.status === 'fulfilled' ? diskUsage.value.availableGB : 0
       }
     }
 

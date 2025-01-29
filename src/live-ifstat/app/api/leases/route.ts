@@ -34,7 +34,7 @@ export async function GET() {
 
     // Get reservations to update hostnames
     const config = await readConfig();
-    const reservations = config.Dhcp4.subnet4[0].reservations;
+    const reservations = config?.Dhcp4?.subnet4?.[0]?.reservations || [];
 
     const formattedLeases = leases.map((lease) => {
       const formattedLease = {
@@ -51,7 +51,7 @@ export async function GET() {
       // Check if this lease has a reservation and update hostname
       const reservation = reservations.find(r => 
         r['ip-address'] === formattedLease.ip_address || 
-        r['hw-address'].toLowerCase() === formattedLease.mac_address.toLowerCase()
+        r['hw-address']?.toLowerCase() === formattedLease.mac_address.toLowerCase()
       );
 
       if (reservation) {
@@ -68,10 +68,8 @@ export async function GET() {
     return NextResponse.json(formattedLeases);
   } catch (error) {
     console.error('Error fetching leases:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to fetch leases' },
-      { status: 500 }
-    );
+    // Return empty array instead of failing
+    return NextResponse.json([]);
   } finally {
     if (connection) {
       await connection.end();

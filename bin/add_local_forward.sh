@@ -27,7 +27,7 @@ if ! [[ "$LOCAL_PORT" =~ ^[0-9]+$ ]] || [ "$LOCAL_PORT" -lt 1 ] || [ "$LOCAL_POR
 fi
 
 # Check for existing rules
-EXISTING=$(nft list ruleset | grep -c "tcp dport $EXT_PORT redirect to :$LOCAL_PORT") || true
+EXISTING=$(nft list ruleset  2>/dev/null | grep -c "tcp dport $EXT_PORT redirect to :$LOCAL_PORT") || true
 if [ "$EXISTING" -ne 0 ]; then
     echo "Port $EXT_PORT is already being forwarded to local port $LOCAL_PORT"
     exit 0
@@ -39,12 +39,12 @@ echo "Adding local port forwarding $EXT_PORT -> $LOCAL_PORT"
 # 1. REDIRECT external traffic to local port
 nft add rule ip nat prerouting \
     tcp dport $EXT_PORT \
-    redirect to :$LOCAL_PORT
+    redirect to :$LOCAL_PORT 2>/dev/null
 
 # 2. Allow incoming connections on external port
 nft add rule inet filter input \
-    tcp dport $EXT_PORT \
-    ct state new,established accept
+    tcp dport $EXT_PORT \  
+    ct state new,established accept 2>/dev/null
 
 echo "Successfully added local port forward $EXT_PORT -> $LOCAL_PORT"
 

@@ -1,6 +1,9 @@
 #!/bin/bash
+cd /usr/local/darkflows/src/live-ifstat
+npm prune --production
+
 mkdir /usr/local/installer_packages
-tar zcvf /usr/local/installer_packages/darkflows_scripts.tgz --exclude=installer_packages --exclude=.git --exclude=node_modules --exclude=.next  /usr/local/darkflows /etc/systemd/system/nextjs-app.service /etc/systemd/system/default_routing.service 
+tar zcvf /usr/local/installer_packages/darkflows_scripts.tgz --exclude=installer_packages --exclude=.git  /usr/local/darkflows /etc/systemd/system/nextjs-app.service /etc/systemd/system/default_routing.service 
 
 # Paths to the configs
 SAMBA_CONF="/etc/samba/smb.conf"

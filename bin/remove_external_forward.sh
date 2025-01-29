@@ -13,7 +13,7 @@ INT_PORT=$3
 echo "Removing forward from external:$EXT_PORT to $TARGET_IP:$INT_PORT"
 
 # Delete NAT rules
-nft -a list ruleset | awk -v eport=$EXT_PORT -v tip=$TARGET_IP -v iport=$INT_PORT '
+nft -a list ruleset 2>/dev/null | awk -v eport=$EXT_PORT -v tip=$TARGET_IP -v iport=$INT_PORT '
 /(dnat|snat) to/ {
     match($0, /handle [0-9]+/)
     if (RLENGTH > 0) {
@@ -27,7 +27,7 @@ nft -a list ruleset | awk -v eport=$EXT_PORT -v tip=$TARGET_IP -v iport=$INT_POR
 done
 
 # Delete forward rules
-nft -a list chain inet filter forward | awk -v tip=$TARGET_IP -v iport=$INT_PORT '
+nft -a list chain inet filter forward 2>/dev/null | awk -v tip=$TARGET_IP -v iport=$INT_PORT '
 /tcp (dport|sport).*ct state/ {
     match($0, /handle [0-9]+/)
     if (RLENGTH > 0 && ((index($0, "dport") && index($0, tip) && index($0, iport)) || \

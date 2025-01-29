@@ -26,7 +26,7 @@ if ! ip route get "$TARGET_IP" | grep -q "$INTERNAL_INTERFACE"; then
     exit 1
 fi
 
-nft list ruleset | grep -q "tcp dport $EXT_PORT.*dnat to $TARGET_IP:$INT_PORT" && {
+nft list ruleset 2>/dev/null | grep -q "tcp dport $EXT_PORT.*dnat to $TARGET_IP:$INT_PORT" && {
     echo "Forward already exists"
     exit 0
 }
@@ -35,14 +35,14 @@ nft list ruleset | grep -q "tcp dport $EXT_PORT.*dnat to $TARGET_IP:$INT_PORT" &
 nft add rule ip nat prerouting \
     tcp dport $EXT_PORT \
     ip saddr != $TARGET_IP \
-    dnat to $TARGET_IP:$INT_PORT
+    dnat to $TARGET_IP:$INT_PORT 2>/dev/null
 
 # SNAT Rule
 nft add rule ip nat postrouting \
     ip saddr $IP_RANGE \
     ip daddr $TARGET_IP \
     tcp dport $INT_PORT \
-    snat to $GATEWAY_IP
+    snat to $GATEWAY_IP 2>/dev/null
 
 # Internal to Internal forwarding
 nft add rule inet filter forward \
@@ -50,14 +50,14 @@ nft add rule inet filter forward \
     oif $INTERNAL_INTERFACE \
     ip daddr $TARGET_IP \
     tcp dport $INT_PORT \
-    ct state new,established accept
+    ct state new,established accept 2>/dev/null
 
 nft add rule inet filter forward \
     iif $INTERNAL_INTERFACE \
     oif $INTERNAL_INTERFACE \
     ip saddr $TARGET_IP \
     tcp sport $INT_PORT \
-    ct state established accept
+    ct state established accept 2>/dev/null
 
 # External to Internal forwarding
 for WAN_IF in $PRIMARY_INTERFACE ${SECONDARY_INTERFACE:+"$SECONDARY_INTERFACE"}; do
@@ -66,14 +66,14 @@ for WAN_IF in $PRIMARY_INTERFACE ${SECONDARY_INTERFACE:+"$SECONDARY_INTERFACE"};
         oif $INTERNAL_INTERFACE \
         ip daddr $TARGET_IP \
         tcp dport $INT_PORT \
-        ct state new,established accept
+        ct state new,established accept 2>/dev/null
 
     nft add rule inet filter forward \
         iif $INTERNAL_INTERFACE \
         oif $WAN_IF \
         ip saddr $TARGET_IP \
         tcp sport $INT_PORT \
-        ct state established accept
+        ct state established accept 2>/dev/null
 done
 
 echo "Added port forward external:$EXT_PORT → $TARGET_IP:$INT_PORT"

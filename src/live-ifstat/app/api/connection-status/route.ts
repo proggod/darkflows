@@ -11,16 +11,15 @@ export async function GET() {
     const lines = stdout.split('\n')
     const active = lines.find(line => line === 'PRIMARY' || line === 'SECONDARY')
     
+    // Return a default value if no active connection is found
     if (!active) {
-      throw new Error('Could not determine active connection')
+      return NextResponse.json({ active: 'UNKNOWN' })
     }
     
     return NextResponse.json({ active })
   } catch (error) {
     console.error('Error reading active gateway:', error)
-    return NextResponse.json(
-      { error: 'Failed to read active gateway status' },
-      { status: 500 }
-    )
+    // Return a safe default instead of failing
+    return NextResponse.json({ active: 'UNKNOWN' })
   }
 } 

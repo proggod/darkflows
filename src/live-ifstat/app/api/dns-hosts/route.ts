@@ -42,7 +42,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error in GET:', error)
     // Return an empty list that won't break the UI
-    return NextResponse.json({ entries: [], error: 'Failed to list DNS entries' }, { status: 500 })
+    return NextResponse.json({ entries: [] })
   }
 }
 
@@ -52,19 +52,25 @@ export async function POST(request: Request) {
     const { ip, hostname } = await request.json()
     
     if (!ip || !hostname) {
-      return NextResponse.json({ error: 'IP and hostname are required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'IP and hostname are required' },
+        { status: 400 }
+      )
     }
 
-    const { stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`)
-    if (stderr) {
-      console.error('Script stderr:', stderr)
-      return NextResponse.json({ error: stderr }, { status: 500 })
-    }
-    return NextResponse.json({ success: true })
+    await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`)
+    
+    // Re-fetch the updated list
+    const { stdout } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`)
+    const entries = parseListOutput(stdout)
+    
+    return NextResponse.json({ entries })
   } catch (error) {
     console.error('Error in POST:', error)
-    const message = error instanceof Error ? error.message : 'Failed to add DNS entry'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to add DNS entry', entries: [] },
+      { status: 500 }
+    )
   }
 }
 

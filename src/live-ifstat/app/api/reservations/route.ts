@@ -37,11 +37,11 @@ async function syncDNSEntry(ip: string, hostname: string, shouldDelete = false) 
 export async function GET() {
   try {
     const config = await readConfig();
-    const reservations = config.Dhcp4.subnet4[0].reservations;
+    const reservations = config?.Dhcp4?.subnet4?.[0]?.reservations || [];
     return NextResponse.json(reservations);
   } catch (error) {
     console.error('Error reading reservations:', error);
-    return NextResponse.json({ error: 'Failed to read reservations' }, { status: 500 });
+    return NextResponse.json([]);
   }
 }
 
@@ -49,6 +49,13 @@ export async function POST(request: Request) {
   try {
     const reservation = await request.json();
     const config = await readConfig();
+    
+    // Ensure the config structure exists
+    if (!config.Dhcp4?.subnet4?.[0]?.reservations) {
+      config.Dhcp4 = config.Dhcp4 || {};
+      config.Dhcp4.subnet4 = config.Dhcp4.subnet4 || [{}];
+      config.Dhcp4.subnet4[0].reservations = [];
+    }
     
     // Add the new reservation
     config.Dhcp4.subnet4[0].reservations.push(reservation);

@@ -12,7 +12,7 @@ LOCAL_PORT=${2:-$1}
 echo "Removing local port forwarding $EXT_PORT -> $LOCAL_PORT"
 
 # Delete redirect rule
-nft -a list ruleset | awk -v port=$EXT_PORT -v lport=$LOCAL_PORT '
+nft -a list ruleset 2>/dev/null | awk -v port=$EXT_PORT -v lport=$LOCAL_PORT '
 /tcp dport .* redirect to/ {
     match($0, /handle [0-9]+/)
     if (RLENGTH > 0 && $3 == port) {
@@ -23,7 +23,7 @@ nft -a list ruleset | awk -v port=$EXT_PORT -v lport=$LOCAL_PORT '
 done
 
 # Delete input rule
-nft -a list chain inet filter input | awk -v port=$EXT_PORT '
+nft -a list chain inet filter input 2>/dev/null | awk -v port=$EXT_PORT '
 /tcp dport .* ct state/ {
     match($0, /handle [0-9]+/)
     if (RLENGTH > 0 && $3 == port) {
