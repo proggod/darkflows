@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Tabs, Tab, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Switch, FormControlLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput } from '@mui/material'
+import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Switch, FormControlLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput } from '@mui/material'
 import FileBrowser from './FileBrowser'
 
 interface SambaShare {
@@ -656,10 +656,6 @@ export default function SambaSharesCard() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue)
-  }
-
   const handleSaveShare = async (share: SambaShare) => {
     try {
       setError('')
@@ -828,217 +824,174 @@ export default function SambaSharesCard() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-[490px] flex flex-col">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Samba Shares</h3>
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={loadData}
-          className="text-xs min-w-0 px-2"
-          title="Refresh"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 2v6h-6"></path>
-            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-            <path d="M3 22v-6h6"></path>
-            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
-          </svg>
-        </Button>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
-          {error}
-        </div>
-      )}
-
-      <Tabs
-        value={activeTab}
-        onChange={handleTabChange}
-        className="border-b border-gray-200 dark:border-gray-700"
-        sx={{
-          minHeight: '32px',
-          '& .MuiTab-root': {
-            minHeight: '32px',
-            padding: '4px 16px',
-            fontSize: '12px',
-            color: 'inherit'
-          }
-        }}
-      >
-        <Tab label="Shares" />
-        <Tab label="Users & Groups" />
-      </Tabs>
-
-      <div className="flex-grow overflow-auto mt-2">
-        {activeTab === 0 && (
-          <div className="flex flex-col h-full">
-            <div className="flex justify-end mb-2">
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setShowAddShare(true)}
-                className="text-xs"
-              >
-                Add Share
-              </Button>
-            </div>
-            <div className="flex-grow overflow-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Path</th>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Access</th>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-16">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800">
-                  {shares.map((share) => (
-                    <tr key={share.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">{share.name}</td>
-                      <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">{share.path}</td>
-                      <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                        {share.validUsers.join(', ')}
-                      </td>
-                      <td className="px-2 whitespace-nowrap text-xs">
-                        <button
-                          onClick={() => {
-                            setEditingShare(share)
-                            setShowAddShare(true)
-                          }}
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mr-2"
-                          title="Edit"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path>
-                            <polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteShare(share.name)}
-                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                          title="Delete"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M3 6h18"></path>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                          </svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
+      <div className="flex flex-col h-full">
+        <h3 className="text-label mb-2">Samba Shares</h3>
+        
+        {/* Add error display */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
+            {error}
           </div>
         )}
 
-        {activeTab === 1 && (
-          <div className="flex flex-col h-full">
-            <div className="flex justify-end gap-2 mb-2">
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setShowAddUser(true)}
-                className="text-xs"
-              >
-                Add User
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setShowAddGroup(true)}
-                className="text-xs"
-              >
-                Add Group
-              </Button>
+        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-2">
+          <button
+            onClick={() => setActiveTab(0)}
+            className={`px-3 py-1 text-xs font-medium ${
+              activeTab === 0 
+                ? 'text-blue-500 border-b-2 border-blue-500' 
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            Shares
+          </button>
+          <button
+            onClick={() => setActiveTab(1)}
+            className={`px-3 py-1 text-xs font-medium ${
+              activeTab === 1 
+                ? 'text-blue-500 border-b-2 border-blue-500' 
+                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            Users & Groups
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          {activeTab === 0 && (
+            <div className="flex flex-col h-full">
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={() => setShowAddShare(true)}
+                  className="btn btn-blue"
+                >
+                  Add Share
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Path</th>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Access</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shares.map((share, index) => (
+                      <tr 
+                        key={share.name} 
+                        className={`card-hover ${
+                          index % 2 === 0 ? '' : 'card-alternate'
+                        } ${index === shares.length - 1 ? 'last-row' : ''}`}
+                      >
+                        <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{share.name}</td>
+                        <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{share.path}</td>
+                        <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{share.validUsers.join(', ')}</td>
+                        <td className="px-2 py-1 text-xs text-right">
+                          <button
+                            onClick={() => handleDeleteShare(share.name)}
+                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="flex-grow overflow-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Username</th>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Groups</th>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                    <th className="px-2 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-16">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800">
-                  {users.map((user) => (
-                    <tr key={user.username} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">{user.username}</td>
-                      <td className="px-2 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">
-                        {user.groups.join(', ')}
-                      </td>
-                      <td className="px-2 whitespace-nowrap text-xs">
+          )}
+          {activeTab === 1 && (
+            <div className="flex flex-col h-full">
+              <div className="flex justify-end gap-2 mb-2">
+                <button
+                  onClick={() => setShowAddUser(true)}
+                  className="btn btn-blue"
+                >
+                  Add User
+                </button>
+                <button
+                  onClick={() => setShowAddGroup(true)}
+                  className="btn btn-blue"
+                >
+                  Add Group
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Username</th>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Groups</th>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user, index) => (
+                      <tr 
+                        key={user.username} 
+                        className={`card-hover ${
+                          index % 2 === 0 ? '' : 'card-alternate'
+                        } ${index === users.length - 1 ? 'last-row' : ''}`}
+                      >
+                        <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{user.username}</td>
+                        <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{user.groups.join(', ')}</td>
+                        <td className="px-2 py-1 text-xs">
+                          <button
+                            onClick={() => handleToggleUser(user.username, !user.enabled)}
+                            className={`px-1.5 py-0.5 rounded ${
+                              user.enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' :
+                              'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                            }`}
+                          >
+                            {user.enabled ? 'Enabled' : 'Disabled'}
+                          </button>
+                        </td>
+                        <td className="px-2 py-1 text-xs text-right">
+                          <button
+                            onClick={() => handleDeleteUser(user.username)}
+                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="mt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Groups</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {groups.map((group) => (
+                      <div
+                        key={group}
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"
+                      >
+                        <span className="text-xs text-gray-700 dark:text-gray-300">{group}</span>
                         <button
-                          onClick={() => handleToggleUser(user.username, !user.enabled)}
-                          className={`px-1.5 py-0.5 rounded ${
-                            user.enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' :
-                            'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
-                          }`}
-                        >
-                          {user.enabled ? 'Enabled' : 'Disabled'}
-                        </button>
-                      </td>
-                      <td className="px-2 whitespace-nowrap text-xs">
-                        <button
-                          onClick={() => {
-                            setEditingUser(user)
-                            setShowAddUser(true)
-                          }}
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mr-2"
-                          title="Edit"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M20 14.66V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5.34"></path>
-                            <polygon points="18 2 22 6 12 16 8 16 8 12 18 2"></polygon>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.username)}
+                          onClick={() => handleDeleteGroup(group)}
                           className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                          title="Delete"
+                          title="Delete Group"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 6h18"></path>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                           </svg>
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="mt-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Groups</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {groups.map((group) => (
-                    <div
-                      key={group}
-                      className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"
-                    >
-                      <span className="text-xs text-gray-700 dark:text-gray-300">{group}</span>
-                      <button
-                        onClick={() => handleDeleteGroup(group)}
-                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                        title="Delete Group"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 6h18"></path>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <ShareDialog

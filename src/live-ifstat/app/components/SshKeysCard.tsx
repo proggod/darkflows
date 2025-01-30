@@ -178,10 +178,10 @@ export default function SshKeysCard() {
   }
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
+        <h3 className="text-label mb-2">SSH Keys</h3>
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">SSH Keys</h3>
           <div className="flex gap-2">
             <RefreshIcon 
               onClick={loadData}
@@ -196,7 +196,7 @@ export default function SshKeysCard() {
           </div>
         )}
 
-        <div className="overflow-auto flex-grow">
+        <div className="flex-1 overflow-auto">
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
               <tr>
@@ -207,9 +207,12 @@ export default function SshKeysCard() {
             </thead>
             <tbody>
               {users.map((user, index) => (
-                <tr key={user.username} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                  index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900/20'
-                }`}>
+                <tr 
+                  key={user.username} 
+                  className={`card-hover ${
+                    index % 2 === 0 ? '' : 'card-alternate'
+                  } ${index === users.length - 1 ? 'last-row' : ''}`}
+                >
                   <td className="px-1 py-0.5 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300">{user.username}</td>
                   <td className="px-1 py-0.5 text-xs text-gray-700 dark:text-gray-300">
                     {user.keys.map(key => (

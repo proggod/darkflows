@@ -13,6 +13,7 @@ import {
   TooltipItem,
   Filler
 } from 'chart.js'
+import { RefreshCw } from 'lucide-react'
 
 ChartJS.register(
   CategoryScale,
@@ -34,10 +35,10 @@ interface IfstatData {
 
 const NetworkStats = ({ data, color }: { data: IfstatData[], color: string }) => (
   <>
-    <span className="text-gray-600 dark:text-gray-300">
+    <span className="text-small">
       Incoming: <span style={{ color }}>{data.length > 0 ? (data[data.length - 1].kbIn * 0.008).toFixed(1) : '0.0'} Mb/s</span>
     </span>
-    <span className="text-gray-600 dark:text-gray-300">
+    <span className="text-small">
       Outgoing: <span style={{ color: '#f97316' }}>{data.length > 0 ? (data[data.length - 1].kbOut * 0.008).toFixed(1) : '0.0'} Mb/s</span>
     </span>
   </>
@@ -46,22 +47,28 @@ const NetworkStats = ({ data, color }: { data: IfstatData[], color: string }) =>
 const NetworkStatsCard = ({ 
   color,
   label,
-  data
+  data,
+  fetchStats,
+  error,
+  loading
 }: { 
   color: string;
   label: string;
   data: IfstatData[];
+  fetchStats: () => void;
+  error: string | null;
+  loading: boolean;
 }) => {
   // Only render chart if we have data
   if (!data || data.length === 0) {
     return (
-      <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200">
+      <div className="p-3 h-full flex flex-col">
         <div className="flex flex-col h-full">
           <div className="px-1 pb-2">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <h3 className="text-label">
               {label} Network Throughput
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-muted">
               Waiting for data...
             </p>
           </div>
@@ -131,10 +138,30 @@ const NetworkStatsCard = ({
   };
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200">
-      <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">{label} Network Stats</h3>
-        
+    <div className="p-3 h-full flex flex-col">
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-2">
+          <h3 className="text-label">{label}</h3>
+          <NetworkStats
+            data={data}
+            color={color}
+          />
+        </div>
+        <RefreshCw 
+          onClick={fetchStats}
+          className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
+        />
+      </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-4 text-muted">Loading network stats...</div>
+      ) : (
         <div className="flex-1 overflow-auto">
           <div className="h-full">
             <Line
@@ -144,13 +171,7 @@ const NetworkStatsCard = ({
             />
           </div>
         </div>
-        <div className="flex justify-between text-xs mt-1 px-1">
-          <NetworkStats
-            data={data}
-            color={color}
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
 };

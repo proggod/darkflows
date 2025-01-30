@@ -15,6 +15,7 @@ export async function GET(request: Request) {
 
     // Basic path sanitization
     const normalizedPath = path.normalize(dirPath).replace(/^(\.\.(\/|\\|$))+/, '')
+    console.log('Attempting to read directory:', normalizedPath) // Add debug log
     
     const entries = await fs.readdir(normalizedPath, { withFileTypes: true })
     

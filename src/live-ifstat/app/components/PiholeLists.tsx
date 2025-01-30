@@ -150,7 +150,7 @@ export default function PiholeLists() {
         
         <div className="space-y-1">
           {state.entries.map((domain) => (
-            <div key={domain} className="flex items-center justify-between bg-white dark:bg-gray-700 rounded px-2 py-1">
+            <div key={domain} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded px-2 py-1">
               <span className="text-xs text-gray-900 dark:text-gray-100">{domain}</span>
               <button
                 onClick={() => handleDelete(type, domain)}
@@ -173,7 +173,7 @@ export default function PiholeLists() {
   }
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Pi-hole Lists</h3>
         

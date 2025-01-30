@@ -243,7 +243,7 @@ export default function BandwidthUsage() {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Bandwidth Usage</h3>
         
@@ -290,9 +290,14 @@ export default function BandwidthUsage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800">
-                {sortedIPs.map((ip) => (
-                  <tr key={ip} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+              <tbody>
+                {sortedIPs.map((ip, index) => (
+                  <tr 
+                    key={ip} 
+                    className={`card-hover ${
+                      index % 2 === 0 ? '' : 'card-alternate'
+                    } ${index === sortedIPs.length - 1 ? 'last-row' : ''}`}
+                  >
                     <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                       <div className="flex flex-col">
                         <span 

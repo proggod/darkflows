@@ -190,32 +190,6 @@ export default function ReservationsCard() {
     );
   };
 
-  const sortedReservations = [...reservations].sort((a, b) => {
-    let comparison = 0;
-    switch (sortField) {
-      case 'ip-address':
-        // Split IP into octets and compare numerically
-        const aOctets = a['ip-address'].split('.').map(Number);
-        const bOctets = b['ip-address'].split('.').map(Number);
-        for (let i = 0; i < 4; i++) {
-          if (aOctets[i] !== bOctets[i]) {
-            comparison = aOctets[i] - bOctets[i];
-            break;
-          }
-        }
-        break;
-      case 'hw-address':
-        comparison = a['hw-address'].localeCompare(b['hw-address']);
-        break;
-      case 'name':
-        const hostnameA = a.hostname || 'N/A';
-        const hostnameB = b.hostname || 'N/A';
-        comparison = hostnameA.localeCompare(hostnameB);
-        break;
-    }
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
-
   const handleNameChange = (ip: string, newName: string) => {
     setEditedNames(prev => ({
       ...prev,
@@ -277,7 +251,7 @@ export default function ReservationsCard() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
+    <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DHCP Reservations</h3>
         <div className="flex gap-2">
@@ -350,29 +324,26 @@ export default function ReservationsCard() {
       )}
 
       <div className="overflow-auto flex-grow -mx-3">
-        <table className="w-full h-full">
-          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-            <tr className="bg-gray-50 dark:bg-gray-700">
-              <th 
-                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 w-[80px]"
-                onClick={() => handleSort('ip-address')}
-              >
+        <table className="w-full h-full table-container">
+          <thead className="sticky top-0 z-10">
+            <tr className="table-header">
+              <th className="w-[80px] card-hover" onClick={() => handleSort('ip-address')}>
                 IP<SortArrow field="ip-address" />
               </th>
-              <th 
-                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('name')}
-              >
+              <th className="card-hover" onClick={() => handleSort('name')}>
                 Name<SortArrow field="name" />
               </th>
               <th className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-10">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800">
-            {sortedReservations.map((reservation, index) => (
-              <tr key={reservation['ip-address']} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
-              }`}>
+          <tbody>
+            {reservations.map((reservation, index) => (
+              <tr 
+                key={reservation['ip-address']} 
+                className={`card-hover ${
+                  index % 2 === 0 ? '' : 'card-alternate'
+                } ${index === reservations.length - 1 ? 'last-row' : ''}`}
+              >
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
                   {reservation['ip-address']}
                 </td>
@@ -410,11 +381,11 @@ export default function ReservationsCard() {
                   <div className="flex gap-1">
                     <EditIcon
                       onClick={() => startEdit(reservation)}
-                      className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500"
+                      className="w-2 h-2 btn-icon btn-icon-blue"
                     />
                     <DeleteIcon
                       onClick={() => handleDelete(reservation)}
-                      className="w-2 h-2 text-red-500 dark:text-red-400 cursor-pointer hover:text-red-600 dark:hover:text-red-500"
+                      className="w-2 h-2 btn-icon btn-icon-red"
                     />
                   </div>
                 </td>

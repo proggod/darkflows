@@ -220,12 +220,12 @@ export default function LeasesCard() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
+    <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Active DHCP Leases</h3>
         <RefreshIcon 
           onClick={fetchLeases}
-          className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+          className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
         />
       </div>
 
@@ -236,34 +236,22 @@ export default function LeasesCard() {
       )}
 
       <div className="overflow-auto flex-grow -mx-3">
-        <table className="w-full h-full">
-          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-            <tr className="bg-gray-50 dark:bg-gray-700">
-              <th 
-                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 w-[80px]"
-                onClick={() => handleSort('ip_address')}
-              >
-                IP<SortArrow field="ip_address" />
-              </th>
-              <th 
-                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('device_name')}
-              >
-                Name<SortArrow field="device_name" />
-              </th>
-              <th 
-                className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
-                onClick={() => handleSort('status')}
-              >
-                Status<SortArrow field="status" />
-              </th>
+        <table className="w-full h-full table-container">
+          <thead className="sticky top-0 z-10">
+            <tr className="table-header">
+              <th className="w-[80px] card-hover" onClick={() => handleSort('ip_address')}>IP<SortArrow field="ip_address" /></th>
+              <th className="card-hover" onClick={() => handleSort('device_name')}>Name<SortArrow field="device_name" /></th>
+              <th className="w-[80px] card-hover" onClick={() => handleSort('status')}>Status<SortArrow field="status" /></th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800">
+          <tbody>
             {sortedLeases.map((lease, index) => (
-              <tr key={lease.ip_address} className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
-              }`}>
+              <tr 
+                key={lease.ip_address} 
+                className={`card-hover ${
+                  index % 2 === 0 ? '' : 'card-alternate'
+                } ${index === sortedLeases.length - 1 ? 'last-row' : ''}`}
+              >
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
                   {lease.ip_address}
                 </td>

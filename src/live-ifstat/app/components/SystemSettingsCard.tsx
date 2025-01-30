@@ -26,6 +26,7 @@ export function SystemSettingsCard() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRestartingNetwork, setIsRestartingNetwork] = useState(false);
   const [isRestartingDhcp, setIsRestartingDhcp] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -34,13 +35,13 @@ export function SystemSettingsCard() {
   const fetchSettings = async () => {
     try {
       const response = await fetch('/api/network-settings');
-      if (!response.ok) throw new Error('Failed to fetch settings');
+      if (!response.ok) {
+        throw new Error('Failed to fetch settings');
+      }
       const data = await response.json();
-      console.log('Fetched settings:', data);
       setSettings(data);
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-      toast.error('Failed to load network settings');
+    } catch {
+      setError('Failed to load settings');
     }
   };
 
@@ -128,9 +129,9 @@ export function SystemSettingsCard() {
   };
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">System Settings</h3>
+        <h3 className="text-label mb-2">System Settings</h3>
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
             <button
@@ -249,9 +250,9 @@ export function SystemSettingsCard() {
         </div>
 
         <div className="mt-2 flex flex-col gap-2">
-          {settings.error && (
+          {error && (
             <div className="p-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
-              <p className="text-[10px] text-red-800 dark:text-red-200">{settings.error}</p>
+              <p className="text-[10px] text-red-800 dark:text-red-200">{error}</p>
             </div>
           )}
         </div>

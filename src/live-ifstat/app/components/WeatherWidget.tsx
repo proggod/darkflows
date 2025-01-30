@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useMemo, useCallback } from 'react'
 import { Cloud, CloudRain, Sun, CloudSun } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -36,7 +36,7 @@ interface Location {
   cityName: string
 }
 
-export function WeatherWidget() {
+const WeatherWidget = forwardRef((props, ref) => {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [location, setLocation] = useState<Location | null>(null)
@@ -67,11 +67,17 @@ export function WeatherWidget() {
 
   const handleMetricChange = (metric: MetricType) => {
     setSelectedMetric(metric)
+    localStorage.setItem('selectedMetric', metric)
   }
 
-  const formatTemp = (celsius: number) => {
-    return tempUnit === 'F' ? Math.round(celsiusToFahrenheit(celsius)) : Math.round(celsius)
+  const handleTempUnitChange = (unit: TempUnit) => {
+    setTempUnit(unit)
+    localStorage.setItem('tempUnit', unit)
   }
+
+  const formatTemp = useCallback((celsius: number) => {
+    return tempUnit === 'F' ? Math.round(celsiusToFahrenheit(celsius)) : Math.round(celsius)
+  }, [tempUnit])
 
   const getWeatherIcon = (code: number) => {
     switch (code) {
@@ -169,34 +175,32 @@ export function WeatherWidget() {
     }
   }, [])
 
-  useEffect(() => {
-    const fetchWeather = async () => {
-      if (!location) return
-      
-      try {
-        const params = new URLSearchParams({
-          lat: location.latitude,
-          lon: location.longitude
-        })
-        const response = await fetch(`/api/weather?${params}`)
-        if (!response.ok) {
-          throw new Error('Failed to fetch weather data')
-        }
-        const data = await response.json()
-        setWeatherData(data)
-        setLoading(false)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load weather data')
-        setLoading(false)
+  const fetchWeather = useCallback(async () => {
+    if (!location) return
+    
+    try {
+      const params = new URLSearchParams({
+        lat: location.latitude,
+        lon: location.longitude
+      })
+      const response = await fetch(`/api/weather?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch weather data')
       }
-    }
-
-    if (location) {
-      fetchWeather()
-      const interval = setInterval(fetchWeather, 5 * 60 * 1000)
-      return () => clearInterval(interval)
+      const data = await response.json()
+      setWeatherData(data)
+      setLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load weather data')
+      setLoading(false)
+      throw err
     }
   }, [location])
+
+  // Expose fetchWeather method to parent component
+  useImperativeHandle(ref, () => ({
+    fetchWeather
+  }))
 
   const celsiusToFahrenheit = (celsius: number) => {
     return (celsius * 9/5) + 32
@@ -216,37 +220,44 @@ export function WeatherWidget() {
     return days[targetDay].slice(0, 3)
   }
 
-  const getMetricData = () => {
-    if (!weatherData) return []
+  const getMetricData = useCallback(() => {
+    if (!weatherData) return [];
     
-    const currentHour = new Date().getHours()
-    const startIndex = currentHour
-    const endIndex = startIndex + 8
+    const currentHour = new Date().getHours();
+    const startIndex = currentHour;
+    const endIndex = startIndex + 8;
 
-    switch (selectedMetric) {
-      case 'temperature':
-        return weatherData.hourly.temperature_2m
-          .slice(startIndex, endIndex)
-          .map((temp, i) => ({
-            time: new Date(weatherData.hourly.time[startIndex + i]).toLocaleTimeString('en-US', { hour: 'numeric' }),
-            value: formatTemp(temp)
-          }))
-      case 'precipitation':
-        return weatherData.hourly.precipitation
-          .slice(startIndex, endIndex)
-          .map((precip, i) => ({
-            time: new Date(weatherData.hourly.time[startIndex + i]).toLocaleTimeString('en-US', { hour: 'numeric' }),
-            value: Math.round(precip * 100)
-          }))
-      case 'wind':
-        return weatherData.hourly.wind_speed_10m
-          .slice(startIndex, endIndex)
-          .map((wind, i) => ({
-            time: new Date(weatherData.hourly.time[startIndex + i]).toLocaleTimeString('en-US', { hour: 'numeric' }),
-            value: Math.round(wind)
-          }))
-    }
-  }
+    const data = (() => {
+      switch (selectedMetric) {
+        case 'temperature':
+          return weatherData.hourly.temperature_2m
+            .slice(startIndex, endIndex)
+            .map((temp, i) => ({
+              time: new Date(weatherData.hourly.time[startIndex + i])
+                .toLocaleTimeString('en-US', { hour: 'numeric' }),
+              value: formatTemp(temp)
+            }));
+        case 'precipitation':
+          return weatherData.hourly.precipitation
+            .slice(startIndex, endIndex)
+            .map((precip, i) => ({
+              time: new Date(weatherData.hourly.time[startIndex + i])
+                .toLocaleTimeString('en-US', { hour: 'numeric' }),
+              value: Math.round(precip)
+            }));
+        case 'wind':
+          return weatherData.hourly.wind_speed_10m
+            .slice(startIndex, endIndex)
+            .map((wind, i) => ({
+              time: new Date(weatherData.hourly.time[startIndex + i])
+                .toLocaleTimeString('en-US', { hour: 'numeric' }),
+              value: Math.round(wind)
+            }));
+      }
+    })();
+
+    return data;
+  }, [weatherData, selectedMetric, formatTemp]);
 
   const getMetricLabel = () => {
     switch (selectedMetric) {
@@ -259,180 +270,222 @@ export function WeatherWidget() {
     }
   }
 
+  // Update chartData dependencies
+  const chartData = useMemo(() => {
+    if (!weatherData) return null;
+    return getMetricData();
+  }, [weatherData, getMetricData]);
+
+  useEffect(() => {
+    if (chartData) {
+      console.log('Chart Data:', chartData)
+    }
+  }, [chartData])
+
+  useEffect(() => {
+    if (location) {
+      fetchWeather();
+    }
+  }, [location, fetchWeather]);
+
   if (loading) {
     return (
-      <div className="h-full">
-        <div className={`h-full ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-sm flex items-center justify-center`}>
-          <div className="animate-pulse">Loading weather data...</div>
-        </div>
+      <div className="p-6">
+        <div className="animate-pulse">Loading weather data...</div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="h-full">
-        <div className={`h-full ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-sm flex items-center justify-center`}>
-          <div>
-            <div className={isDarkMode ? 'text-red-400' : 'text-red-600'}>{error}</div>
-            <button 
-              onClick={() => window.location.reload()} 
-              className={`mt-2 ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
-            >
-              Retry
-            </button>
-          </div>
-        </div>
+      <div className="p-6">
+        <div className="text-red-600 dark:text-red-400">{error}</div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+        >
+          Retry
+        </button>
       </div>
     )
   }
 
   if (!weatherData || !location) {
-    return null
+    return (
+      <div className="p-6">
+        <div className="text-yellow-600 dark:text-yellow-400">Waiting for location data...</div>
+      </div>
+    )
   }
 
   const { current_weather } = weatherData
-  const chartData = getMetricData()
 
   return (
-    <div className="h-full">
-      <div className={`h-full ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} rounded-lg shadow-sm flex flex-col`}>
-        {/* Current Weather Header */}
-        <div className="flex items-start justify-between p-3">
-          <div className="flex items-center gap-2">
-            {getWeatherIcon(current_weather.weathercode)}
-            <span className="text-4xl font-light">
-              {formatTemp(current_weather.temperature)}
-            </span>
-            <div className="text-xs text-gray-500 mt-1">
-              <span className="flex gap-2">
-                <button 
-                  onClick={() => setTempUnit('F')}
-                  className={`${tempUnit === 'F' ? 'text-blue-500 font-medium' : ''}`}
-                >
-                  °F
-                </button>
-                |
-                <button 
-                  onClick={() => setTempUnit('C')}
-                  className={`${tempUnit === 'C' ? 'text-blue-500 font-medium' : ''}`}
-                >
-                  °C
-                </button>
-              </span>
-              <div className="mt-0.5">
-                <div>Precipitation: {weatherData.hourly.precipitation[0]}%</div>
-                <div>Humidity: 76%</div>
-                <div>Wind: {Math.round(current_weather.windspeed)} mph</div>
-              </div>
-            </div>
-          </div>
-          <div className="text-right">
-            {showZipInput ? (
-              <form onSubmit={handleZipSubmit} className="mb-0.5">
-                <input
-                  type="text"
-                  value={zipCode}
-                  onChange={(e) => setZipCode(e.target.value)}
-                  placeholder="Enter ZIP code"
-                  className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'} px-2 py-0.5 rounded w-20 text-xs`}
-                  maxLength={5}
-                />
-              </form>
-            ) : (
+    <div className="flex flex-col h-full">
+      {/* Location and Update */}
+      <div className="flex justify-between items-center mb-2 px-3">
+        <span className="text-label">
+          {location.cityName} ({weatherData.timezone})
+        </span>
+        <div className="flex gap-2">
+          {showZipInput ? (
+            <form onSubmit={handleZipSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={zipCode}
+                onChange={(e) => setZipCode(e.target.value)}
+                placeholder="Enter ZIP code"
+                className="input w-24"
+                maxLength={5}
+              />
               <button 
-                onClick={() => setShowZipInput(true)}
-                className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+                type="submit" 
+                className="btn btn-blue"
               >
-                {location.cityName}
+                Update
               </button>
-            )}
-            <div className="text-xs text-gray-500">{getCurrentDateTime(weatherData.timezone)}</div>
-            <div className="text-xs text-gray-500">{getWeatherDescription(current_weather.weathercode)}</div>
-          </div>
+            </form>
+          ) : (
+            <button 
+              onClick={() => setShowZipInput(true)} 
+              className="btn btn-blue"
+            >
+              Change ZIP Code
+            </button>
+          )}
         </div>
+      </div>
 
-        {/* Metric Selector */}
-        <div className="flex gap-3 px-3 border-b border-gray-700">
-          <button
-            onClick={() => handleMetricChange('temperature')}
-            className={`h-6 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-              selectedMetric === 'temperature' 
-                ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
-            }`}
-          >
-            Temperature
-          </button>
-          <button
-            onClick={() => handleMetricChange('precipitation')}
-            className={`h-6 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-              selectedMetric === 'precipitation'
-                ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
-            }`}
-          >
-            Precipitation
-          </button>
-          <button
-            onClick={() => handleMetricChange('wind')}
-            className={`h-6 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-              selectedMetric === 'wind'
-                ? 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
-            }`}
-          >
-            Wind
-          </button>
-        </div>
-
-        {/* Chart */}
-        <div className="flex-grow px-3 py-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-              <XAxis 
-                dataKey="time" 
-                stroke={isDarkMode ? '#9CA3AF' : '#4B5563'}
-                fontSize={10}
-                tickMargin={5}
-              />
-              <YAxis 
-                stroke={isDarkMode ? '#9CA3AF' : '#4B5563'}
-                fontSize={10}
-                tickFormatter={(value) => `${value}${getMetricLabel()}`}
-                width={35}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="value" 
-                stroke={
-                  selectedMetric === 'temperature' ? '#F59E0B' :
-                  selectedMetric === 'precipitation' ? '#3B82F6' :
-                  '#10B981'
-                }
-                strokeWidth={1.5}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Daily Forecast */}
-        <div className="grid grid-cols-7 gap-1 text-center px-3 pb-2 mx-auto max-w-3xl w-full">
-          {weatherData.daily.weathercode.slice(0, 7).map((code, index) => (
-            <div key={index} className="flex flex-col items-center">
-              <div className="text-xs text-gray-500">{getDayName(index, weatherData.timezone)}</div>
-              <div className="my-0.5">{getWeatherIcon(code)}</div>
-              <div className="text-xs">
-                {formatTemp(weatherData.daily.temperature_2m_max[index])}°{' '}
-                <span className="text-gray-500">
-                  {formatTemp(weatherData.daily.temperature_2m_min[index])}°
+      <div className="flex-1 overflow-auto">
+        <div className="h-full flex flex-col">
+          {/* Current Weather Header */}
+          <div className="flex items-start justify-between p-3">
+            <div className="flex items-center gap-2">
+              {getWeatherIcon(current_weather.weathercode)}
+              <span className="text-4xl font-light text-gray-900 dark:text-gray-100">
+                {formatTemp(current_weather.temperature)}
+              </span>
+              <div className="text-muted mt-1">
+                <span className="flex gap-2">
+                  <button 
+                    onClick={() => handleTempUnitChange('F')}
+                    className={`btn-icon ${tempUnit === 'F' ? 'btn-icon-blue' : 'text-muted'}`}
+                  >
+                    °F
+                  </button>
+                  |
+                  <button 
+                    onClick={() => handleTempUnitChange('C')}
+                    className={`btn-icon ${tempUnit === 'C' ? 'btn-icon-blue' : 'text-muted'}`}
+                  >
+                    °C
+                  </button>
                 </span>
+                <div className="mt-0.5">
+                  <div>Precipitation: {weatherData.hourly.precipitation[0]}%</div>
+                  <div>Humidity: 76%</div>
+                  <div>Wind: {Math.round(current_weather.windspeed)} mph</div>
+                </div>
               </div>
             </div>
-          ))}
+            <div className="text-right">
+              <div className="text-muted">{getCurrentDateTime(weatherData.timezone)}</div>
+              <div className="text-muted">{getWeatherDescription(current_weather.weathercode)}</div>
+            </div>
+          </div>
+
+          {/* Metric Selector */}
+          <div className="flex gap-3 px-3 border-b border-gray-700">
+            <button
+              onClick={() => handleMetricChange('temperature')}
+              className={`btn ${
+                selectedMetric === 'temperature' 
+                  ? 'btn-blue' 
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              Temperature
+            </button>
+            <button
+              onClick={() => handleMetricChange('precipitation')}
+              className={`btn ${
+                selectedMetric === 'precipitation' 
+                  ? 'btn-blue' 
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              Precipitation
+            </button>
+            <button
+              onClick={() => handleMetricChange('wind')}
+              className={`btn ${
+                selectedMetric === 'wind' 
+                  ? 'btn-blue' 
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              Wind
+            </button>
+          </div>
+
+          {/* Chart */}
+          {chartData && (
+            <div className="flex-grow px-3 py-2 h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart 
+                  data={chartData}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+                >
+                  <XAxis 
+                    dataKey="time" 
+                    stroke={isDarkMode ? '#9CA3AF' : '#4B5563'}
+                    fontSize={10}
+                    tickMargin={5}
+                  />
+                  <YAxis 
+                    stroke={isDarkMode ? '#9CA3AF' : '#4B5563'}
+                    fontSize={10}
+                    tickFormatter={(value) => `${value}${getMetricLabel()}`}
+                    width={35}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke={
+                      selectedMetric === 'temperature' ? '#F59E0B' :
+                      selectedMetric === 'precipitation' ? '#3B82F6' :
+                      '#10B981'
+                    }
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Daily Forecast */}
+          <div className="grid grid-cols-7 gap-1 text-center px-3 pb-2 mx-auto max-w-3xl w-full">
+            {weatherData.daily.weathercode.slice(0, 7).map((code, index) => (
+              <div key={index} className="flex flex-col items-center">
+                <div className="text-muted">{getDayName(index, weatherData.timezone)}</div>
+                <div className="my-0.5">{getWeatherIcon(code)}</div>
+                <div className="text-small">
+                  {formatTemp(weatherData.daily.temperature_2m_max[index])}°{' '}
+                  <span className="text-muted">
+                    {formatTemp(weatherData.daily.temperature_2m_min[index])}°
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   )
-} 
+})
+
+WeatherWidget.displayName = 'WeatherWidget'
+
+export default WeatherWidget 

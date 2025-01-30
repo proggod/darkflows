@@ -299,80 +299,80 @@ export function DnsClientsCard() {
   }, [registerRefreshCallback]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
+    <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Clients</h3>
+        <h3 className="text-label">DNS Clients</h3>
         <div className="flex gap-2">
           <button
             onClick={handleSyncDNS}
             disabled={isSyncing}
-            className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors disabled:opacity-50"
+            className={`btn ${isSyncing ? 'btn-gray' : 'btn-green'}`}
           >
             {isSyncing ? 'Syncing...' : 'Sync DNS'}
           </button>
           <RefreshIcon 
             onClick={fetchClients}
-            className="w-2 h-2 text-blue-500 dark:text-blue-400 cursor-pointer hover:text-blue-600 dark:hover:text-blue-500 transform scale-25"
+            className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
           />
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
           {error}
         </div>
       )}
 
       <div className="overflow-auto flex-grow -mx-3">
         {loading ? (
-          <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">Loading DNS clients...</div>
+          <div className="text-center py-4 text-muted">Loading DNS clients...</div>
         ) : clients.length === 0 ? (
-          <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">No DNS clients found</div>
+          <div className="text-center py-4 text-muted">No DNS clients found</div>
         ) : (
-          <table className="w-full h-full">
-            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-              <tr className="bg-gray-50 dark:bg-gray-700">
+          <table className="w-full h-full table-container">
+            <thead className="sticky top-0 z-10">
+              <tr className="table-header">
                 <th 
-                  className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="w-[80px] card-hover"
                   onClick={() => handleSort('ip')}
                 >
                   IP<SortArrow field="ip" />
                 </th>
                 <th 
-                  className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="w-[80px] card-hover"
                   onClick={() => handleSort('name')}
                 >
                   Name<SortArrow field="name" />
                 </th>
                 <th 
-                  className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="w-[80px] card-hover"
                   onClick={() => handleSort('status')}
                 >
                   Status<SortArrow field="status" />
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800">
+            <tbody>
               {sortedClients.map((client, index) => (
                 <tr 
                   key={client.ip} 
-                  className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                    index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
-                  }`}
+                  className={`card-hover ${
+                    index % 2 === 0 ? '' : 'card-alternate'
+                  } ${index === sortedClients.length - 1 ? 'last-row' : ''}`}
                 >
-                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
+                  <td className="px-1 whitespace-nowrap text-small leading-3 tabular-nums">
                     {client.ip}
                   </td>
-                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                  <td className="px-1 whitespace-nowrap text-small leading-3">
                     <input
                       type="text"
-                      value={editedNames.hasOwnProperty(client.ip) ? editedNames[client.ip] : client.name}
+                      value={editedNames[client.ip] ?? ''}
                       onChange={(e) => handleNameChange(client.ip, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(e, client)}
-                      disabled={client.status === 'static' || savingHostnames[client.ip]}
-                      className={`w-full bg-transparent border-none p-0 focus:ring-0 text-xs disabled:text-gray-500 ${
-                        savingHostnames[client.ip] ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
+                      className={`input ${savingHostnames[client.ip] ? 'opacity-50' : ''}`}
+                      disabled={savingHostnames[client.ip]}
+                      autoFocus
+                      placeholder="N/A"
                     />
                   </td>
                   <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
@@ -382,7 +382,7 @@ export function DnsClientsCard() {
                       <button
                         onClick={() => handleRemoveReservation(client)}
                         disabled={processingClients[client.ip]}
-                        className={`h-6 px-2 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 transition-colors flex items-center gap-1 w-[72px] justify-center ${
+                        className={`btn btn-red w-[72px] justify-center ${
                           processingClients[client.ip] ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
@@ -392,7 +392,7 @@ export function DnsClientsCard() {
                       <button
                         onClick={() => handleReserve(client)}
                         disabled={processingClients[client.ip]}
-                        className={`h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors flex items-center gap-1 w-[72px] justify-center ${
+                        className={`btn btn-blue w-[72px] justify-center ${
                           processingClients[client.ip] ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >

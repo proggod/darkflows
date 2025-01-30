@@ -20,39 +20,38 @@ interface TuningConfig {
 }
 
 export default function ConnectionTuningNew() {
-  const [config, setConfig] = useState<TuningConfig>({
-    PRIMARY_EGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
-    PRIMARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
-    SECONDARY_EGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
-    SECONDARY_INGRESS_BANDWIDTH: { value: '', unit: 'mbit' },
-    PRIMARY_LABEL: '',
-    SECONDARY_LABEL: '',
-    CAKE_PARAMS: '',
-    CAKE_DEFAULT: ''
-  })
+  const [config, setConfig] = useState<TuningConfig | null>(null)
+  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [activeConnection, setActiveConnection] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeConnection, setActiveConnection] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchConfig()
+    const fetchInitialData = async () => {
+      try {
+        const response = await fetch('/api/network-config')
+        if (!response.ok) {
+          throw new Error(`Failed to fetch config: ${response.status}`)
+        }
+        const data = await response.json()
+        console.log('Initial config:', data)
+        setConfig(data)
+      } catch (error) {
+        console.error('Failed to fetch config:', error)
+        setError('Failed to load configuration')
+      } finally {
+        setMounted(true)
+      }
+    }
+
+    fetchInitialData()
+  }, [])
+
+  useEffect(() => {
     fetchConnectionStatus()
     const interval = setInterval(fetchConnectionStatus, 5000)
     return () => clearInterval(interval)
   }, [])
-
-  const fetchConfig = async () => {
-    try {
-      const response = await fetch('/api/network-config')
-      if (!response.ok) {
-        throw new Error(`Failed to fetch config: ${response.status}`)
-      }
-      const data = await response.json()
-      setConfig(data)
-    } catch (error) {
-      console.error('Error fetching config:', error)
-    }
-  }
 
   const fetchConnectionStatus = async () => {
     try {
@@ -67,37 +66,56 @@ export default function ConnectionTuningNew() {
   }
 
   const handleBandwidthChange = (key: string, value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      [key]: {
-        ...((prev[key] as BandwidthValue) || { unit: 'mbit' }),
-        value: value
-      }
-    }))
+    setConfig(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        [key]: {
+          ...(prev[key] as BandwidthValue),
+          value
+        }
+      } as TuningConfig;
+    });
   }
 
   const handleUnitChange = (key: string, unit: string) => {
-    setConfig(prev => ({
-      ...prev,
-      [key]: {
-        ...((prev[key] as BandwidthValue) || { value: '' }),
-        unit: unit
-      }
-    }))
+    setConfig(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        [key]: {
+          ...(prev[key] as BandwidthValue),
+          unit
+        }
+      } as TuningConfig;
+    });
   }
 
   const handleCakeParamsChange = (value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      CAKE_PARAMS: value
-    }))
+    if (!config) return;
+    
+    try {
+      setConfig(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          CAKE_PARAMS: value
+        } as TuningConfig;
+      });
+    } catch (error) {
+      console.error('Error updating CAKE params:', error);
+      setError('Failed to update CAKE parameters');
+    }
   }
 
   const handleLabelChange = (type: string, value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      [`${type}_LABEL`]: value
-    }))
+    setConfig(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        [`${type}_LABEL`]: value
+      } as TuningConfig;
+    });
   }
 
   const handleApply = async () => {
@@ -117,7 +135,7 @@ export default function ConnectionTuningNew() {
       }
       
       await response.json()
-      await fetchConfig()
+      await fetchConnectionStatus()
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message)
@@ -153,10 +171,28 @@ export default function ConnectionTuningNew() {
   }
 
   const loadDefaultCakeParams = () => {
-    handleCakeParamsChange(config.CAKE_DEFAULT);
-  };
+    if (!config?.CAKE_DEFAULT) {
+      console.warn('No default CAKE parameters available');
+      return;
+    }
+    
+    try {
+      setConfig(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          CAKE_PARAMS: prev.CAKE_DEFAULT
+        } as TuningConfig;
+      });
+    } catch (error) {
+      console.error('Error setting CAKE params:', error);
+      setError('Failed to load default CAKE parameters');
+    }
+  }
 
   const renderConnectionSection = (type: 'PRIMARY' | 'SECONDARY') => {
+    if (!config) return null;
+    
     const isActive = activeConnection === type
     const ingressKey = `${type}_INGRESS_BANDWIDTH`
     const egressKey = `${type}_EGRESS_BANDWIDTH`
@@ -252,53 +288,62 @@ export default function ConnectionTuningNew() {
     )
   }
 
-  return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
-      <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1"></h3>
-        
-        <div className="flex-1 overflow-auto">
-          <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Connection Tuning</h3>
-              <button
-                onClick={handleApply}
-                disabled={loading}
-                className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Applying...' : 'Apply'}
-              </button>
-            </div>
-            
-            <div className="flex-1 grid grid-cols-2 gap-2">
-              {renderConnectionSection('PRIMARY')}
-              {renderConnectionSection('SECONDARY')}
-            </div>
-
-            <div className="mt-2 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={config.CAKE_PARAMS}
-                  onChange={(e) => handleCakeParamsChange(e.target.value)}
-                  className="flex-1 px-2 py-1 text-xs rounded-l bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  placeholder="CAKE Parameters"
-                />
-                <button
-                  onClick={loadDefaultCakeParams}
-                  className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-r border border-l-0 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
-                >
-                  D
-                </button>
-              </div>
-
-              {error && (
-                <div className="p-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
-                  <p className="text-[10px] text-red-800 dark:text-red-200">{error}</p>
-                </div>
-              )}
-            </div>
+  if (!mounted || !config) {
+    return (
+      <div className="p-3 h-full flex flex-col">
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <h3 className="text-label">Connection Tuning</h3>
           </div>
+          <div className="text-center py-4 text-muted">Loading...</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3 h-full flex flex-col">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h3 className="text-label">Connection Tuning</h3>
+          <button
+            onClick={handleApply}
+            disabled={loading}
+            className="btn btn-green"
+          >
+            {loading ? 'Applying...' : 'Apply'}
+          </button>
+        </div>
+        
+        <div className="flex-1 grid grid-cols-2 gap-2">
+          {renderConnectionSection('PRIMARY')}
+          {renderConnectionSection('SECONDARY')}
+        </div>
+
+        <div className="mt-2 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={config?.CAKE_PARAMS ?? ''}
+              onChange={(e) => handleCakeParamsChange(e.target.value)}
+              className="flex-1 px-2 py-1 text-small rounded-l bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="CAKE Parameters"
+            />
+            <button
+              onClick={loadDefaultCakeParams}
+              disabled={!config?.CAKE_DEFAULT}
+              className="px-2 py-1 text-small bg-gray-100 dark:bg-gray-600 rounded-r border border-l-0 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+              title={config?.CAKE_DEFAULT || 'No default parameters available'}
+            >
+              Default
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
+              {error}
+            </div>
+          )}
         </div>
       </div>
     </div>

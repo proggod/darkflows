@@ -4,7 +4,7 @@
 const NETWORK_UPDATE_INTERVAL = 10000; // 30 seconds
 
 import { useState, useEffect } from 'react';
-import { Cpu, Box, HardDrive, Wifi } from 'lucide-react';
+import { Cpu, Box, HardDrive, Wifi, RefreshCw } from 'lucide-react';
 
 interface SysData {
   timestamp: string;
@@ -39,6 +39,8 @@ const SystemMonitor: React.FC = () => {
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     // Fetch devices first
@@ -68,7 +70,8 @@ const SystemMonitor: React.FC = () => {
           diskAvailable: data.serverInfo.diskAvailable
         });
       })
-      .catch(() => {/* Error handling preserved but without logging */});
+      .catch(() => {/* Error handling preserved but without logging */})
+      .finally(() => setLoading(false));
 
     // Fetch connection status
     const updateConnectionStatus = (data: ConnectionStatus) => {
@@ -78,7 +81,8 @@ const SystemMonitor: React.FC = () => {
     fetch('/api/connection-status')
       .then(res => res.json())
       .then(updateConnectionStatus)
-      .catch(() => {/* Error handling preserved but without logging */});
+      .catch(() => {/* Error handling preserved but without logging */})
+      .finally(() => setLoading(false));
 
     // Set up SSE for real-time stats
     const eventSource = new EventSource('/api/sys-stats');
@@ -101,7 +105,8 @@ const SystemMonitor: React.FC = () => {
       fetch('/api/connection-status')
         .then(res => res.json())
         .then(updateConnectionStatus)
-        .catch(() => {/* Error handling preserved but without logging */});
+        .catch(() => {/* Error handling preserved but without logging */})
+        .finally(() => setLoading(false));
     }, NETWORK_UPDATE_INTERVAL);
 
     return () => {
@@ -138,71 +143,102 @@ const SystemMonitor: React.FC = () => {
   const activeDevice = devices.find(device => device.type?.toUpperCase() === connectionStatus?.active)
   const activeLabel = activeDevice?.label || activeDevice?.name || connectionStatus?.active || 'Unknown'
 
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/sys-stats');
+      const data = await response.json();
+      setSysData(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 shadow-sm transition-colors duration-200 h-card">
-      <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">System Monitor</h3>
-        
+    <div className="p-3 h-full flex flex-col">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-label">System Monitor</h3>
+        <RefreshCw 
+          onClick={fetchStats}
+          className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
+        />
+      </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-center py-4 text-muted">Loading system stats...</div>
+      ) : (
         <div className="flex-1 overflow-auto">
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-                <Wifi className="w-3 h-3 mr-1" />ISP:</span>
+              <span className="w-16 text-small flex items-center">
+                <Wifi className="w-3 h-3 mr-1" />ISP:
+              </span>
               <div className="flex justify-between flex-1">
-                <span className="text-xs text-gray-400 dark:text-gray-400">{activeLabel}</span>
-                <span className="text-xs text-gray-400 dark:text-gray-400">{serverInfo?.uptime || 'Unknown'}</span>
+                <span className="text-muted">{activeLabel}</span>
+                <span className="text-muted">{serverInfo?.uptime || 'Unknown'}</span>
               </div>
             </div>
 
             <div className="flex items-center">
-              <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-                <Cpu className="w-3 h-3 mr-1" />CPU:</span>
+              <span className="w-16 text-small flex items-center">
+                <Cpu className="w-3 h-3 mr-1" />CPU:
+              </span>
               <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
                 <div className={`h-full ${getBarColor(sysData?.cpu || 0, 'cpu')} rounded-full ${getBarWidth(sysData?.cpu || 0)}`} />
               </div>
-              <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{sysData?.cpu?.toFixed(1) || 0}%</span>
+              <span className="ml-2 text-muted min-w-[32px] text-right">{sysData?.cpu?.toFixed(1) || 0}%</span>
             </div>
 
             <div>
               <div className="flex items-center">
-                <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-                  <Box className="w-3 h-3 mr-1" />Memory:</span>
+                <span className="w-16 text-small flex items-center">
+                  <Box className="w-3 h-3 mr-1" />Memory:
+                </span>
                 <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
                   <div className={`h-full ${getBarColor(memoryUsage, 'memory')} rounded-full ${getBarWidth(memoryUsage)}`} />
                 </div>
-                <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{memoryUsage.toFixed(1)}%</span>
+                <span className="ml-2 text-muted min-w-[32px] text-right">{memoryUsage.toFixed(1)}%</span>
               </div>
-              <div className="text-xs text-gray-400 dark:text-gray-400 pl-16 mt-0.5">
+              <div className="text-muted pl-16 mt-0.5">
                 {sysData ? `${(sysData.memFree / 1024).toFixed(1)} GB free of ${(sysData.totalMemMB / 1024).toFixed(1)} GB` : 'Loading...'}
               </div>
             </div>
 
             <div>
               <div className="flex items-center">
-                <span className="w-16 text-xs text-gray-500 dark:text-gray-300 flex items-center">
-                  <HardDrive className="w-3 h-3 mr-1" />Disk:</span>
+                <span className="w-16 text-small flex items-center">
+                  <HardDrive className="w-3 h-3 mr-1" />Disk:
+                </span>
                 <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full">
                   <div className={`h-full ${getBarColor(serverInfo?.disk || 0, 'disk')} rounded-full ${getBarWidth(serverInfo?.disk || 0)}`} />
                 </div>
-                <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 min-w-[32px] text-right">{serverInfo?.disk || 0}%</span>
+                <span className="ml-2 text-muted min-w-[32px] text-right">{serverInfo?.disk || 0}%</span>
               </div>
-              <div className="text-xs text-gray-400 dark:text-gray-400 pl-16 mt-0.5">
+              <div className="text-muted pl-16 mt-0.5">
                 {serverInfo && typeof serverInfo.diskAvailable === 'number' && typeof serverInfo.diskTotal === 'number' 
                   ? `${serverInfo.diskAvailable.toFixed(1)} GB free of ${serverInfo.diskTotal.toFixed(1)} GB` 
                   : 'Loading...'}
               </div>
             </div>
 
-            <div className="text-xs text-gray-400 dark:text-gray-400">
+            <div className="text-muted">
               {serverInfo ? `${serverInfo.osName} ${serverInfo.osVersion}` : 'Loading OS info...'}
             </div>
 
-            <div className="text-xs text-gray-400 dark:text-gray-400">
+            <div className="text-muted">
               {serverInfo?.cpuModel || 'Loading CPU info...'}
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

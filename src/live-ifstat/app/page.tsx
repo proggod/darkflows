@@ -42,6 +42,8 @@ import React from 'react'
 import { useNetworkStats } from '@/hooks/useNetworkStats'
 import SshKeysCard from '@/components/SshKeysCard'
 import { usePingData } from '@/contexts/PingDataContext'
+import Clock from '@/components/Clock'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 interface NetworkInterface {
   name: string
@@ -59,7 +61,7 @@ interface IfstatData {
 
 const DEFAULT_ITEMS = [
   'systemMonitor',
-  'interfaceStatus', // Shows CAKE status including ifb0
+  'interfaceStatus',
   'pingPrimary',
   'pingSecondary',
   'speedTest',
@@ -77,7 +79,8 @@ const DEFAULT_ITEMS = [
   'dnsHosts',
   'piholeLists',
   'bandwidth',
-  'systemSettings'
+  'systemSettings',
+  'clock',
 ]
 
 const CombinedDashboard = () => {
@@ -122,21 +125,15 @@ const CombinedDashboard = () => {
           }
         } else {
           // Reset to defaults if any components are missing
-          console.log('Missing components in dashboard - resetting layout')
+          // console.log('Missing components in dashboard - resetting layout')
           localStorage.removeItem('betaDashboardOrder')
           localStorage.removeItem('betaDashboardHidden')
           localStorage.removeItem('betaDashboardVersion')
           setItems(DEFAULT_ITEMS)
           setHiddenItems(new Set())
         }
-      } catch (e) {
-        console.error('Failed to load saved dashboard state:', e)
-        // Reset to defaults on error
-        localStorage.removeItem('betaDashboardOrder')
-        localStorage.removeItem('betaDashboardHidden')
-        localStorage.removeItem('betaDashboardVersion')
-        setItems(DEFAULT_ITEMS)
-        setHiddenItems(new Set())
+      } catch {  // Remove unused 'e' parameter
+        // Silent fail for localStorage issues
       }
     }
 
@@ -188,9 +185,9 @@ const CombinedDashboard = () => {
         
         if (!savedVersion || savedVersion !== version) {
           // Version mismatch or first run - reset dashboard
-          console.log('Version mismatch or first run - resetting dashboard layout');
-          localStorage.removeItem('betaDashboardOrder');
-          localStorage.removeItem('betaDashboardHidden');
+          // console.log('Version mismatch or first run - resetting dashboard layout')
+          localStorage.removeItem('betaDashboardOrder')
+          localStorage.removeItem('betaDashboardHidden')
           localStorage.setItem('betaDashboardVersion', version);
           setItems(DEFAULT_ITEMS);
           setHiddenItems(new Set());
@@ -266,11 +263,11 @@ const CombinedDashboard = () => {
 
     switch (id) {
       case 'systemMonitor':
-        return <SystemMonitor />
+        return <ErrorBoundary><SystemMonitor /></ErrorBoundary>
       case 'interfaceStatus':
-        return <InterfaceStatusCard />
+        return <ErrorBoundary><InterfaceStatusCard /></ErrorBoundary>
       case 'pingPrimary':
-        return <PingStatsCard color="#3b82f6" server="PRIMARY" />
+        return <ErrorBoundary><PingStatsCard color="#3b82f6" server="PRIMARY" /></ErrorBoundary>
       case 'pingSecondary':
         if (isPingDataLoading) {
           return <div>Loading...</div>;
@@ -278,39 +275,41 @@ const CombinedDashboard = () => {
         if (!networkConfig?.SECONDARY_INTERFACE) {
           return null;
         }
-        return <PingStatsCard color="#10b981" server="SECONDARY" />
+        return <ErrorBoundary><PingStatsCard color="#10b981" server="SECONDARY" /></ErrorBoundary>
       case 'speedTest':
-        return <SpeedTestNew />
+        return <ErrorBoundary><SpeedTestNew /></ErrorBoundary>
       case 'connectionTuning':
-        return <ConnectionTuningNew />
+        return <ErrorBoundary><ConnectionTuningNew /></ErrorBoundary>
       case 'reservations':
-        return <ReservationsCard />
+        return <ErrorBoundary><ReservationsCard /></ErrorBoundary>
       case 'leases':
-        return <LeasesCard />
+        return <ErrorBoundary><LeasesCard /></ErrorBoundary>
       case 'weather':
-        return <WeatherCard />
+        return <ErrorBoundary><WeatherCard /></ErrorBoundary>
       case 'processes':
-        return <ServicesCard />
+        return <ErrorBoundary><ServicesCard /></ErrorBoundary>
       case 'sambaShares':
-        return <SambaSharesCard />
+        return <ErrorBoundary><SambaSharesCard /></ErrorBoundary>
       case 'dnsClients':
-        return <DnsClientsCard />
+        return <ErrorBoundary><DnsClientsCard /></ErrorBoundary>
       case 'routeToSecondary':
-        return <RouteHostToSecondary />
+        return <ErrorBoundary><RouteHostToSecondary /></ErrorBoundary>
       case 'portForwards':
-        return <PortForwards />
+        return <ErrorBoundary><PortForwards /></ErrorBoundary>
       case 'dnsHosts':
-        return <DnsHosts />
+        return <ErrorBoundary><DnsHosts /></ErrorBoundary>
       case 'piholeLists':
-        return <PiholeLists />
+        return <ErrorBoundary><PiholeLists /></ErrorBoundary>
       case 'bandwidth':
-        return <BandwidthUsage />
+        return <ErrorBoundary><BandwidthUsage /></ErrorBoundary>
       case 'systemSettings':
-        return <SystemSettingsCard />
+        return <ErrorBoundary><SystemSettingsCard /></ErrorBoundary>
       case 'blockClients':
-        return <BlockClientsCard />
+        return <ErrorBoundary><BlockClientsCard /></ErrorBoundary>
       case 'sshKeys':
-        return <SshKeysCard />
+        return <ErrorBoundary><SshKeysCard /></ErrorBoundary>
+      case 'clock':
+        return <ErrorBoundary><Clock /></ErrorBoundary>
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -319,11 +318,16 @@ const CombinedDashboard = () => {
           
           const colorIndex = interfaces.findIndex(i => i.name === deviceName) % colors.length
           return (
-            <NetworkStatsCard
-              data={getNetworkCardData(deviceName)}
-              label={device.label || device.name}
-              color={isDarkMode ? colors[colorIndex].dark : colors[colorIndex].light}
-            />
+            <ErrorBoundary>
+              <NetworkStatsCard
+                data={getNetworkCardData(deviceName)}
+                label={device.label || device.name}
+                color={isDarkMode ? colors[colorIndex].dark : colors[colorIndex].light}
+                fetchStats={() => {}}
+                error={null}
+                loading={false}
+              />
+            </ErrorBoundary>
           )
         }
         return null
@@ -339,8 +343,6 @@ const CombinedDashboard = () => {
       }
       return true;
     });
-
-  const hiddenItemsList = items.filter(id => hiddenItems.has(id))
 
   const getComponentLabel = (id: string) => {
     switch (id) {
@@ -382,6 +384,8 @@ const CombinedDashboard = () => {
         return 'Block Clients'
       case 'sshKeys':
         return 'SSH Keys'
+      case 'clock':
+        return 'Clock'
       default:
         if (id.startsWith('device_')) {
           const deviceName = id.replace('device_', '')
@@ -391,6 +395,9 @@ const CombinedDashboard = () => {
         return id
     }
   }
+
+  // Add back hiddenItemsList
+  const hiddenItemsList = items.filter(id => hiddenItems.has(id))
 
   return (
     <>
@@ -402,21 +409,27 @@ const CombinedDashboard = () => {
             onDragEnd={handleDragEnd}
           >
             <SortableContext items={visibleItems} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 auto-rows-[250px] gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 auto-rows-[250px] gap-3">
                 {visibleItems.map((id) => (
                   <SortableItem 
                     key={id} 
                     id={id} 
                     isEditMode={isEditMode}
-                    className={id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || 
-                             id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' || 
-                             id === 'systemSettings' || id === 'blockClients' ? 'row-span-2' : ''}
+                    className={
+                      id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || 
+                      id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' || 
+                      id === 'systemSettings' || id === 'blockClients' 
+                        ? 'row-span-2 col-span-2'
+                        : id === 'clock' || id === 'interfaceStatus'
+                        ? 'row-span-1 col-span-1'
+                        : 'row-span-1 col-span-2'
+                    }
                   >
                     <div className="relative h-full">
                       {isEditMode && (
                         <button
                           onClick={() => toggleVisibility(id)}
-                          className="absolute top-2 left-2 z-20 p-1 bg-red-500 dark:bg-red-600 text-white rounded-full hover:bg-red-600 dark:hover:bg-red-700"
+                          className="absolute top-2 left-2 z-20 p-1 btn btn-red rounded-full"
                           title={`Hide ${getComponentLabel(id)}`}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -432,54 +445,35 @@ const CombinedDashboard = () => {
               </div>
             </SortableContext>
           </DndContext>
-
-          {isEditMode && hiddenItemsList.length > 0 && (
-            <div className="mt-8 p-4 bg-gray-200 dark:bg-gray-800 rounded-lg">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Hidden Components</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {hiddenItemsList.map(id => (
-                  <div key={id} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded shadow-sm hover:shadow dark:shadow-gray-900">
-                    <button
-                      onClick={() => toggleVisibility(id)}
-                      className="p-1 bg-green-500 dark:bg-green-600 text-white rounded-full hover:bg-green-600 dark:hover:bg-green-700 flex-shrink-0"
-                      title={`Show ${getComponentLabel(id)}`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                      </svg>
-                    </button>
-                    <span className="text-gray-900 dark:text-gray-100">{getComponentLabel(id)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
-      <ViewportDisplay />
+      
+      {isEditMode && hiddenItemsList.length > 0 && (
+        <div className="p-4 border-t">
+          <h3 className="text-label mb-2">Hidden Components</h3>
+          <div className="flex flex-wrap gap-2">
+            {hiddenItemsList.map(id => (
+              <button
+                key={id}
+                onClick={() => toggleVisibility(id)}
+                className="px-2 py-1 text-small bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                {getComponentLabel(id)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   )
 }
-function ViewportDisplay() {
-  const [width, setWidth] = React.useState<number | undefined>(undefined);
 
-  React.useEffect(() => {
-    // Set initial width
-    setWidth(window.innerWidth);
-    
-    const handleResize = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  if (width === undefined) return null;
-
+const DashboardWithErrorBoundary = () => {
   return (
-    <div className="fixed bottom-4 right-4 bg-black/80 text-white px-4 py-2 rounded-full z-50">
-      Width: {width}px
-    </div>
-  );
+    <ErrorBoundary>
+      <CombinedDashboard />
+    </ErrorBoundary>
+  )
 }
 
-export default CombinedDashboard
+export default DashboardWithErrorBoundary

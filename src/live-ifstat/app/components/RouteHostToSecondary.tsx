@@ -83,29 +83,40 @@ export default function RouteHostToSecondary() {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Route Host to Secondary</h3>
+        <h3 className="text-label mb-2">Route to Secondary</h3>
         
         <div className="flex-1 overflow-auto">
-          {ips.length === 0 ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">No routes configured</p>
-          ) : (
-            <div className="space-y-1">
-              {ips.map((ip) => (
-                <div key={ip} className="flex items-center justify-between bg-white dark:bg-gray-700 rounded px-2 py-1">
-                  <span className="text-xs text-gray-900 dark:text-gray-100">{ip}</span>
-                  <button
-                    onClick={() => handleDelete(ip)}
-                    disabled={loading}
-                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-                </div>
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+              <tr>
+                <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">IP Address</th>
+                <th className="px-2 py-1 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ips.map((ip, index) => (
+                <tr 
+                  key={ip} 
+                  className={`card-hover ${
+                    index % 2 === 0 ? '' : 'card-alternate'
+                  } ${index === ips.length - 1 ? 'last-row' : ''}`}
+                >
+                  <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{ip}</td>
+                  <td className="px-2 py-1 text-xs text-right">
+                    <button
+                      onClick={() => handleDelete(ip)}
+                      disabled={loading}
+                      className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
+            </tbody>
+          </table>
         </div>
 
         {error && (

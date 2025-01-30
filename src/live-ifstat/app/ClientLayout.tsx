@@ -30,12 +30,22 @@ function ThemeToggle() {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-0"
+        style={{ 
+          backgroundImage: 'url("/background.jpg")',
+          filter: 'brightness(0.4)'
+        }}
+      />
+      
       <div className="fixed top-2 right-4 z-50 flex items-center gap-2">
         <EditModeButton />
         <ThemeToggle />
       </div>
       
-      {children}
+      <div className="relative z-10">
+        {children}
+      </div>
     </div>
   );
 } 

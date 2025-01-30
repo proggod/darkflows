@@ -170,9 +170,9 @@ export default function PortForwards() {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200 h-card">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Port Forwards</h3>
+        <h3 className="text-label mb-2">Port Forwards</h3>
         
         <div className="flex-1 overflow-auto">
           <div className="space-y-4">

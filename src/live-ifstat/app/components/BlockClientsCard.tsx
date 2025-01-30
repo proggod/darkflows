@@ -333,13 +333,13 @@ export function BlockClientsCard() {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 h-full flex flex-col">
+    <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Block Clients</h3>
+        <h3 className="text-label">Block Clients</h3>
         <div className="flex gap-2">
           <button
             onClick={handleOpenSchedule}
-            className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors flex items-center gap-1"
+            className="btn btn-blue flex items-center gap-1"
           >
             <AccessTimeIcon className="!w-3 !h-3" />
             Schedule
@@ -349,7 +349,7 @@ export function BlockClientsCard() {
               fetchClients();
               fetchBlockedMacs();
             }}
-            className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors flex items-center gap-1"
+            className="btn btn-blue flex items-center gap-1"
           >
             <RefreshIcon className="!w-3 !h-3" />
             Refresh
@@ -358,7 +358,7 @@ export function BlockClientsCard() {
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
           {error}
         </div>
       )}
@@ -369,36 +369,36 @@ export function BlockClientsCard() {
         ) : clients.length === 0 ? (
           <div className="text-center py-4 text-sm text-gray-500 dark:text-gray-400">No clients found</div>
         ) : (
-          <table className="w-full h-full">
-            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-              <tr className="bg-gray-50 dark:bg-gray-700">
+          <table className="w-full h-full table-container">
+            <thead className="sticky top-0 z-10">
+              <tr className="table-header">
                 <th 
-                  className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="w-[80px] card-hover"
                   onClick={() => handleSort('ip')}
                 >
                   IP<SortArrow field="ip" />
                 </th>
                 <th 
-                  className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="card-hover"
                   onClick={() => handleSort('name')}
                 >
                   Name<SortArrow field="name" />
                 </th>
                 <th 
-                  className="px-1 py-0.5 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                  className="card-hover"
                   onClick={() => handleSort('status')}
                 >
                   Status<SortArrow field="status" />
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800">
+            <tbody>
               {sortedClients.map((client, index) => (
                 <tr 
                   key={client.ip} 
-                  className={`hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                    index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-blue-50 dark:bg-blue-900/20'
-                  }`}
+                  className={`card-hover ${
+                    index % 2 === 0 ? '' : 'card-alternate'
+                  } ${index === sortedClients.length - 1 ? 'last-row' : ''}`}
                 >
                   <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
                     {client.ip}
@@ -411,10 +411,10 @@ export function BlockClientsCard() {
                       <button
                         onClick={() => handleBlockToggle(client)}
                         disabled={processingMacs[client.mac]}
-                        className={`h-6 px-2 py-0.5 rounded text-xs font-medium focus:outline-none focus:ring-1 transition-colors flex items-center gap-1 w-[72px] justify-center ${
+                        className={`btn w-[72px] justify-center ${
                           blockedMacs.includes(client.mac)
-                            ? 'bg-red-500 dark:bg-red-600 text-white hover:bg-red-600 dark:hover:bg-red-700 focus:ring-red-500 dark:focus:ring-red-400'
-                            : 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700 focus:ring-green-500 dark:focus:ring-green-400'
+                            ? 'btn-red'
+                            : 'btn-green'
                         } ${processingMacs[client.mac] ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {processingMacs[client.mac] ? 'SAVING...' : blockedMacs.includes(client.mac) ? 'UNBLOCK' : 'BLOCK'}

@@ -141,7 +141,7 @@ export default function DnsHosts() {
   }
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm transition-colors duration-200">
+    <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Hosts</h3>
@@ -275,4 +275,4 @@ export default function DnsHosts() {
       </div>
     </div>
   )
-} 
+}
