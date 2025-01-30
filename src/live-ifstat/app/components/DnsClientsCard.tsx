@@ -345,7 +345,7 @@ export function DnsClientsCard() {
                   Name<SortArrow field="name" />
                 </th>
                 <th 
-                  className="w-[80px] card-hover"
+                  className="w-[80px] card-hover text-right pr-3"
                   onClick={() => handleSort('status')}
                 >
                   Status<SortArrow field="status" />
@@ -375,7 +375,7 @@ export function DnsClientsCard() {
                       placeholder="N/A"
                     />
                   </td>
-                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                  <td className="px-1 pr-3 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right">
                     {client.status === 'static' ? (
                       'STATIC'
                     ) : client.status === 'reserved' ? (

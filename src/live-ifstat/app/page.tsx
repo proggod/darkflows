@@ -159,12 +159,14 @@ const CombinedDashboard = () => {
       .then(res => res.json())
       .then(data => {
         if (data.devices) {
-          setInterfaces(data.devices)
+          // Filter out ifb0 interface
+          const filteredDevices = data.devices.filter((device: NetworkInterface) => device.name !== 'ifb0')
+          setInterfaces(filteredDevices)
           // Update items state to include network interfaces while preserving order of non-device items
           setItems(current => {
             const nonDeviceItems = current.filter(item => !item.startsWith('device_'))
             const existingDeviceItems = current.filter(item => item.startsWith('device_'))
-            const newDeviceItems = data.devices
+            const newDeviceItems = filteredDevices
               .map((device: NetworkInterface) => `device_${device.name}`)
               .filter((deviceId: string) => !existingDeviceItems.includes(deviceId))
             return [...nonDeviceItems, ...existingDeviceItems, ...newDeviceItems]

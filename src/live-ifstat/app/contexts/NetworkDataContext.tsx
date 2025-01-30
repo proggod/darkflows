@@ -36,9 +36,10 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     const url = '/api/ifstat-stream'
     setConnectionStatus('connecting')
 
-    let es = new EventSource(url)
+    const es = new EventSource(url)
 
     es.onopen = () => {
+      console.log('SSE connection opened')
       setConnectionStatus('connected')
       setLastError(null)
     }
@@ -78,29 +79,44 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     }
 
     es.onerror = (err) => {
-      console.error('Shared SSE error:', err)
+      // Get more detailed error information
+      const errorDetails = {
+        readyState: es.readyState,
+        timestamp: new Date().toISOString(),
+        type: err.type,
+        // Add any additional error properties that might be available
+        ...(err instanceof ErrorEvent ? {
+          message: err.message,
+          filename: err.filename,
+          lineno: err.lineno,
+          colno: err.colno,
+        } : {})
+      }
+
+      console.error('Shared SSE error:', errorDetails)
       setConnectionStatus('error')
-      setLastError('Connection error occurred')
       
-      // Try to reconnect after a delay without reloading the page
-      setTimeout(() => {
-        if (es.readyState === EventSource.CLOSED) {
+      // Provide more specific error message based on readyState
+      const errorMessage = es.readyState === EventSource.CLOSED 
+        ? 'Connection closed unexpectedly'
+        : es.readyState === EventSource.CONNECTING 
+          ? 'Connection attempt failed'
+          : 'Connection error occurred'
+        
+      setLastError(errorMessage)
+      
+      // Attempt to reconnect after a delay if connection is closed
+      if (es.readyState === EventSource.CLOSED) {
+        setTimeout(() => {
+          console.log('Attempting to reconnect...')
           es.close()
-          const newEs = new EventSource(url)
-          es = newEs
-          
-          newEs.onopen = () => {
-            setConnectionStatus('connected')
-            setLastError(null)
-          }
-          
-          newEs.onmessage = es.onmessage
-          newEs.onerror = es.onerror
-        }
-      }, 5000)
+          // The browser will automatically attempt to reconnect
+        }, 5000)
+      }
     }
 
     return () => {
+      console.log('Cleaning up SSE connection')
       es.close()
     }
   }, [])

@@ -14,8 +14,6 @@ interface StatusData {
   interfaces: {
     [key: string]: InterfaceStatus
   }
-  qos_enabled: boolean
-  cake_enabled: boolean
 }
 
 interface NetworkDevice {
@@ -40,8 +38,6 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
   const [deviceLabels, setDeviceLabels] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [qosEnabled, setQosEnabled] = useState(false)
-  const [cakeEnabled, setCakeEnabled] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -53,9 +49,8 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
     try {
       const response = await fetch('/api/status')
       const data = await response.json()
+      console.log('Status data:', data)
       setStatus(data)
-      setQosEnabled(data.qos_enabled || false)
-      setCakeEnabled(data.cake_enabled || false)
       setError(null)
     } catch (error) {
       console.error('Failed to fetch cake status:', error)
@@ -64,32 +59,6 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
       setLoading(false)
     }
   }, [])
-
-  const toggleQos = async () => {
-    try {
-      const response = await fetch('/api/qos', {
-        method: 'POST',
-        body: JSON.stringify({ enabled: !qosEnabled })
-      })
-      if (!response.ok) throw new Error('Failed to toggle QoS')
-      setQosEnabled(!qosEnabled)
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to toggle QoS')
-    }
-  }
-
-  const toggleCake = async () => {
-    try {
-      const response = await fetch('/api/cake', {
-        method: 'POST',
-        body: JSON.stringify({ enabled: !cakeEnabled })
-      })
-      if (!response.ok) throw new Error('Failed to toggle Cake')
-      setCakeEnabled(!cakeEnabled)
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to toggle Cake')
-    }
-  }
 
   useEffect(() => {
     const fetchDeviceLabels = async () => {
@@ -130,8 +99,8 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
   }
 
   return (
-    <div className="p-3 h-full flex flex-col">
-      <div className="flex justify-between items-center mb-2">
+    <div className="p-2 h-full flex flex-col">
+      <div className="flex justify-between items-center mb-1">
         <h3 className="text-label">{title}</h3>
         <RefreshCw 
           onClick={fetchStatus}
@@ -140,55 +109,32 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-1 text-small">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="text-center py-4 text-muted">Loading interface status...</div>
+        <div className="text-center py-2 text-muted">Loading interface status...</div>
       ) : (
-        <div className="flex-1 overflow-auto">
-          <div className="space-y-2">
+        <div>
+          <div className="space-y-1">
             {status?.interfaces && Object.entries(status.interfaces).map(([iface, stats]) => (
-              <div key={iface} className="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${stats.new_drops > 0 ? 'bg-green-500' : 'bg-gray-400'}`} />
-                  <span className="text-small">{deviceLabels[iface] || iface}</span>
+              <div key={iface} className="flex items-center justify-between p-1 rounded-lg">
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${stats.new_drops > 0 ? 'bg-red-500' : 'bg-green-500'}`} />
+                  <span className="text-xs">{deviceLabels[iface] || iface}</span>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-muted">
+                <div className="flex items-center">
+                  <div className="text-muted text-xs">
                     {stats.memory > 0 ? formatMemory(stats.memory) : ''}
                   </div>
-                  <div className="text-muted min-w-[60px] text-right">
-                    {stats.new_drops > 0 ? `${stats.new_drops} drops` : 'OK'}
+                  <div className="text-muted text-xs min-w-[50px] text-right">
+                    {`${stats.new_drops} drops`}
                   </div>
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Settings */}
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
-              <span className="text-small">QoS</span>
-              <button
-                onClick={toggleQos}
-                className={`btn ${qosEnabled ? 'btn-green' : 'btn-red'}`}
-              >
-                {qosEnabled ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
-              <span className="text-small">Cake</span>
-              <button
-                onClick={toggleCake}
-                className={`btn ${cakeEnabled ? 'btn-green' : 'btn-red'}`}
-              >
-                {cakeEnabled ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
           </div>
         </div>
       )}

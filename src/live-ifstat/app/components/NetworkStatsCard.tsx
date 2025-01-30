@@ -141,7 +141,7 @@ const NetworkStatsCard = ({
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-label">{label}</h3>
+          <h3 className="text-label">Bandwidth Stats for {label}</h3>
           <NetworkStats
             data={data}
             color={color}

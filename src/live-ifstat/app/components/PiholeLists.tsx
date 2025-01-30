@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
+import LaunchIcon from '@mui/icons-material/Launch'
 
 type ListType = 'whitelist' | 'blacklist'
 
@@ -175,7 +176,16 @@ export default function PiholeLists() {
   return (
     <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Pi-hole Lists</h3>
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Pi-hole Lists</h3>
+          <button
+            onClick={() => window.open(`${window.location.protocol}//${window.location.hostname}/admin`, '_blank')}
+            className="btn btn-blue flex items-center gap-1"
+          >
+            <LaunchIcon className="!w-3 !h-3" />
+            Pi-hole Admin
+          </button>
+        </div>
         
         <div className="flex-1 overflow-auto">
           <div className="h-full overflow-y-auto space-y-4">

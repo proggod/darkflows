@@ -336,7 +336,7 @@ export function BlockClientsCard() {
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-label">Block Clients</h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 ml-auto">
           <button
             onClick={handleOpenSchedule}
             className="btn btn-blue flex items-center gap-1"
@@ -385,7 +385,7 @@ export function BlockClientsCard() {
                   Name<SortArrow field="name" />
                 </th>
                 <th 
-                  className="card-hover"
+                  className="card-hover text-right w-[100px]"
                   onClick={() => handleSort('status')}
                 >
                   Status<SortArrow field="status" />
@@ -406,7 +406,7 @@ export function BlockClientsCard() {
                   <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 max-w-[128px] overflow-hidden" title={client.name}>
                     {client.name.length > 16 ? client.name.slice(0, 16) + '...' : client.name}
                   </td>
-                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right">
                     {client.mac ? (
                       <button
                         onClick={() => handleBlockToggle(client)}
