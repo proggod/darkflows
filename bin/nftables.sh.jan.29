@@ -10,32 +10,15 @@ source /etc/darkflows/d_network.cfg || { echo "Failed to source network configur
 # Set CAKE parameters (default to empty string if not defined)
 COMMON_CAKE_PARAMS="${CAKE_PARAMS:-}"
 
-
-
-
-############ CHANGE ######################
 # Flush existing rules
 echo "Flushing iptables rules..."
-#iptables -F
-#iptables -t nat -F
-#iptables -t mangle -F
-#iptables -X
+iptables -F
+iptables -t nat -F
+iptables -t mangle -F
+iptables -X
 
-#echo "Flushing nftables rules..."
-#nft flush ruleset
-
-
-# Flush only your tables/chains, not Docker’s
-nft flush table inet filter 2>/dev/null || true
-nft delete table inet filter 2>/dev/null || true
-
-# Preserve Docker’s NAT table
-if ! nft list table ip nat >/dev/null 2>&1; then
-  nft add table ip nat
-fi
-
-############ CHANGE ######################
-
+echo "Flushing nftables rules..."
+nft flush ruleset
 
 # Load and setup IFB
 modprobe ifb || { echo "Failed to load ifb module"; exit 1; }
