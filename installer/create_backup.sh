@@ -1,6 +1,5 @@
 #!/bin/bash
 cd /usr/local/darkflows/src/live-ifstat
-npm prune --production
 
 mkdir /usr/local/installer_packages
 tar zcvf /usr/local/installer_packages/darkflows_scripts.tgz  --exclude=node_modules --exclude=.next --exclude=installer_packages --exclude=.git  /usr/local/darkflows /etc/systemd/system/nextjs-app.service /etc/systemd/system/default_routing.service 

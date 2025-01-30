@@ -1,9 +1,11 @@
 'use client';
 
 import React from "react";
-//import Sidebar from './components/Sidebar';
+import NavBar from './components/NavBar';
 import { EditModeButton } from './contexts/EditModeContext';
 import { useTheme } from './contexts/ThemeContext';
+import Link from 'next/link';
+import Image from 'next/image';
 
 function ThemeToggle() {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -29,23 +31,41 @@ function ThemeToggle() {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-      <div 
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-0"
-        style={{ 
-          backgroundImage: 'url("/background.jpg")',
-          filter: 'brightness(0.4)'
-        }}
-      />
-      
-      <div className="fixed top-2 right-4 z-50 flex items-center gap-2">
-        <EditModeButton />
-        <ThemeToggle />
+    <>
+      <NavBar />
+      <div className="pt-12">
+        <div className="min-h-screen antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+          <div 
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat z-0"
+            style={{ 
+              backgroundImage: 'url("/background.jpg")',
+              filter: 'brightness(0.4)'
+            }}
+          />
+          
+          <div className="fixed top-2 right-4 z-50 flex items-center gap-2">
+            <Link 
+              href="https://discord.gg/HxY5tEFV" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:opacity-80 transition-opacity"
+            >
+              <Image 
+                src="/discord-icon.svg" 
+                alt="Discord" 
+                width={24} 
+                height={24}
+              />
+            </Link>
+            <EditModeButton />
+            <ThemeToggle />
+          </div>
+          
+          <div className="relative z-10">
+            {children}
+          </div>
+        </div>
       </div>
-      
-      <div className="relative z-10">
-        {children}
-      </div>
-    </div>
+    </>
   );
 } 

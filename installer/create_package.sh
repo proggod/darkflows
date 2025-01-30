@@ -1,4 +1,4 @@
-k#!/bin/sh
+k#!/bin/bash
 DARKFLOWS_DIR="/usr/local/darkflows"
 PACKAGE_DIR="/usr/local/installer_packages"
 VERSION=$(head -n1 $DARKFLOWS_DIR/version.txt | tr -d '\r')  # Get cleaned version number

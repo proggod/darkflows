@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40">
+  <!-- Define the glow filter -->
+  <defs>
+    <filter id="redGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feFlood flood-color="#990000" flood-opacity="0.8" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Flowing curves in red tones with slightly more transparency -->
+  <path d="M 0 20 C 5 10, 15 30, 20 20" 
+        stroke="#ff3333" 
+        stroke-width="3" 
+        fill="none" 
+        opacity="0.6"/>
+  
+  <path d="M -2 22 C 5 12, 15 28, 22 18" 
+        stroke="#cc0000" 
+        stroke-width="3" 
+        fill="none" 
+        opacity="0.5"/>
+        
+  <path d="M 2 18 C 8 8, 18 28, 25 16" 
+        stroke="#990000" 
+        stroke-width="3" 
+        fill="none" 
+        opacity="0.4"/>
+
+  <!-- Text "Dark" with original color and enhanced glow -->
+  <text x="28" y="28" 
+        font-family="Arial, sans-serif" 
+        font-size="24" 
+        font-weight="bold"
+        fill="#ff3333"
+        filter="url(#redGlow)">Dark</text>
+        
+  <!-- Text "Flows" -->
+  <text x="75" y="28" 
+        font-family="Palatino, 'Palatino Linotype', serif" 
+        font-size="16"
+        font-style="italic"
+        fill="#ffffff"
+        letter-spacing="0.5">Flows</text>
+</svg> 

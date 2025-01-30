@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import SystemMonitor from '@/components/SystemMonitor'
 import SpeedTestNew from '@/components/SpeedTestNew'
 import PingStatsCard from '@/components/PingStatsCard'
@@ -89,110 +89,126 @@ const CombinedDashboard = () => {
   const { isEditMode } = useEditMode()
   const { isDarkMode } = useTheme()
   const { networkConfig, isLoading: isPingDataLoading } = usePingData()
+  const initialLoadComplete = useRef(false)
+  const deviceUpdatePending = useRef(false)
+  const [isLoading, setIsLoading] = useState(true)
   
   const [items, setItems] = useState<string[]>(DEFAULT_ITEMS)
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set())
+
+  // Save layout changes to localStorage
+  useEffect(() => {
+    if (!initialLoadComplete.current) return; // Don't save during initial load
+    
+    try {
+      console.log('DEBUG: Saving layout to localStorage', items);
+      localStorage.setItem('betaDashboardOrder', JSON.stringify(items));
+      localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)));
+    } catch (e) {
+      console.error('Failed to save dashboard state:', e);
+    }
+  }, [items, hiddenItems]);
 
   // Load saved state from localStorage
   useEffect(() => {
     const loadSavedState = () => {
       try {
-        // Force reset if network config changes
-        if (!networkConfig?.SECONDARY_INTERFACE) {
-          localStorage.removeItem('betaDashboardOrder')
-          localStorage.removeItem('betaDashboardHidden')
-          setItems(DEFAULT_ITEMS.filter(item => item !== 'pingSecondary'))
-          setHiddenItems(new Set())
-          return
+        if (initialLoadComplete.current) {
+          return;
         }
+
+        if (networkConfig === null || isPingDataLoading) {
+          return;
+        }
+
         const savedOrder = localStorage.getItem('betaDashboardOrder')
-        const savedHidden = localStorage.getItem('betaDashboardHidden')
+        console.log('DEBUG: Loading saved state', { savedOrder });
         
-        // Check if we have saved state and parse it
-        const parsedOrder = savedOrder ? JSON.parse(savedOrder) : null
-        const parsedHidden = savedHidden ? JSON.parse(savedHidden) : null
-        
-        // Verify all default components exist in saved order
-        const hasAllComponents = DEFAULT_ITEMS.every(item => 
-          parsedOrder ? parsedOrder.includes(item) : false
-        )
-        
-        if (parsedOrder && hasAllComponents) {
-          // Only use saved order if it has all required components
+        if (savedOrder) {
+          const parsedOrder = JSON.parse(savedOrder)
           setItems(parsedOrder)
-          if (parsedHidden) {
-            setHiddenItems(new Set(parsedHidden))
-          }
-        } else {
-          // Reset to defaults if any components are missing
-          // console.log('Missing components in dashboard - resetting layout')
-          localStorage.removeItem('betaDashboardOrder')
-          localStorage.removeItem('betaDashboardHidden')
-          localStorage.removeItem('betaDashboardVersion')
-          setItems(DEFAULT_ITEMS)
-          setHiddenItems(new Set())
         }
-      } catch {  // Remove unused 'e' parameter
-        // Silent fail for localStorage issues
+
+        const savedHidden = localStorage.getItem('betaDashboardHidden')
+        if (savedHidden) {
+          setHiddenItems(new Set(JSON.parse(savedHidden)))
+        }
+
+        initialLoadComplete.current = true
+        deviceUpdatePending.current = true
+        setIsLoading(false) // Hide loading state after layout is ready
+      } catch (error) {
+        console.error('DEBUG: Error loading saved dashboard state:', error)
+        initialLoadComplete.current = true
+        setIsLoading(false)
       }
     }
 
     loadSavedState()
-  }, [networkConfig?.SECONDARY_INTERFACE])
+  }, [networkConfig, isPingDataLoading])
 
-  // Save state to localStorage whenever it changes
+  // Fetch devices after initial load
   useEffect(() => {
-    try {
-      localStorage.setItem('betaDashboardOrder', JSON.stringify(items))
-      localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)))
-    } catch (e) {
-      console.error('Failed to save dashboard state:', e)
-    }
-  }, [items, hiddenItems])
+    if (!networkConfig || !initialLoadComplete.current || !deviceUpdatePending.current) return;
+
+    deviceUpdatePending.current = false;
+    console.log('DEBUG: Fetching devices');
+
+    fetch('/api/devices')
+      .then(res => res.json())
+      .then(data => {
+        if (data.devices) {
+          const filteredDevices = data.devices.filter((device: NetworkInterface) => device.name !== 'ifb0')
+          setInterfaces(filteredDevices)
+          
+          setItems(current => {
+            const deviceItems = filteredDevices.map((device: NetworkInterface) => `device_${device.name}`)
+            const existingDeviceItems = current.filter((item: string) => 
+              item.startsWith('device_') && deviceItems.includes(item)
+            )
+            const newDevices = deviceItems.filter((item: string) => !current.includes(item))
+            const nonDeviceItems = current.filter((item: string) => 
+              !item.startsWith('device_')
+            )
+            
+            if (newDevices.length === 0) {
+              return current
+            }
+            
+            console.log('DEBUG: Updating items with devices', {
+              nonDeviceItems,
+              existingDeviceItems,
+              newDevices
+            });
+            
+            return [...nonDeviceItems, ...existingDeviceItems, ...newDevices]
+          })
+        }
+      })
+      .catch(() => console.error('Failed to load devices'))
+  }, [networkConfig])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])
 
-  useEffect(() => {
-    fetch('/api/devices')
-      .then(res => res.json())
-      .then(data => {
-        if (data.devices) {
-          // Filter out ifb0 interface
-          const filteredDevices = data.devices.filter((device: NetworkInterface) => device.name !== 'ifb0')
-          setInterfaces(filteredDevices)
-          // Update items state to include network interfaces while preserving order of non-device items
-          setItems(current => {
-            const nonDeviceItems = current.filter(item => !item.startsWith('device_'))
-            const existingDeviceItems = current.filter(item => item.startsWith('device_'))
-            const newDeviceItems = filteredDevices
-              .map((device: NetworkInterface) => `device_${device.name}`)
-              .filter((deviceId: string) => !existingDeviceItems.includes(deviceId))
-            return [...nonDeviceItems, ...existingDeviceItems, ...newDeviceItems]
-          })
-        }
-      })
-      .catch(() => console.error('Failed to load devices'))
-  }, [])
-
-  // Add this effect to fetch and check version
+  // Modify the version check effect to preserve layout if possible
   useEffect(() => {
     const checkVersion = async () => {
       try {
         const response = await fetch('/api/version');
         const { version } = await response.json();
-        
         const savedVersion = localStorage.getItem('betaDashboardVersion');
         
         if (!savedVersion || savedVersion !== version) {
-          // Version mismatch or first run - reset dashboard
-          // console.log('Version mismatch or first run - resetting dashboard layout')
-          localStorage.removeItem('betaDashboardOrder')
-          localStorage.removeItem('betaDashboardHidden')
+          // Only reset if there's no saved version
+          if (!savedVersion) {
+            localStorage.removeItem('betaDashboardOrder');
+            localStorage.removeItem('betaDashboardHidden');
+            setItems(DEFAULT_ITEMS);
+            setHiddenItems(new Set());
+          }
           localStorage.setItem('betaDashboardVersion', version);
-          setItems(DEFAULT_ITEMS);
-          setHiddenItems(new Set());
         }
       } catch (error) {
         console.error('Failed to check version:', error);
@@ -217,17 +233,67 @@ const CombinedDashboard = () => {
   )
 
   function handleDragEnd(event: DragEndEvent) {
-    if (!isEditMode) return
-    const { active, over } = event
+    const { active, over } = event;
     
     if (over && active.id !== over.id) {
       setItems((items) => {
-        const oldIndex = items.indexOf(active.id.toString())
-        const newIndex = items.indexOf(over.id.toString())
-        return arrayMove(items, oldIndex, newIndex)
-      })
+        const oldIndex = items.indexOf(active.id.toString());
+        const newIndex = items.indexOf(over.id.toString());
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        
+        console.log('DEBUG: Drag end - updating order', {
+          oldIndex,
+          newIndex,
+          oldOrder: items,
+          newOrder
+        });
+        
+        // Force a save to localStorage immediately after drag
+        try {
+          localStorage.setItem('betaDashboardOrder', JSON.stringify(newOrder));
+          console.log('DEBUG: Saved new order after drag');
+        } catch (e) {
+          console.error('Failed to save order after drag:', e);
+        }
+        
+        return newOrder;
+      });
     }
   }
+
+  // Add a debug effect to monitor items changes
+  useEffect(() => {
+    console.log('DEBUG: Items changed', {
+      items,
+      savedOrder: localStorage.getItem('betaDashboardOrder')
+    });
+  }, [items]);
+
+  // Modify the save effect to be more robust
+  useEffect(() => {
+    if (!initialLoadComplete.current) {
+      console.log('DEBUG: Skipping save - initial load not complete');
+      return;
+    }
+    
+    try {
+      const currentSaved = localStorage.getItem('betaDashboardOrder');
+      const newOrder = JSON.stringify(items);
+      
+      if (currentSaved !== newOrder) {
+        console.log('DEBUG: Saving new layout', {
+          old: JSON.parse(currentSaved || '[]'),
+          new: items
+        });
+        localStorage.setItem('betaDashboardOrder', newOrder);
+        localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)));
+      } else {
+        console.log('DEBUG: Skipping save - no changes');
+      }
+    } catch (e) {
+      console.error('Failed to save dashboard state:', e);
+    }
+  }, [items, hiddenItems]);
 
   const toggleVisibility = (id: string) => {
     setHiddenItems(current => {
@@ -400,6 +466,10 @@ const CombinedDashboard = () => {
 
   // Add back hiddenItemsList
   const hiddenItemsList = items.filter(id => hiddenItems.has(id))
+
+  if (isLoading) {
+    return <div className="p-4">Loading dashboard...</div>
+  }
 
   return (
     <>
