@@ -1,16 +1,33 @@
 #!/bin/bash
 set -e
 
+
 source /etc/darkflows/d_network.cfg || { echo "Failed to source network config"; exit 1; }
 
-# Get gateway IP
-GATEWAY_IP=$(ip -4 addr show dev $INTERNAL_INTERFACE | awk '/inet/ {split($2,a,"/"); print a[1]}')
-[ -n "$GATEWAY_IP" ] || { echo "Failed to get gateway IP"; exit 1; }
+# Get gateways for both interfaces
+PRIMARY_LEASE_FILE="/var/lib/dhcp/dhclient.${PRIMARY_INTERFACE}.leases"
+GATEWAY_PRIMARY=$(grep 'option routers' "$PRIMARY_LEASE_FILE" | tail -1 | awk '{print $3}' | tr -d ';')
+[ -n "$GATEWAY_PRIMARY" ] || { echo "Failed to get primary gateway IP"; exit 1; }
+
+if [ -n "$SECONDARY_INTERFACE" ]; then
+    SECONDARY_LEASE_FILE="/var/lib/dhcp/dhclient.${SECONDARY_INTERFACE}.leases"
+    GATEWAY_SECONDARY=$(grep 'option routers' "$SECONDARY_LEASE_FILE" | tail -1 | awk '{print $3}' | tr -d ';')
+    [ -n "$GATEWAY_SECONDARY" ] || { echo "Failed to get secondary gateway IP"; exit 1; }
+fi
+
+# Calculate network range from interface
+IP_RANGE=$(ip -4 addr show dev $INTERNAL_INTERFACE | awk '/inet/ {print $2}')
+[ -n "$IP_RANGE" ] || { echo "Failed to get network range"; exit 1; }
+
+echo "Calculated IP_RANGE: $IP_RANGE, GATEWAY_PRIMARY: $GATEWAY_PRIMARY, GATEWAY_SECONDARY: $GATEWAY_SECONDARY"
+
+
 
 if [ $# -ne 3 ]; then
     echo "Usage: $0 <external_port> <internal_ip> <internal_port>"
     exit 1
 fi
+
 
 EXT_PORT=$1
 TARGET_IP=$2
@@ -42,7 +59,7 @@ nft add rule ip nat postrouting \
     ip saddr $IP_RANGE \
     ip daddr $TARGET_IP \
     tcp dport $INT_PORT \
-    snat to $GATEWAY_IP 2>/dev/null
+    snat to $GATEWAY_PRIMARY 2>/dev/null
 
 # Internal to Internal forwarding
 nft add rule inet filter forward \
@@ -77,5 +94,7 @@ for WAN_IF in $PRIMARY_INTERFACE ${SECONDARY_INTERFACE:+"$SECONDARY_INTERFACE"};
 done
 
 echo "Added port forward external:$EXT_PORT → $TARGET_IP:$INT_PORT"
+
+
 
 

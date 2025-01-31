@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { isIPv4 } from "is-ip";
-import { Plus, Trash2, Save, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Save, RefreshCw, RotateCcw } from "lucide-react";
 
 interface IpPool {
   start: string;
@@ -13,7 +13,37 @@ interface NetworkSettings {
   subnetMask: string;
   ipPools: IpPool[];
   cakeDefault?: string;
+  cakeParams?: string;
   error?: string;
+}
+
+function calculateDefaultPools(gatewayIp: string, subnetMask: string): IpPool[] {
+  try {
+    // Split IP into octets
+    const ipParts = gatewayIp.split('.').map(Number);
+    const maskParts = subnetMask.split('.').map(Number);
+    
+    // Calculate network address
+    const networkParts = ipParts.map((part, i) => part & maskParts[i]);
+    
+    // Find the first non-255 octet in subnet mask for the range
+    const rangeOctetIndex = maskParts.findIndex(part => part !== 255);
+    if (rangeOctetIndex === -1) return [{ start: `${networkParts.join('.')}.10`, end: `${networkParts.join('.')}.240` }];
+
+    // Create start and end addresses
+    const startParts = [...networkParts];
+    const endParts = [...networkParts];
+    startParts[rangeOctetIndex] = networkParts[rangeOctetIndex];
+    endParts[rangeOctetIndex] = networkParts[rangeOctetIndex] | (~maskParts[rangeOctetIndex] & 255);
+
+    return [{
+      start: `${startParts.slice(0, -1).join('.')}.10`,
+      end: `${endParts.slice(0, -1).join('.')}.240`
+    }];
+  } catch {
+    // Return default pool if calculation fails
+    return [{ start: "192.168.0.10", end: "192.168.1.240" }];
+  }
 }
 
 export function SystemSettingsCard() {
@@ -21,11 +51,11 @@ export function SystemSettingsCard() {
     gatewayIp: "192.168.1.1",
     subnetMask: "255.255.254.0",
     ipPools: [{ start: "192.168.0.10", end: "192.168.1.200" }],
-    cakeDefault: ""
+    cakeDefault: "",
+    cakeParams: ""
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isRestartingNetwork, setIsRestartingNetwork] = useState(false);
-  const [isRestartingDhcp, setIsRestartingDhcp] = useState(false);
+  const [isRebooting, setIsRebooting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,6 +107,24 @@ export function SystemSettingsCard() {
     setSettings({ ...settings, ipPools: newPools });
   };
 
+  const handleGatewayIpChange = (newGatewayIp: string) => {
+    const newPools = calculateDefaultPools(newGatewayIp, settings.subnetMask);
+    setSettings({
+      ...settings,
+      gatewayIp: newGatewayIp,
+      ipPools: newPools
+    });
+  };
+
+  const handleSubnetMaskChange = (newSubnetMask: string) => {
+    const newPools = calculateDefaultPools(settings.gatewayIp, newSubnetMask);
+    setSettings({
+      ...settings,
+      subnetMask: newSubnetMask,
+      ipPools: newPools
+    });
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -102,30 +150,36 @@ export function SystemSettingsCard() {
     }
   };
 
-  const restartService = async (service: 'network' | 'dhcp') => {
-    const setLoading = service === 'network' ? setIsRestartingNetwork : setIsRestartingDhcp;
-    setLoading(true);
+  const rebootServer = async () => {
+    setIsRebooting(true);
     try {
-      const response = await fetch('/api/network-settings', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ service }),
+      const response = await fetch('/api/network-settings/reboot', {
+        method: 'POST',
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || `Failed to restart ${service}`);
+        throw new Error(error.error || 'Failed to reboot server');
       }
 
-      toast.success(`${service === 'network' ? 'Network' : 'DHCP'} service restarted successfully`);
+      toast.success('Server is rebooting...');
     } catch (error) {
-      console.error(`Error restarting ${service}:`, error);
-      toast.error(error instanceof Error ? error.message : `Failed to restart ${service}`);
+      console.error('Error rebooting server:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reboot server');
     } finally {
-      setLoading(false);
+      setIsRebooting(false);
     }
+  };
+
+  const loadDefaultCakeParams = () => {
+    if (!settings.cakeDefault) {
+      console.warn('No default CAKE parameters available');
+      return;
+    }
+    setSettings(prev => ({
+      ...prev,
+      cakeParams: prev.cakeDefault
+    }));
   };
 
   return (
@@ -135,20 +189,12 @@ export function SystemSettingsCard() {
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => restartService('network')}
-              disabled={isRestartingNetwork}
-              className="px-2 py-1 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+              onClick={rebootServer}
+              disabled={isRebooting}
+              className="px-2 py-1 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
             >
-              <RefreshCw className={`h-3 w-3 ${isRestartingNetwork ? 'animate-spin' : ''}`} />
-              Network
-            </button>
-            <button
-              onClick={() => restartService('dhcp')}
-              disabled={isRestartingDhcp}
-              className="px-2 py-1 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-            >
-              <RefreshCw className={`h-3 w-3 ${isRestartingDhcp ? 'animate-spin' : ''}`} />
-              DHCP
+              <RefreshCw className={`h-3 w-3 ${isRebooting ? 'animate-spin' : ''}`} />
+              Reboot
             </button>
             <button
               onClick={handleSave}
@@ -168,7 +214,7 @@ export function SystemSettingsCard() {
               <input
                 type="text"
                 value={settings.gatewayIp}
-                onChange={(e) => setSettings({ ...settings, gatewayIp: e.target.value })}
+                onChange={(e) => handleGatewayIpChange(e.target.value)}
                 placeholder="192.168.1.1"
                 className={`px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full min-w-[120px]`}
               />
@@ -179,7 +225,7 @@ export function SystemSettingsCard() {
               <input
                 type="text"
                 value={settings.subnetMask}
-                onChange={(e) => setSettings({ ...settings, subnetMask: e.target.value })}
+                onChange={(e) => handleSubnetMaskChange(e.target.value)}
                 placeholder="255.255.254.0"
                 className={`px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full min-w-[120px]`}
               />
@@ -236,15 +282,25 @@ export function SystemSettingsCard() {
 
             <div className="flex items-center gap-1">
               <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
-                CAKE Default
+                CAKE Params
               </label>
-              <input
-                type="text"
-                value={settings.cakeDefault || ''}
-                onChange={(e) => setSettings({ ...settings, cakeDefault: e.target.value })}
-                placeholder="CAKE Default Parameters"
-                className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
-              />
+              <div className="flex gap-1 flex-1">
+                <input
+                  type="text"
+                  value={settings.cakeParams || ''}
+                  onChange={(e) => setSettings({ ...settings, cakeParams: e.target.value })}
+                  placeholder="CAKE Parameters"
+                  className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
+                />
+                <button
+                  onClick={loadDefaultCakeParams}
+                  disabled={!settings.cakeDefault}
+                  className="px-2 py-0.5 text-xs font-medium bg-gray-500 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-500 dark:focus:ring-gray-400 transition-colors flex items-center gap-1 disabled:opacity-50"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Default
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server'
 import { promises as fs } from 'fs'
-import { exec } from 'child_process'
-import { promisify } from 'util'
-
-const execAsync = promisify(exec)
 
 interface NetworkSettings {
   gatewayIp: string
   subnetMask: string
   ipPools: { start: string; end: string }[]
   cakeDefault?: string
+  cakeParams?: string
 }
 
 interface DhcpPool {
@@ -44,9 +41,11 @@ export async function GET() {
     const gatewayIp = staticMatch ? staticMatch[1] : '192.168.1.1'
     const subnetMask = staticMatch ? staticMatch[2] : '255.255.254.0'
 
-    // Parse CAKE_DEFAULT from network config
+    // Parse CAKE_DEFAULT and CAKE_PARAMS from network config
     const cakeDefaultMatch = networkConfig.match(/CAKE_DEFAULT="([^"]*)"/)
+    const cakeParamsMatch = networkConfig.match(/CAKE_PARAMS="([^"]*)"/)
     const cakeDefault = cakeDefaultMatch ? cakeDefaultMatch[1] : ''
+    const cakeParams = cakeParamsMatch ? cakeParamsMatch[1] : ''
 
     // Parse IP pools from DHCP config
     const dhcpJson = JSON.parse(dhcpConfig)
@@ -55,7 +54,13 @@ export async function GET() {
       return { start: start.trim(), end: end.trim() }
     })
 
-    return NextResponse.json({ gatewayIp, subnetMask, ipPools: pools, cakeDefault })
+    return NextResponse.json({ 
+      gatewayIp, 
+      subnetMask, 
+      ipPools: pools, 
+      cakeDefault,
+      cakeParams 
+    })
   } catch (error) {
     console.error('Error reading network settings:', error)
     return NextResponse.json({ error: 'Failed to read network settings' }, { status: 500 })
@@ -110,41 +115,30 @@ export async function POST(request: Request) {
       }
     ]
 
-    // Update CAKE_DEFAULT in network config
+    // Update CAKE_PARAMS in network config
+    if (settings.cakeParams !== undefined) {
+      networkConfig = networkConfig.replace(
+        /CAKE_PARAMS="[^"]*"/,
+        `CAKE_PARAMS="${settings.cakeParams}"`
+      )
+    }
+
+    // Keep the CAKE_DEFAULT update
     if (settings.cakeDefault) {
       networkConfig = networkConfig.replace(
         /CAKE_DEFAULT="[^"]*"/,
         `CAKE_DEFAULT="${settings.cakeDefault}"`
       )
-      await fs.writeFile('/etc/darkflows/d_network.cfg', networkConfig, 'utf-8')
     }
 
     // Write updated configs
     await fs.writeFile('/etc/network/interfaces', interfacesConfig)
     await fs.writeFile('/etc/kea/kea-dhcp4.conf', JSON.stringify(dhcpJson, null, 2))
+    await fs.writeFile('/etc/darkflows/d_network.cfg', networkConfig, 'utf-8')
 
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error updating network settings:', error)
     return NextResponse.json({ error: 'Failed to update network settings' }, { status: 500 })
-  }
-}
-
-export async function PUT(request: Request) {
-  const { service } = await request.json()
-  
-  try {
-    if (service === 'network') {
-      await execAsync('systemctl restart networking')
-    } else if (service === 'dhcp') {
-      await execAsync('systemctl restart kea-dhcp4-server')
-    } else {
-      throw new Error('Invalid service specified')
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error(`Error restarting ${service} service:`, error)
-    return NextResponse.json({ error: `Failed to restart ${service} service` }, { status: 500 })
   }
 } 

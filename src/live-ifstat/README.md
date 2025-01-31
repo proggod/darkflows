@@ -1,3 +1,12 @@
+v 0.17
+    - Removed Network Reboot
+    - Removed DHCP Service Restart
+    - Added Server Reboot   
+    - Automatically calculate ip pools based on gateway ip and subnet mask
+    - Removed the need to set IP_RANGE in the network settings
+    - Fixed Cake Settings not being saved
+    - Made add external port forward script more intelligent
+
 v 0.16
     - Added Navigation Bar
     - Fixed losing layout on reload
@@ -15,3 +24,4 @@ v 0.14
     - Added Pi-hole Admin Link
     - Fixed Network Stats Card to ignore ifb0 interface
     - Fixed Network Stats Card to show correct interface name
+
