@@ -3,6 +3,7 @@ import fs from 'fs/promises'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
+import { requireAuth } from '../../lib/auth'
 
 const execAsync = promisify(exec)
 const ROUTES_FILE = '/etc/darkflows/route_to_secondary.txt'
@@ -112,36 +113,30 @@ async function updateRoutes(): Promise<void> {
   }
 }
 
-// Helper to validate and clean routes
-async function validateAndCleanRoutes(routes: string[]): Promise<string[]> {
-  try {
-    const internalIface = await getInternalInterface()
-    const networkInfo = await getInterfaceInfo(internalIface)
-    
-    return routes.filter(ip => isIpInNetwork(ip, networkInfo.address, networkInfo.netmask))
-  } catch (error) {
-    console.error('Error validating routes:', error)
-    throw error
-  }
-}
-
 // GET handler
 export async function GET() {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
-    let ips = await readRoutes()
-    // Clean up any IPs not in the internal network
-    ips = await validateAndCleanRoutes(ips)
-    await writeRoutes(ips) // Update the file if any IPs were removed
-    return NextResponse.json({ ips })
+    const routes = await readRoutes();
+    return NextResponse.json({ routes });
   } catch (error) {
-    console.error('Error in GET:', error)
-    const message = error instanceof Error ? error.message : 'Failed to read routes'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Error reading routes:', error);
+    return NextResponse.json(
+      { error: 'Failed to read routes' },
+      { status: 500 }
+    );
   }
 }
 
 // POST handler
 export async function POST(request: Request) {
+  // Check authentication first
+  const authResponse = await requireAuth()
+  if (authResponse) return authResponse
+
   try {
     const { ip } = await request.json()
     
@@ -194,16 +189,22 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in POST:', error)
-    const message = error instanceof Error ? error.message : 'Failed to add route'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Error updating routes:', error)
+    return NextResponse.json(
+      { error: 'Failed to update routes' },
+      { status: 500 }
+    )
   }
 }
 
 // DELETE handler
 export async function DELETE(request: Request) {
+  // Add authentication check
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
-    const { ip } = await request.json()
+    const { ip } = await request.json();
     
     if (!ip || typeof ip !== 'string') {
       return NextResponse.json(

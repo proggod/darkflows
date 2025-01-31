@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
+import { requireAuth } from '../../lib/auth';
 
 const SCHEDULE_FILE = '/etc/darkflows/block_schedule.json';
 
@@ -42,6 +43,10 @@ async function readSchedule() {
 }
 
 export async function GET() {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const schedule = await readSchedule();
     return NextResponse.json(schedule);
@@ -52,6 +57,10 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const schedule = await request.json();
     // Validate schedule format

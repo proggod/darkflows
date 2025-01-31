@@ -1,11 +1,15 @@
 'use client';
 
-import React from 'react';
+import { usePathname } from 'next/navigation';
+import AuthLayout from '../layouts/AuthLayout';
 
-interface LayoutWrapperProps {
-  children: React.ReactNode;
-}
+export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/login';
 
-export default function LayoutWrapper({ children }: LayoutWrapperProps) {
-  return <>{children}</>;
+  if (isLoginPage) {
+    return children;
+  }
+
+  return <AuthLayout>{children}</AuthLayout>;
 } 

@@ -1,11 +1,10 @@
 'use client';
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import NavBar from './components/NavBar';
 import { EditModeButton } from './contexts/EditModeContext';
 import { useTheme } from './contexts/ThemeContext';
-import Link from 'next/link';
-import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 function ThemeToggle() {
   const { isDarkMode, toggleTheme } = useTheme();
@@ -29,43 +28,87 @@ function ThemeToggle() {
   );
 }
 
+function LogoutButton() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const response = await fetch('/api/logout', {
+      method: 'POST'
+    });
+    
+    if (response.ok) {
+      router.push('/login');
+      router.refresh();
+      window.location.reload();
+    }
+  };
+
+  return (
+    <button
+      onClick={handleLogout}
+      className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+      title="Logout"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-900 dark:text-gray-100">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+    </button>
+  );
+}
+
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/check');
+        const isAuthed = response.ok;
+        setIsAuthenticated(isAuthed);
+        
+        if (!isAuthed && window.location.pathname !== '/login') {
+          router.push('/login');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        setIsAuthenticated(false);
+        if (window.location.pathname !== '/login') {
+          router.push('/login');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // Show nothing while checking authentication
+  if (isLoading) {
+    return null;
+  }
+
+  // Show only children (login page) when not authenticated
+  if (!isAuthenticated) {
+    return children;
+  }
+
+  // Show full layout when authenticated
   return (
     <>
       <NavBar />
-      <div className="pt-12">
-        <div className="min-h-screen antialiased bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-          <div 
-            className="fixed inset-0 bg-cover bg-center bg-no-repeat z-0"
-            style={{ 
-              backgroundImage: 'url("/background.jpg")',
-              filter: 'brightness(0.4)'
-            }}
-          />
-          
-          <div className="fixed top-2 right-4 z-50 flex items-center gap-2">
-            <Link 
-              href="https://discord.gg/HxY5tEFV" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:opacity-80 transition-opacity"
-            >
-              <Image 
-                src="/discord-icon.svg" 
-                alt="Discord" 
-                width={24} 
-                height={24}
-              />
-            </Link>
-            <EditModeButton />
-            <ThemeToggle />
-          </div>
-          
-          <div className="relative z-10">
-            {children}
-          </div>
-        </div>
+      <div className="fixed top-2 right-4 flex items-center gap-2 z-50">
+        <EditModeButton />
+        <ThemeToggle />
+        <LogoutButton />
       </div>
+      <main className="pt-12">
+        {children}
+      </main>
     </>
   );
 } 

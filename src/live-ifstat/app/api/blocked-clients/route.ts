@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
+import { requireAuth } from '../../lib/auth';
 
 const BLOCKED_CLIENTS_FILE = '/etc/darkflows/blocked_clients.txt';
 
@@ -21,6 +22,10 @@ async function writeBlockedClients(macs: string[]): Promise<void> {
 }
 
 export async function GET() {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const blockedMacs = await readBlockedClients();
     return NextResponse.json({ blockedMacs });
@@ -34,6 +39,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const { mac } = await request.json();
     if (!mac) {
@@ -60,6 +69,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  // Add authentication check
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const { mac } = await request.json();
     if (!mac) {

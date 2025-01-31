@@ -1,11 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ClientLayout from './ClientLayout';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { EditModeProvider } from './contexts/EditModeContext';
-import { NetworkDataProvider } from './contexts/NetworkDataContext';
-import { PingDataProvider } from './contexts/PingDataContext';
-import { RefreshProvider } from './contexts/RefreshContext'
+import LayoutWrapper from './components/LayoutWrapper';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,23 +15,16 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: 'DarkFlows Router Interface',
   description: 'DarkFlows Router Interface',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="light">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ThemeProvider>
-          <EditModeProvider>
-            <NetworkDataProvider>
-              <PingDataProvider>
-                <RefreshProvider>
-                  <ClientLayout>{children}</ClientLayout>
-                </RefreshProvider>
-              </PingDataProvider>
-            </NetworkDataProvider>
-          </EditModeProvider>
-        </ThemeProvider>
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );

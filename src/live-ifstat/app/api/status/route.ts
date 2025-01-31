@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
+import { requireAuth } from '../../lib/auth'
 
 export async function GET() {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const content = await readFile('/dev/shm/status.json', 'utf-8')
     const data = JSON.parse(content)

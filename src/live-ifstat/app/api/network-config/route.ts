@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { readFile, writeFile } from 'fs/promises'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { requireAuth } from '../../lib/auth'
 
 const execAsync = promisify(exec)
 const CONFIG_PATH = '/etc/darkflows/d_network.cfg'
@@ -146,6 +147,10 @@ async function writeConfig(config: NetworkConfig): Promise<void> {
 }
 
 export async function GET() {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const config = await parseConfig();
     return NextResponse.json(config);
@@ -159,6 +164,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Check authentication first
+  const authResponse = await requireAuth();
+  if (authResponse) return authResponse;
+
   try {
     const config = await request.json()
     await writeConfig(config)
