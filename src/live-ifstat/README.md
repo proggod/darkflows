@@ -1,3 +1,8 @@
+v 0.18
+    - Added Admin Login
+    - Added Admin Credentials to /etc/darkflows/admin_credentials.json
+    - Added Security to All API Routes
+
 v 0.17
     - Removed Network Reboot
     - Removed DHCP Service Restart
