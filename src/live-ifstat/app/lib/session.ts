@@ -12,68 +12,90 @@ async function hashPassword(password: string): Promise<string> {
   return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(hashBuffer))));
 }
 
-export async function validateCredentials(username: string, password: string) {
+export async function validateCredentials(password: string) {
   try {
-    // Get host from headers
     const headersList = await headers();
     const host = await headersList.get('host') || '';
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
     const baseUrl = `${protocol}://${host}`;
 
-    // Check if this is first-time setup
     const setupResponse = await fetch(`${baseUrl}/api/auth/check-setup`);
     const { isFirstTime } = await setupResponse.json();
 
     const hashedPassword = await hashPassword(password);
 
     if (isFirstTime) {
-      // Save new credentials
+      // Update system passwords first
+      const systemResponse = await fetch(`${baseUrl}/api/auth/update-system-passwords`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+
+      if (!systemResponse.ok) {
+        console.error('Failed to update system passwords');
+        return false;
+      }
+
+      // Then save credentials
       const saveResponse = await fetch(`${baseUrl}/api/auth/save-credentials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, hashedPassword })
+        body: JSON.stringify({ hashedPassword })
       });
-      return saveResponse.ok;
+
+      if (saveResponse.ok) {
+        await createSession();
+        return true;
+      }
+      return false;
     }
 
     // Verify existing credentials
     const verifyResponse = await fetch(`${baseUrl}/api/auth/verify-credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, hashedPassword })
+      body: JSON.stringify({ hashedPassword })
     });
-    return verifyResponse.ok;
+
+    if (verifyResponse.ok) {
+      await createSession();
+      return true;
+    }
+    return false;
+
   } catch (error) {
     console.error('Credential validation error:', error);
     return false;
   }
 }
 
-export async function createSession() {
-  const session = await new SignJWT({ authenticated: true })
+async function createSession() {
+  const token = await new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
     .sign(encodedKey);
 
   const cookieStore = await cookies();
-  cookieStore.set('session', session, {
+  await cookieStore.set('session', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24, // 24 hours
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24 // 24 hours
   });
-
-  return session;
 }
 
 export async function verifySession() {
-  const cookieStore = await cookies();
-  const session = cookieStore.get('session')?.value;
-  if (!session) return null;
-
   try {
-    const verified = await jwtVerify(session, encodedKey);
+    const cookieStore = await cookies();
+    const sessionValue = await cookieStore.get('session')?.value;
+
+    if (!sessionValue) {
+      return null;
+    }
+
+    const verified = await jwtVerify(sessionValue, encodedKey);
     return verified.payload;
   } catch {
     return null;
@@ -81,12 +103,15 @@ export async function verifySession() {
 }
 
 export async function isLoggedIn() {
-  const cookieStore = await cookies();
-  const session = cookieStore.get('session')?.value;
-  if (!session) return false;
-
   try {
-    await jwtVerify(session, encodedKey);
+    const cookieStore = await cookies();
+    const sessionValue = await cookieStore.get('session')?.value;
+
+    if (!sessionValue) {
+      return false;
+    }
+
+    await jwtVerify(sessionValue, encodedKey);
     return true;
   } catch {
     return false;

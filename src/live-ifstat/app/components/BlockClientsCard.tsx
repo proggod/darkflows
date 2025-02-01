@@ -4,13 +4,7 @@ import { useEffect, useState } from 'react';
 import { Select, MenuItem, FormControl, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-
-interface DnsClient {
-  ip: string;
-  name: string;
-  status: 'static' | 'reserved' | 'dynamic';
-  mac?: string;
-}
+import { DnsClient } from '@/types/dns';
 
 interface Schedule {
   id: string;
@@ -173,7 +167,15 @@ export function BlockClientsCard() {
       }
       const data = await response.json();
       if (Array.isArray(data)) {
-        setClients(data);
+        const formattedClients = data.map(client => ({
+          ip: client.ip,
+          name: client.name || client.ip,
+          mac: client.mac !== 'N/A' ? client.mac : undefined,
+          lastSeen: client.lastSeen,
+          isReserved: client.isReserved,
+          status: client.status
+        }));
+        setClients(formattedClients);
       } else {
         setClients([]);
         setError('Invalid data format received from server');
@@ -302,29 +304,33 @@ export function BlockClientsCard() {
     );
   };
 
-  const sortedClients = [...clients].sort((a, b) => {
-    let comparison = 0;
-    switch (sortField) {
-      case 'ip':
-        // Split IP into octets and compare numerically
-        const aOctets = a.ip.split('.').map(Number);
-        const bOctets = b.ip.split('.').map(Number);
-        for (let i = 0; i < 4; i++) {
-          if (aOctets[i] !== bOctets[i]) {
-            comparison = aOctets[i] - bOctets[i];
-            break;
+  const sortClients = (clients: DnsClient[], sortBy: string, sortDirection: 'asc' | 'desc') => {
+    return [...clients].sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'ip':
+          // Split IP into octets and compare numerically
+          const aOctets = a.ip.split('.').map(Number);
+          const bOctets = b.ip.split('.').map(Number);
+          for (let i = 0; i < 4; i++) {
+            if (aOctets[i] !== bOctets[i]) {
+              comparison = aOctets[i] - bOctets[i];
+              break;
+            }
           }
-        }
-        break;
-      case 'name':
-        comparison = a.name.localeCompare(b.name);
-        break;
-      case 'status':
-        comparison = a.status.localeCompare(b.status);
-        break;
-    }
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
+          break;
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const sortedClients = sortClients(clients, sortField, sortDirection);
 
   useEffect(() => {
     fetchClients();

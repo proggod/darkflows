@@ -197,6 +197,18 @@ export default function ReservationsCard() {
     }));
   };
 
+  const startHostnameEdit = (ip: string, currentHostname: string) => {
+    setEditingHostname(ip);
+    setEditedNames(prev => ({
+      ...prev,
+      [ip]: currentHostname || ''
+    }));
+  };
+
+  const isProcessing = (ip: string) => {
+    return savingHostnames[ip];
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>, reservation: Reservation) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -206,7 +218,7 @@ export default function ReservationsCard() {
       try {
         setSavingHostnames(prev => ({ ...prev, [reservation['ip-address']]: true }));
 
-        // Update DNS hostname for reserved clients
+        // Update DNS hostname
         const dnsResponse = await fetch('/api/dns-hosts', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -226,6 +238,8 @@ export default function ReservationsCard() {
         }
 
         await fetchReservations();
+        triggerRefresh();
+        
         // Clear editing state after successful update
         setEditingHostname(null);
         setEditedNames(prev => {
@@ -240,14 +254,6 @@ export default function ReservationsCard() {
         setSavingHostnames(prev => ({ ...prev, [reservation['ip-address']]: false }));
       }
     }
-  };
-
-  const startHostnameEdit = (ip: string, currentHostname: string) => {
-    setEditingHostname(ip);
-    setEditedNames(prev => ({
-      ...prev,
-      [ip]: currentHostname || ''
-    }));
   };
 
   return (
@@ -353,18 +359,12 @@ export default function ReservationsCard() {
                       type="text"
                       value={editedNames[reservation['ip-address']] ?? ''}
                       onChange={(e) => handleNameChange(reservation['ip-address'], e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleKeyDown(e, reservation);
-                        } else if (e.key === 'Escape') {
-                          setEditingHostname(null);
-                        }
-                      }}
+                      onKeyDown={(e) => handleKeyDown(e, reservation)}
                       onBlur={() => setEditingHostname(null)}
                       className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
-                        savingHostnames[reservation['ip-address']] ? 'opacity-50' : ''
+                        isProcessing(reservation['ip-address']) ? 'opacity-50' : ''
                       }`}
-                      disabled={savingHostnames[reservation['ip-address']]}
+                      disabled={isProcessing(reservation['ip-address'])}
                       autoFocus
                       placeholder="N/A"
                     />
@@ -380,12 +380,16 @@ export default function ReservationsCard() {
                 <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                   <div className="flex gap-1">
                     <EditIcon
-                      onClick={() => startEdit(reservation)}
-                      className="w-2 h-2 btn-icon btn-icon-blue"
+                      onClick={() => !isProcessing(reservation['ip-address']) && startEdit(reservation)}
+                      className={`w-2 h-2 btn-icon btn-icon-blue ${
+                        isProcessing(reservation['ip-address']) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     />
                     <DeleteIcon
-                      onClick={() => handleDelete(reservation)}
-                      className="w-2 h-2 btn-icon btn-icon-red"
+                      onClick={() => !isProcessing(reservation['ip-address']) && handleDelete(reservation)}
+                      className={`w-2 h-2 btn-icon btn-icon-red ${
+                        isProcessing(reservation['ip-address']) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     />
                   </div>
                 </td>

@@ -20,53 +20,30 @@ async function getKeaConfig(): Promise<KeaConfig> {
   return JSON.parse(content);
 }
 
-export async function getMacVendor(macAddress: string): Promise<string> {
+export async function getMacVendor(macAddress: string): Promise<string | null> {
   let connection;
   try {
-    // Get Kea database credentials
     const keaConfig = await getKeaConfig();
     const dbConfig = keaConfig.Dhcp4['lease-database'];
 
-    // Create connection using Kea credentials but for darkflows database
     connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
-      user: dbConfig.user,         // This will be 'kea' from your config
-      password: dbConfig.password, // This will be 'IayqXKWcosPT' from your config
-      database: 'darkflows'        // Using darkflows database instead of kea
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: 'darkflows'
     });
 
-    // Get first 8 characters without colons (updated from 6 to 8 to match table schema)
-    const macPrefix = macAddress.toLowerCase().replace(/:/g, '').slice(0, 8);
-
-    // Debug log
-    //console.log('Looking up MAC vendor:', {
-    //  macAddress,
-    //  prefix: macPrefix,
-    //  originalPrefix: macAddress.slice(0, 8)
-    //});
-
+    const macPrefix = macAddress.toLowerCase().replace(/:/g, '').slice(0, 6);
     const [rows] = await connection.execute<mysql.RowDataPacket[]>(
       'SELECT vendor FROM mac_vendor_lookup WHERE mac_prefix = ?',
       [macPrefix]
     );
 
-    const vendor = (rows as { vendor: string }[])[0]?.vendor || 'Unknown';
-
-    // Debug log
-    //console.log('Vendor lookup result:', {
-    //  macAddress,
-    //  prefix: macPrefix,
-    //  vendor,
-    //  rowCount: rows.length
-    //});
-
-    return vendor;
-  } catch (error) {
-    console.error('Error looking up MAC vendor:', {
-      macAddress,
-      error: error instanceof Error ? error.message : error
-    });
-    return 'Unknown';
+    const vendor = (rows as { vendor: string }[])[0]?.vendor;
+    return vendor || macAddress;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_error) {
+    return null;
   } finally {
     if (connection) {
       await connection.end();

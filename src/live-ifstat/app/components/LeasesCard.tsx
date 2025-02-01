@@ -30,6 +30,7 @@ export default function LeasesCard() {
   const [editingHostname, setEditingHostname] = useState<string | null>(null);
   const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({});
   const { triggerRefresh, registerRefreshCallback } = useRefresh()
+  const [processingClients, setProcessingClients] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     fetchLeases()
@@ -63,6 +64,7 @@ export default function LeasesCard() {
 
   const handleReserve = async (lease: Lease) => {
     try {
+      setProcessingClients(prev => ({ ...prev, [lease.ip_address]: true }));
       const reservation = {
         'ip-address': lease.ip_address,
         'hw-address': lease.mac_address,
@@ -84,11 +86,14 @@ export default function LeasesCard() {
     } catch (error) {
       console.error('Error creating reservation:', error)
       setError('Error creating reservation')
+    } finally {
+      setProcessingClients(prev => ({ ...prev, [lease.ip_address]: false }));
     }
   }
 
   const handleRemoveReservation = async (lease: Lease) => {
     try {
+      setProcessingClients(prev => ({ ...prev, [lease.ip_address]: true }));
       const response = await fetch('/api/reservations', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -107,6 +112,8 @@ export default function LeasesCard() {
     } catch (error) {
       console.error('Error removing reservation:', error)
       setError('Error removing reservation')
+    } finally {
+      setProcessingClients(prev => ({ ...prev, [lease.ip_address]: false }));
     }
   }
 
@@ -183,6 +190,26 @@ export default function LeasesCard() {
       try {
         setSavingHostnames(prev => ({ ...prev, [lease.ip_address]: true }));
 
+        // If not reserved, create reservation first
+        if (!lease.is_reserved) {
+          const reserveResponse = await fetch('/api/reservations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              'ip-address': lease.ip_address,
+              'hw-address': lease.mac_address,
+              'hostname': editedName
+            })
+          });
+
+          if (!reserveResponse.ok) {
+            const errorText = await reserveResponse.text();
+            console.error('Failed to create reservation:', errorText);
+            setError('Failed to create reservation');
+            return;
+          }
+        }
+
         // Update DNS hostname
         const dnsResponse = await fetch('/api/dns-hosts', {
           method: 'PUT',
@@ -203,6 +230,8 @@ export default function LeasesCard() {
         }
 
         await fetchLeases();
+        triggerRefresh();
+        
         // Clear editing state after successful update
         setEditingHostname(null);
         setEditedNames(prev => {
@@ -217,6 +246,10 @@ export default function LeasesCard() {
         setSavingHostnames(prev => ({ ...prev, [lease.ip_address]: false }));
       }
     }
+  };
+
+  const isProcessing = (ip: string) => {
+    return processingClients[ip] || savingHostnames[ip];
   };
 
   return (
@@ -261,18 +294,12 @@ export default function LeasesCard() {
                       type="text"
                       value={editedNames[lease.ip_address] ?? ''}
                       onChange={(e) => handleNameChange(lease.ip_address, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleKeyDown(e, lease);
-                        } else if (e.key === 'Escape') {
-                          setEditingHostname(null);
-                        }
-                      }}
+                      onKeyDown={(e) => handleKeyDown(e, lease)}
                       onBlur={() => setEditingHostname(null)}
                       className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
-                        savingHostnames[lease.ip_address] ? 'opacity-50' : ''
+                        isProcessing(lease.ip_address) ? 'opacity-50' : ''
                       }`}
-                      disabled={savingHostnames[lease.ip_address]}
+                      disabled={isProcessing(lease.ip_address)}
                       autoFocus
                       placeholder="N/A"
                     />
@@ -289,16 +316,22 @@ export default function LeasesCard() {
                   {lease.is_reserved ? (
                     <button
                       onClick={() => handleRemoveReservation(lease)}
-                      className="h-6 px-2 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 transition-colors w-[72px]"
+                      disabled={isProcessing(lease.ip_address)}
+                      className={`h-6 px-2 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 transition-colors w-[72px] ${
+                        isProcessing(lease.ip_address) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
-                      REMOVE
+                      {isProcessing(lease.ip_address) ? 'SAVING...' : 'REMOVE'}
                     </button>
                   ) : (
                     <button
                       onClick={() => handleReserve(lease)}
-                      className="h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors w-[72px]"
+                      disabled={isProcessing(lease.ip_address)}
+                      className={`h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors w-[72px] ${
+                        isProcessing(lease.ip_address) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
-                      RESERVE
+                      {isProcessing(lease.ip_address) ? 'SAVING...' : 'RESERVE'}
                     </button>
                   )}
                 </td>

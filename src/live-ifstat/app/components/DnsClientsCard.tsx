@@ -7,8 +7,10 @@ import { useRefresh } from '../contexts/RefreshContext';
 interface DnsClient {
   ip: string;
   name: string;
+  mac: string | undefined;
+  lastSeen: number;
+  isReserved: boolean;
   status: 'static' | 'reserved' | 'dynamic';
-  mac?: string;
 }
 
 type SortField = 'ip' | 'name' | 'status';
@@ -19,6 +21,7 @@ export function DnsClientsCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editedNames, setEditedNames] = useState<{[key: string]: string}>({});
+  const [editingHostname, setEditingHostname] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({});
@@ -35,7 +38,15 @@ export function DnsClientsCard() {
       }
       const data = await response.json();
       if (Array.isArray(data)) {
-        setClients(data);
+        const formattedClients = data.map((client: DnsClient) => ({
+          ip: client.ip,
+          name: client.name || client.ip,
+          mac: client.mac !== 'N/A' ? client.mac : undefined,
+          lastSeen: client.lastSeen,
+          isReserved: client.isReserved,
+          status: client.status as 'static' | 'reserved' | 'dynamic'
+        }));
+        setClients(formattedClients);
         setEditedNames({});
       } else {
         setClients([]);
@@ -54,6 +65,14 @@ export function DnsClientsCard() {
     setEditedNames(prev => ({
       ...prev,
       [ip]: newName
+    }));
+  };
+
+  const startHostnameEdit = (ip: string, currentHostname: string) => {
+    setEditingHostname(ip);
+    setEditedNames(prev => ({
+      ...prev,
+      [ip]: currentHostname || ''
     }));
   };
 
@@ -121,13 +140,21 @@ export function DnsClientsCard() {
             setError('Failed to reserve client');
             return;
           }
-        } else if (client.status === 'reserved') {
-          // Update DNS hostname for reserved clients
-          const success = await handleDnsUpdate(client, editedName);
-          if (success) {
-            await fetchClients();
-            triggerRefresh();
-          }
+        }
+
+        // Update DNS hostname
+        const success = await handleDnsUpdate(client, editedName);
+        if (success) {
+          await fetchClients();
+          triggerRefresh();
+          
+          // Clear editing state after successful update
+          setEditingHostname(null);
+          setEditedNames(prev => {
+            const newState = { ...prev };
+            delete newState[client.ip];
+            return newState;
+          });
         }
       } catch (error) {
         console.error('Error in handleKeyDown:', error);
@@ -293,6 +320,10 @@ export function DnsClientsCard() {
     }
   };
 
+  const isProcessing = (ip: string) => {
+    return processingClients[ip] || savingHostnames[ip];
+  };
+
   useEffect(() => {
     fetchClients();
     return registerRefreshCallback(fetchClients);
@@ -363,17 +394,29 @@ export function DnsClientsCard() {
                   <td className="px-1 whitespace-nowrap text-small leading-3 tabular-nums">
                     {client.ip}
                   </td>
-                  <td className="px-1 whitespace-nowrap text-small leading-3">
-                    <input
-                      type="text"
-                      value={editedNames[client.ip] ?? ''}
-                      onChange={(e) => handleNameChange(client.ip, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, client)}
-                      className={`input ${savingHostnames[client.ip] ? 'opacity-50' : ''}`}
-                      disabled={savingHostnames[client.ip]}
-                      autoFocus
-                      placeholder="N/A"
-                    />
+                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                    {editingHostname === client.ip ? (
+                      <input
+                        type="text"
+                        value={editedNames[client.ip] ?? ''}
+                        onChange={(e) => handleNameChange(client.ip, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, client)}
+                        onBlur={() => setEditingHostname(null)}
+                        className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
+                          isProcessing(client.ip) ? 'opacity-50' : ''
+                        }`}
+                        disabled={isProcessing(client.ip)}
+                        autoFocus
+                        placeholder="N/A"
+                      />
+                    ) : (
+                      <span
+                        onClick={() => startHostnameEdit(client.ip, client.name || '')}
+                        className="cursor-pointer hover:text-blue-500"
+                      >
+                        {client.name || 'N/A'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-1 pr-3 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 text-right">
                     {client.status === 'static' ? (
@@ -381,22 +424,22 @@ export function DnsClientsCard() {
                     ) : client.status === 'reserved' ? (
                       <button
                         onClick={() => handleRemoveReservation(client)}
-                        disabled={processingClients[client.ip]}
+                        disabled={isProcessing(client.ip)}
                         className={`btn btn-red w-[72px] justify-center ${
-                          processingClients[client.ip] ? 'opacity-50 cursor-not-allowed' : ''
+                          isProcessing(client.ip) ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
-                        {processingClients[client.ip] ? 'SAVING...' : 'REMOVE'}
+                        {isProcessing(client.ip) ? 'SAVING...' : 'REMOVE'}
                       </button>
                     ) : (
                       <button
                         onClick={() => handleReserve(client)}
-                        disabled={processingClients[client.ip]}
+                        disabled={isProcessing(client.ip)}
                         className={`btn btn-blue w-[72px] justify-center ${
-                          processingClients[client.ip] ? 'opacity-50 cursor-not-allowed' : ''
+                          isProcessing(client.ip) ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                       >
-                        {processingClients[client.ip] ? 'SAVING...' : 'RESERVE'}
+                        {isProcessing(client.ip) ? 'SAVING...' : 'RESERVE'}
                       </button>
                     )}
                   </td>

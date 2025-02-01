@@ -21,7 +21,6 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const username = formData.get('username') as string;
     const password = formData.get('password') as string;
 
     if (isFirstTime) {
@@ -39,15 +38,14 @@ export default function LoginPage() {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ password }),
       });
 
       if (response.ok) {
         router.push('/');
         router.refresh();
-        window.location.reload();
       } else {
-        setError('Invalid credentials');
+        setError('Invalid password');
       }
     } catch (error) {
       console.error('Login failed:', error);
@@ -63,16 +61,6 @@ export default function LoginPage() {
             {isFirstTime ? 'Create Admin Account' : 'Login'}
           </h1>
           {error && <p className="text-red-500">{error}</p>}
-          <div>
-            <label htmlFor="username" className="block mb-1">Username</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              required
-              className="w-full p-2 rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-            />
-          </div>
           <div>
             <label htmlFor="password" className="block mb-1">Password</label>
             <input

@@ -1,3 +1,11 @@
+v 0.19
+    - Added First time password prompt sets darkflows user, darkflows samba user, and pihole password
+    - Fixed a bug with route to secondary interface
+    - Removed the need for a username to login, only a password
+    - Fixing client name lookup bugs added by authentication changes
+    - Fixed ability to easily edit host names by clicking fields
+    - Auto adds reservations any time you edit name
+
 v 0.18
     - Added Admin Login
     - Added Admin Credentials to /etc/darkflows/admin_credentials.json

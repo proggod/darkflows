@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 export default function RouteHostToSecondary() {
   const [ips, setIps] = useState<string[]>([])
   const [newIp, setNewIp] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -14,15 +14,19 @@ export default function RouteHostToSecondary() {
 
   const fetchIps = async () => {
     try {
+      setLoading(true)
       const response = await fetch('/api/secondary-routes')
       if (!response.ok) {
         throw new Error('Failed to fetch routes')
       }
       const data = await response.json()
-      setIps(data.ips)
+      setIps(data.ips || [])
     } catch (error) {
       console.error('Error fetching IPs:', error)
       setError('Failed to load routes')
+      setIps([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -87,37 +91,41 @@ export default function RouteHostToSecondary() {
       <div className="flex flex-col h-full">
         <h3 className="text-label mb-2">Route to Secondary</h3>
         
-        <div className="flex-1 overflow-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-              <tr>
-                <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">IP Address</th>
-                <th className="px-2 py-1 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ips.map((ip, index) => (
-                <tr 
-                  key={ip} 
-                  className={`card-hover ${
-                    index % 2 === 0 ? '' : 'card-alternate'
-                  } ${index === ips.length - 1 ? 'last-row' : ''}`}
-                >
-                  <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{ip}</td>
-                  <td className="px-2 py-1 text-xs text-right">
-                    <button
-                      onClick={() => handleDelete(ip)}
-                      disabled={loading}
-                      className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </td>
+        {loading ? (
+          <div className="text-center py-4 text-muted">Loading routes...</div>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                <tr>
+                  <th className="px-2 py-1 text-left text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">IP Address</th>
+                  <th className="px-2 py-1 text-right text-[11px] font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {ips.map((ip, index) => (
+                  <tr 
+                    key={ip} 
+                    className={`card-hover ${
+                      index % 2 === 0 ? '' : 'card-alternate'
+                    } ${index === ips.length - 1 ? 'last-row' : ''}`}
+                  >
+                    <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">{ip}</td>
+                    <td className="px-2 py-1 text-xs text-right">
+                      <button
+                        onClick={() => handleDelete(ip)}
+                        disabled={loading}
+                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {error && (
           <div className="mt-2 p-1.5 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
