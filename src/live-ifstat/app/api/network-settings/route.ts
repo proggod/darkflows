@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { promises as fs } from 'fs'
+import { requireAuth } from '../../lib/auth'
 
 interface NetworkSettings {
   gatewayIp: string
@@ -29,7 +30,10 @@ function calculateCidr(mask: string): number {
     .length - 1
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authResponse = await requireAuth(request)
+  if (authResponse) return authResponse
+
   try {
     // Read network interface config
     const interfacesConfig = await fs.readFile('/etc/network/interfaces', 'utf-8')
@@ -67,7 +71,10 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authResponse = await requireAuth(request)
+  if (authResponse) return authResponse
+  
   try {
     const settings: NetworkSettings = await request.json()
 

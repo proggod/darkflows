@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { spawn } from 'child_process'
+import { requireAuth } from '../../lib/auth'
 
 // Add GET handler for SSE
-export async function GET() {
-  console.log('=== SPEEDTEST START ===')
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth(request)
+  if (authError) return authError
   
   return new NextResponse(new ReadableStream({
     async start(controller) {
@@ -25,31 +27,25 @@ export async function GET() {
           try {
             const parsed = JSON.parse(errorData)
             if (parsed.type === 'log' && parsed.level === 'error') {
-              console.log('Speedtest error:', parsed.message)
               if (!parsed.message.includes('Timeout occurred')) {
                 controller.enqueue(`data: {"error": "${parsed.message}"}\n\n`)
                 controller.close()
               }
             }
-          } catch {
-            console.log('Speedtest stderr:', errorData)
-          }
+          } catch {}
         })
 
         speedtest.on('error', (error) => {
-          console.log('Speedtest error:', error.message)
           controller.enqueue(`data: {"error": "${error.message}"}\n\n`)
           controller.close()
         })
 
         speedtest.on('close', (code) => {
-          console.log('Speedtest exit code:', code)
-          
           if (code === 0 && buffer) {
             try {
               const rawResult = JSON.parse(buffer)
               const result = {
-                download: rawResult.download.bandwidth * 8 / 1000000, // Convert to Mbps
+                download: rawResult.download.bandwidth * 8 / 1000000,
                 upload: rawResult.upload.bandwidth * 8 / 1000000,
                 idleLatency: rawResult.ping.latency,
                 jitterDown: rawResult.download.latency.jitter,
@@ -61,18 +57,15 @@ export async function GET() {
                 resultUrl: rawResult.result.url
               }
               controller.enqueue(`data: {"result": ${JSON.stringify(result)}}\n\n`)
-            } catch (err) {
-              console.log('Parse error:', err)
+            } catch {
               controller.enqueue(`data: {"error": "Parse failed"}\n\n`)
             }
           } else {
             controller.enqueue(`data: {"error": "Test failed"}\n\n`)
           }
-          console.log('=== SPEEDTEST END ===')
           controller.close()
         })
-      } catch (err) {
-        console.log('Startup error:', err)
+      } catch {
         controller.enqueue(`data: {"error": "Startup failed"}\n\n`)
         controller.close()
       }
@@ -87,6 +80,9 @@ export async function GET() {
 }
 
 // Modify POST to just return success
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const authResponse = await requireAuth(request)
+  if (authResponse) return authResponse
+
   return NextResponse.json({ success: true })
 } 

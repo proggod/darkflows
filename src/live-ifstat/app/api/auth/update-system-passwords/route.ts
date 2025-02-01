@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
@@ -6,8 +6,9 @@ import fs from 'fs/promises';
 const execAsync = promisify(exec);
 const CREDENTIALS_FILE = '/etc/darkflows/admin_credentials.json';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const { password } = await request.json();
     // Check if this is first-time setup
     try {
       await fs.access(CREDENTIALS_FILE);
@@ -18,7 +19,6 @@ export async function POST(request: Request) {
       );
     } catch {
       // File doesn't exist, proceed with first-time setup
-      const { password } = await request.json();
 
       // Update Unix password
       await execAsync(`echo "darkflows:${password}" | chpasswd`);
@@ -33,9 +33,6 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     console.error('Failed to update system passwords:', error);
-    return NextResponse.json(
-      { error: 'Failed to update system passwords' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update system passwords' }, { status: 500 });
   }
 } 

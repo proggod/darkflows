@@ -1,3 +1,10 @@
+v 0.21
+    - Completely Changed Authentication other System to hopefully be more reliable
+
+v 0.20
+    - Fixed issue creating account
+    - Excluded default login file
+
 v 0.19
     - Added First time password prompt sets darkflows user, darkflows samba user, and pihole password
     - Fixed a bug with route to secondary interface

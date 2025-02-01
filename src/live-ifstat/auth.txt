@@ -1,0 +1,498 @@
+DarkFlows Authentication System Documentation
+==========================================
+
+Overview
+--------
+The authentication system is a JWT-based session management system implemented in Next.js, using cookies for session persistence. It provides both client-side and server-side protection for routes and API endpoints.
+
+Key Components
+-------------
+1. Middleware (middleware.ts)
+   - Intercepts all requests
+   - Manages public/protected routes
+   - Handles redirections based on auth status
+   - Public paths: ['/login', '/api/auth/check-setup', '/api/login', '/api/auth/save-credentials']
+
+2. Session Management (lib/session.ts)
+   - Uses JWT (JSON Web Tokens) with jose library
+   - Handles token creation, verification, and cookie management
+   - Cookie settings: httpOnly, sameSite: 'lax', 24-hour expiration
+   - Environment variable: SESSION_SECRET (fallback to default for development)
+
+3. Auth Protection (lib/auth.ts)
+   - Server-side route protection
+   - Verifies JWT tokens
+   - Manages setup-related paths that bypass auth
+   - Returns 401 for unauthorized requests
+
+4. Client-side Protection (components/AuthProtection.tsx)
+   - Wraps the entire application
+   - Checks authentication status on route changes
+   - Shows loading state during auth checks
+   - Redirects to login when needed
+
+Implementation Steps
+------------------
+1. Setup Environment
+   ```env
+   SESSION_SECRET=your-secure-secret-key-min-32-chars
+   ```
+
+2. Install Dependencies
+   ```json
+   {
+     "dependencies": {
+       "jose": "^4.x.x",
+       "next": "14.x.x"
+     }
+   }
+   ```
+
+3. File Structure
+   ```
+   app/
+   ├── lib/
+   │   ├── auth.ts         # Auth verification
+   │   └── session.ts      # Session management
+   ├── components/
+   │   └── AuthProtection.tsx  # Client-side wrapper
+   ├── api/
+   │   ├── auth/
+   │   │   ├── check.ts    # Auth status endpoint
+   │   │   └── login.ts    # Login endpoint
+   │   └── [protected routes]
+   └── middleware.ts       # Global auth middleware
+   ```
+
+4. Credential Storage
+   - Credentials stored in '/etc/darkflows/admin_credentials.json'
+   - Password hashed using SHA-256 with secret key
+   - Format: { "hashedPassword": "hashed_value" }
+
+API Endpoints
+------------
+1. /api/auth/check-setup
+   - Checks if initial setup is complete
+   - Returns: { isFirstTime: boolean }
+
+2. /api/auth/save-credentials
+   - Saves initial admin credentials
+   - Body: { password: string }
+
+3. /api/login
+   - Handles login requests
+   - Body: { password: string }
+   - Returns: JWT session token in cookie
+
+4. /api/auth/check
+   - Verifies current session
+   - Returns: { authenticated: boolean }
+
+Protected Route Implementation
+----------------------------
+1. API Routes:
+   ```typescript
+   import { requireAuth } from '@/lib/auth';
+
+   export async function GET(request: NextRequest) {
+     const authError = await requireAuth(request);
+     if (authError) return authError;
+     // Protected route logic
+   }
+   ```
+
+2. Page Routes:
+   - Automatically protected by AuthProtection component
+   - Wrapped in layout.tsx
+
+Security Features
+---------------
+1. JWT Token:
+   - 24-hour expiration
+   - HS256 algorithm
+   - Stored in httpOnly cookie
+
+2. Cookie Security:
+   - httpOnly: true
+   - secure: false (for development, true for production)
+   - sameSite: 'lax'
+   - 24-hour maxAge
+
+3. Password Security:
+   - SHA-256 hashing
+   - Combined with secret key
+   - No plaintext storage
+
+Error Handling
+-------------
+1. Authentication Errors:
+   - 401 Unauthorized for invalid/missing tokens
+   - Automatic redirect to login page
+   - Error messages in JSON response
+
+2. Setup Errors:
+   - 500 Server Error for filesystem issues
+   - Error details in response for setup-related endpoints
+
+Best Practices
+-------------
+1. Environment Variables:
+   - Use strong SESSION_SECRET in production
+   - Minimum 32 characters
+   - Keep secret key secure
+
+2. Production Settings:
+   - Enable secure cookies
+   - Use HTTPS
+   - Set appropriate CORS headers
+
+3. Security Considerations:
+   - Regular session rotation
+   - Rate limiting on login attempts
+   - Secure credential storage
+   - Input validation
+
+Implementation Example
+--------------------
+See the provided code files for detailed implementation examples.
+The system is designed to be modular and can be adapted for different
+authentication requirements while maintaining security best practices.
+
+Complete Implementation Guide
+---------------------------
+
+1. Session Management (lib/session.ts)
+```typescript
+export const runtime = 'nodejs';
+import { cookies } from 'next/headers';
+import { SignJWT, jwtVerify } from 'jose';
+import 'server-only';
+
+const secretKey = process.env.SESSION_SECRET || 'your-secret-key-min-32-chars-long';
+const encodedKey = new TextEncoder().encode(secretKey);
+
+async function hashPassword(password: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(password + secretKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(hashBuffer))));
+}
+
+export async function createSession() {
+  try {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(encodedKey);
+
+    const cookieStore = await cookies();
+    const cookieOptions = {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: 60 * 60 * 24
+    };
+    
+    cookieStore.set('session', token, cookieOptions);
+    const response = new Response(null);
+    const cookieHeader = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24}`;
+    response.headers.set('Set-Cookie', cookieHeader);
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function isLoggedIn() {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('session');
+    if (!sessionCookie?.value) return false;
+    await jwtVerify(sessionCookie.value, encodedKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function verifySession() {
+  try {
+    const cookieStore = await cookies();
+    const sessionValue = await cookieStore.get('session')?.value;
+    if (!sessionValue) return null;
+    const verified = await jwtVerify(sessionValue, encodedKey);
+    return verified.payload;
+  } catch {
+    return null;
+  }
+}
+```
+
+2. Auth Protection (lib/auth.ts)
+```typescript
+import { verifySession } from './session';
+import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+
+const SETUP_PATHS = [
+  '/api/auth/check-setup',
+  '/api/auth/save-credentials',
+  '/api/auth/update-system-passwords',
+  '/api/auth/verify-credentials'
+];
+
+export async function requireAuth(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (SETUP_PATHS.includes(path)) {
+    return null;
+  }
+  
+  const session = await verifySession();
+  if (!session) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  return null;
+}
+```
+
+3. Middleware (middleware.ts)
+```typescript
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export async function middleware(request: NextRequest) {
+  const publicPaths = ['/login', '/api/auth/check-setup', '/api/login', '/api/auth/save-credentials'];
+  const isPublicPath = publicPaths.includes(request.nextUrl.pathname);
+  const session = request.cookies.get('session');
+
+  if (!session && !isPublicPath) {
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (session && isPublicPath) {
+    const homeUrl = new URL('/', request.url);
+    return NextResponse.redirect(homeUrl);
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
+  ],
+};
+```
+
+4. Client Protection (components/AuthProtection.tsx)
+```typescript
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+
+export default function AuthProtection({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (pathname === '/login') {
+      setIsLoading(false);
+      return;
+    }
+
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.authenticated) {
+          router.push('/login');
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch(() => router.push('/login'));
+  }, [router, pathname]);
+
+  if (isLoading && pathname !== '/login') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-600 dark:text-gray-300">Loading...</div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+```
+
+5. Login API (app/api/login/route.ts)
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import { validateCredentials, createSession } from '@/lib/session';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { password } = body;
+
+    if (!password) {
+      return NextResponse.json(
+        { error: 'Password is required' },
+        { status: 400 }
+      );
+    }
+
+    const success = await validateCredentials(password);
+
+    if (success) {
+      const sessionResponse = await createSession();
+      const response = NextResponse.json({ success: true });
+      
+      sessionResponse.headers.forEach((value, key) => {
+        response.headers.set(key, value);
+      });
+      
+      return response;
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: 'Login failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+6. Auth Check API (app/api/auth/check/route.ts)
+```typescript
+import { NextResponse } from 'next/server';
+import { isLoggedIn } from '@/lib/session';
+
+export async function GET() {
+  try {
+    const authenticated = await isLoggedIn();
+    return NextResponse.json({ authenticated });
+  } catch {
+    return NextResponse.json(
+      { error: 'Authentication check failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+7. Protected Route Example (app/api/protected/route.ts)
+```typescript
+import { NextResponse, NextRequest } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+
+  return NextResponse.json({ 
+    message: 'Protected endpoint accessed successfully',
+    timestamp: new Date().toISOString()
+  });
+}
+```
+
+8. Login Page (app/login/page.tsx)
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function LoginPage() {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        router.push('/');
+      } else {
+        setError(data.error || 'Login failed');
+      }
+    } catch {
+      setError('Network error');
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="border p-2 rounded"
+          placeholder="Password"
+        />
+        {error && <div className="text-red-500">{error}</div>}
+        <button type="submit" className="bg-blue-500 text-white p-2 rounded">
+          Login
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+Usage Example
+------------
+1. Wrap your app with AuthProtection in layout.tsx:
+```typescript
+import AuthProtection from '@/components/AuthProtection';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html>
+      <body>
+        <AuthProtection>{children}</AuthProtection>
+      </body>
+    </html>
+  );
+}
+```
+
+2. Protect API routes:
+```typescript
+import { requireAuth } from '@/lib/auth';
+
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+  
+  // Your protected API logic here
+}
+``` 

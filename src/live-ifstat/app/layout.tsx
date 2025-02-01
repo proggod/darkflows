@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LayoutWrapper from './components/LayoutWrapper';
+import AuthProtection from './components/AuthProtection';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,8 +24,10 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="light">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <LayoutWrapper>{children}</LayoutWrapper>
+      <body className={`${geistSans.variable} ${geistMono.variable} bg-white dark:bg-gray-900`}>
+        <AuthProtection>
+          <LayoutWrapper>{children}</LayoutWrapper>
+        </AuthProtection>
       </body>
     </html>
   );

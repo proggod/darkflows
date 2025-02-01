@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { readConfig, writeConfig } from '@/lib/config'
@@ -47,7 +47,7 @@ export async function GET() {
 }
 
 // POST handler to add new DNS entries
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { ip, hostname } = await request.json()
     
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 }
 
 // DELETE handler to remove DNS entries
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const { hostname } = await request.json()
     
@@ -96,7 +96,7 @@ export async function DELETE(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
     const { ip, newHostname, mac } = await request.json();
     

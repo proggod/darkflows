@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import fs from 'fs/promises'
-import { NextRequest } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 
 const execAsync = promisify(exec)
 
@@ -111,7 +111,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const data = await request.json()
     
@@ -209,7 +212,10 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const data = await request.json()
     
@@ -281,7 +287,10 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const { searchParams } = new URL(request.url)
     const name = searchParams.get('name')

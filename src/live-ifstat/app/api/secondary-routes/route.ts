@@ -4,6 +4,7 @@ import { exec } from 'child_process'
 import { promisify } from 'util'
 import path from 'path'
 import { requireAuth } from '../../lib/auth'
+import { NextRequest } from 'next/server'
 
 const execAsync = promisify(exec)
 const ROUTES_FILE = '/etc/darkflows/route_to_secondary.txt'
@@ -114,9 +115,8 @@ async function updateRoutes(): Promise<void> {
 }
 
 // GET handler
-export async function GET() {
-  // Check authentication first
-  const authResponse = await requireAuth();
+export async function GET(request: NextRequest) {
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   try {
@@ -132,9 +132,8 @@ export async function GET() {
 }
 
 // POST handler
-export async function POST(request: Request) {
-  // Check authentication first
-  const authResponse = await requireAuth()
+export async function POST(request: NextRequest) {
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse
 
   try {
@@ -198,9 +197,8 @@ export async function POST(request: Request) {
 }
 
 // DELETE handler
-export async function DELETE(request: Request) {
-  // Add authentication check
-  const authResponse = await requireAuth();
+export async function DELETE(request: NextRequest) {
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   try {

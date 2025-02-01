@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readConfig, writeConfig, type KeaReservation } from '@/lib/config';
 import { syncAllSystems } from '@/lib/sync';
+import { requireAuth } from '../../lib/auth';
 
 // At the top of the file, after imports
 process.stdout.write('=== Reservations API module loaded ===\n');
@@ -34,7 +35,10 @@ async function syncDNSEntry(ip: string, hostname: string, shouldDelete = false) 
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const config = await readConfig();
     const reservations = config?.Dhcp4?.subnet4?.[0]?.reservations || [];
@@ -45,7 +49,10 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const reservation = await request.json();
     const config = await readConfig();
@@ -71,7 +78,10 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const { ip, mac } = await request.json();
     const config = await readConfig();
@@ -96,7 +106,10 @@ export async function DELETE(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     const reservation = await request.json();
     const config = await readConfig();

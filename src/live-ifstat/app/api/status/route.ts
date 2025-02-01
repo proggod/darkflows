@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 import { requireAuth } from '../../lib/auth'
+import { NextRequest } from 'next/server'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   // Check authentication first
-  const authResponse = await requireAuth();
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   try {

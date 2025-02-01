@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import fs from 'fs/promises';
 
 const CREDENTIALS_FILE = '/etc/darkflows/admin_credentials.json';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const { username, hashedPassword } = await request.json();
     const content = await fs.readFile(CREDENTIALS_FILE, 'utf-8');

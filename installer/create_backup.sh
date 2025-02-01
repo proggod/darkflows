@@ -29,6 +29,7 @@ tar zcvf /usr/local/installer_packages/darkflows_configs.tgz \
     --exclude=.git \
     --exclude=node_modules \
     --exclude=.next \
+    --exclude=admin_credentials.json \
     /etc/kea /etc/lighttpd /etc/darkflows /root/.ssh/authorized_keys /etc/ssh/sshd_config  /var/www/html/index.php /etc/samba /etc/darkflows
 
 mkdir /usr/local/darkflows/configs/

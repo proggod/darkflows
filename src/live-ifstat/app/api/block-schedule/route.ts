@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import { requireAuth } from '../../lib/auth';
 
@@ -42,9 +42,9 @@ async function readSchedule() {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   // Check authentication first
-  const authResponse = await requireAuth();
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   try {
@@ -56,9 +56,9 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   // Check authentication first
-  const authResponse = await requireAuth();
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   try {

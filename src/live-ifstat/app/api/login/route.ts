@@ -1,20 +1,39 @@
-import { NextResponse } from 'next/server';
-import { validateCredentials } from '@/lib/session';
+import { NextRequest, NextResponse } from 'next/server';
+import { validateCredentials, createSession } from '@/lib/session';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { password } = body; // Only get password since username is not needed
+    const { password } = body;
 
-    const isValid = await validateCredentials(password);
-    
-    if (!isValid) {
-      return new NextResponse(null, { status: 401 });
+    if (!password) {
+      return NextResponse.json(
+        { error: 'Password is required' },
+        { status: 400 }
+      );
     }
 
-    return new NextResponse(null, { status: 200 });
-  } catch (error) {
-    console.error('Login error:', error);
-    return new NextResponse(null, { status: 500 });
+    const success = await validateCredentials(password);
+
+    if (success) {
+      const sessionResponse = await createSession();
+      const response = NextResponse.json({ success: true });
+      
+      sessionResponse.headers.forEach((value, key) => {
+        response.headers.set(key, value);
+      });
+      
+      return response;
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: 'Login failed' },
+      { status: 500 }
+    );
   }
 } 

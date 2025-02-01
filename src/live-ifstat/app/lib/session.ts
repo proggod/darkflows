@@ -1,7 +1,10 @@
+export const runtime = 'nodejs';
+
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import 'server-only';
-import { headers } from 'next/headers';
+import fs from 'fs/promises';
+import { execAsync } from './utils/execAsync';
 
 const secretKey = process.env.SESSION_SECRET || 'your-secret-key-min-32-chars-long';
 const encodedKey = new TextEncoder().encode(secretKey);
@@ -14,76 +17,126 @@ async function hashPassword(password: string): Promise<string> {
 
 export async function validateCredentials(password: string) {
   try {
-    const headersList = await headers();
-    const host = await headersList.get('host') || '';
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = `${protocol}://${host}`;
-
-    const setupResponse = await fetch(`${baseUrl}/api/auth/check-setup`);
-    const { isFirstTime } = await setupResponse.json();
-
-    const hashedPassword = await hashPassword(password);
+    console.log('=== Starting validateCredentials ===');
+    
+    // Check setup status directly via file system
+    console.log('Checking setup status...');
+    const CREDENTIALS_FILE = '/etc/darkflows/admin_credentials.json';
+    let isFirstTime = false;
+    
+    try {
+      await fs.access(CREDENTIALS_FILE);
+      console.log('Credentials file exists - not first time setup');
+    } catch {
+      console.log('No credentials file - this is first time setup');
+      isFirstTime = true;
+    }
 
     if (isFirstTime) {
-      // Update system passwords first
-      const systemResponse = await fetch(`${baseUrl}/api/auth/update-system-passwords`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      });
+      console.log('=== Starting first-time setup flow ===');
+      try {
+        // Hash password first
+        console.log('Hashing password...');
+        const hashedPassword = await hashPassword(password);
+        console.log('Password hashed successfully');
 
-      if (!systemResponse.ok) {
-        console.error('Failed to update system passwords');
+        // Save credentials
+        console.log('Saving credentials...');
+        await fs.mkdir('/etc/darkflows', { recursive: true });
+        await fs.writeFile(CREDENTIALS_FILE, JSON.stringify({ hashedPassword }));
+        console.log('Credentials saved successfully');
+
+        // Update system passwords
+        console.log('Updating system passwords...');
+        await execAsync(`echo "darkflows:${password}" | chpasswd`);
+        await execAsync(`(echo "${password}"; echo "${password}") | smbpasswd -s -a darkflows`);
+        await execAsync(`pihole -a -p "${password}"`);
+        console.log('System passwords updated successfully');
+
+        console.log('Creating session...');
+        await createSession();
+        console.log('Session created successfully');
+        return true;
+      } catch (error) {
+        console.error('Error during first-time setup:', error);
         return false;
       }
-
-      // Then save credentials
-      const saveResponse = await fetch(`${baseUrl}/api/auth/save-credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hashedPassword })
-      });
-
-      if (saveResponse.ok) {
-        await createSession();
-        return true;
+    } else {
+      // Normal login flow
+      console.log('=== Starting normal login flow ===');
+      try {
+        const content = await fs.readFile(CREDENTIALS_FILE, 'utf-8');
+        const { hashedPassword: storedHash } = JSON.parse(content);
+        
+        console.log('Hashing provided password...');
+        const hashedInput = await hashPassword(password);
+        
+        if (hashedInput === storedHash) {
+          console.log('Password verified, creating session...');
+          await createSession();
+          console.log('Session created successfully');
+          return true;
+        }
+        
+        console.log('Password verification failed');
+        return false;
+      } catch (error) {
+        console.error('Error during login:', error);
+        return false;
       }
-      return false;
     }
-
-    // Verify existing credentials
-    const verifyResponse = await fetch(`${baseUrl}/api/auth/verify-credentials`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hashedPassword })
-    });
-
-    if (verifyResponse.ok) {
-      await createSession();
-      return true;
-    }
-    return false;
-
   } catch (error) {
-    console.error('Credential validation error:', error);
+    console.error('Validation error:', error);
     return false;
   }
 }
 
-async function createSession() {
-  const token = await new SignJWT({})
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('24h')
-    .sign(encodedKey);
+export async function createSession() {
+  try {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(encodedKey);
 
-  const cookieStore = await cookies();
-  await cookieStore.set('session', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 60 * 60 * 24 // 24 hours
-  });
+    const cookieStore = await cookies();
+    
+    const cookieOptions = {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: 60 * 60 * 24
+    };
+    
+    cookieStore.set('session', token, cookieOptions);
+    
+    const response = new Response(null);
+    const cookieHeader = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24}`;
+    response.headers.set('Set-Cookie', cookieHeader);
+
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+
+export async function isLoggedIn() {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('session');
+
+    if (!sessionCookie?.value) {
+      return false;
+    }
+
+    // Just verify the token, we don't need the payload
+    await jwtVerify(sessionCookie.value, encodedKey);
+    return true;
+  } catch {
+    // Don't need the error variable if we're not using it
+    return false;
+  }
 }
 
 export async function verifySession() {
@@ -99,21 +152,5 @@ export async function verifySession() {
     return verified.payload;
   } catch {
     return null;
-  }
-}
-
-export async function isLoggedIn() {
-  try {
-    const cookieStore = await cookies();
-    const sessionValue = await cookieStore.get('session')?.value;
-
-    if (!sessionValue) {
-      return false;
-    }
-
-    await jwtVerify(sessionValue, encodedKey);
-    return true;
-  } catch {
-    return false;
   }
 } 

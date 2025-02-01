@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { requireAuth } from '../../../../lib/auth'
 
 const execAsync = promisify(exec)
 
-// Define the context type with params as a Promise
 interface RouteContext {
   params: Promise<{
     name: string;
@@ -15,6 +15,10 @@ export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
+  // Check authentication first
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   try {
     // Await the params Promise to get the actual parameters
     const { name } = await context.params;

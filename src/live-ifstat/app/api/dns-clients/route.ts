@@ -1,12 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSqliteDb } from '@/lib/db';
 import { lookupHostnames } from '@/lib/hostname-lookup';
 import { DnsClient } from '@/types/dns';
 
-export async function GET() {
-  // Check authentication first
-  const authResponse = await requireAuth();
+export async function GET(request: NextRequest) {
+  const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   try {
@@ -68,7 +67,17 @@ export async function GET() {
   }
 }
 
-export async function PUT() {
+export async function PUT(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
   // ... existing code ...
+}
+
+export async function POST(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) return authResponse;
+
+  // ... rest of the code ...
 }
 
