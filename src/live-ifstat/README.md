@@ -1,3 +1,10 @@
+
+v 0.22
+    - Changed default component order, made it so i can order network stats…
+    - Added install verifications, added internet verification before running install
+    - make dark mode permenenant, removed switch mode button
+    - fixed spacing with a component card for cake
+    
 v 0.21
     - Completely Changed Authentication other System to hopefully be more reliable
 
