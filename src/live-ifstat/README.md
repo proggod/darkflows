@@ -3,10 +3,12 @@ v 0.22
     - Changed default component order, made it so i can order network stats…
     - Added install verifications, added internet verification before running install
     - make dark mode permenenant, removed switch mode button
-    - fixed spacing with a component card for cake
-    
+    - fixed spacing with a component card for cake]
+    - install with command, "su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install.sh | bash"
+    - visit web after at "http://192.168.58.1"
+
 v 0.21
-    - Completely Changed Authentication other System to hopefully be more reliable
+    - Completely Changed Authentication to other System to hopefully be more reliable
 
 v 0.20
     - Fixed issue creating account

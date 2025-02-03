@@ -36,4 +36,9 @@ echo "Running the installer script: $INSTALLER_SCRIPT"
 
 echo "First boot setup completed!"
 
+echo "==================================================================="
+echo "======= access web at http://192.168.58.1                 ========="
+echo "==================================================================="
+echo ""
+
 

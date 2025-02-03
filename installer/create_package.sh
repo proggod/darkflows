@@ -10,6 +10,10 @@ $DARKFLOWS_DIR/installer/create_backup.sh
 cd $PACKAGE_DIR
 tar zcvf /tmp/darkflows-${VERSION}.tgz *
 echo "package is in /tmp/darkflows-${VERSION}.tgz"
+cd /tmp
+rm darkflows-current.tgz
+ln -s darkflows-${VERSION}.tgz darkflows-current.tgz
 scp -P 8020 /tmp/darkflows-${VERSION}.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
+scp -P 8020 /tmp/darkflows-current.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
 
 
