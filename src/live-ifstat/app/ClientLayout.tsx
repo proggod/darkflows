@@ -103,7 +103,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <NavBar />
       <div className="fixed top-2 right-4 flex items-center gap-2 z-50">
         <EditModeButton />
-        <ThemeToggle />
+        {/* <ThemeToggle /> */}
         <LogoutButton />
       </div>
       <main className="pt-12">

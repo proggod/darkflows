@@ -243,10 +243,12 @@ const WeatherWidget = () => {
         
         <div className="ml-auto text-right">
           <div className="text-xl">Weather</div>
-          <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+          <div className={`text-sm ${isDarkMode ? 'text-muted' : 'text-foreground'}`}>
             {getCurrentDateTime(weatherData.timezone)}
           </div>
-          <div className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Cloudy</div>
+          <div className={`text-sm ${isDarkMode ? 'text-muted' : 'text-foreground'}`}>
+            {weatherData.current_weather.weathercode === 0 ? 'Clear' : 'Cloudy'}
+          </div>
         </div>
       </div>
 

@@ -123,7 +123,7 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
               <div key={iface} className="flex items-center justify-between p-1 rounded-lg">
                 <div className="flex items-center gap-1.5">
                   <div className={`w-1.5 h-1.5 rounded-full ${stats.new_drops > 0 ? 'bg-red-500' : 'bg-green-500'}`} />
-                  <span className="text-xs">{deviceLabels[iface] || iface}</span>
+                  <span className="text-xs text-foreground">{deviceLabels[iface] || iface}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="text-muted text-xs">
