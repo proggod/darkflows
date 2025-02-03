@@ -129,7 +129,7 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
                   <div className="text-muted text-xs">
                     {stats.memory > 0 ? formatMemory(stats.memory) : ''}
                   </div>
-                  <div className="text-muted text-xs min-w-[50px] text-right">
+                  <div className="text-muted text-xs min-w-[80px] text-right">
                     {`${stats.new_drops} drops`}
                   </div>
                 </div>
