@@ -2,6 +2,16 @@
 cd /usr/local/darkflows/src/live-ifstat
 
 mkdir /usr/local/installer_packages
+
+# Generate random suffix for darkflows directory
+DARKFLOWS_SUFFIX="$RANDOM"
+DARKFLOWS_BACKUP="/etc/darkflows.$DARKFLOWS_SUFFIX"
+
+# Move darkflows to temporary name and replace with default
+mv /etc/darkflows "$DARKFLOWS_BACKUP"
+mv /etc/darkflows.default /etc/darkflows
+
+# Create the archives with the default config in place
 tar zcvf /usr/local/installer_packages/darkflows_scripts.tgz  --exclude=node_modules --exclude=.next --exclude=installer_packages --exclude=.git  /usr/local/darkflows /etc/systemd/system/nextjs-app.service /etc/systemd/system/default_routing.service 
 
 # Paths to the configs
@@ -41,6 +51,10 @@ rm -f "$KEA_CONF"
 # Restore the original config files
 mv "$SAMBA_CONF_BACKUP" "$SAMBA_CONF"
 mv "$KEA_CONF_BACKUP" "$KEA_CONF"
+
+# Restore original darkflows directory
+mv /etc/darkflows /etc/darkflows.default
+mv "$DARKFLOWS_BACKUP" /etc/darkflows
 
 echo "Backup completed successfully."
 
