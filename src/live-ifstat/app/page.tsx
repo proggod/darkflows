@@ -61,14 +61,16 @@ interface IfstatData {
 
 const DEFAULT_ITEMS = [
   'systemMonitor',
+  'clock',
   'interfaceStatus',
   'pingPrimary',
   'pingSecondary',
-  'speedTest',
+  'networkStats',
   'connectionTuning',
+  'systemSettings',
+  'weather',
   'reservations',
   'leases',
-  'weather',
   'processes',
   'sambaShares',
   'sshKeys',
@@ -79,8 +81,8 @@ const DEFAULT_ITEMS = [
   'dnsHosts',
   'piholeLists',
   'bandwidth',
-  'systemSettings',
-  'clock',
+  'speedTest',
+
 ]
 
 const CombinedDashboard = () => {
@@ -167,21 +169,22 @@ const CombinedDashboard = () => {
               item.startsWith('device_') && deviceItems.includes(item)
             )
             const newDevices = deviceItems.filter((item: string) => !current.includes(item))
-            const nonDeviceItems = current.filter((item: string) => 
-              !item.startsWith('device_')
-            )
             
-            if (newDevices.length === 0) {
-              return current
+            // Find the networkStats placeholder index
+            const networkStatsIndex = current.indexOf('networkStats')
+            
+            // Remove the networkStats placeholder and insert device cards in its place
+            const newItems = current.filter(item => item !== 'networkStats')
+            if (networkStatsIndex === -1) {
+              return [...newItems, ...existingDeviceItems, ...newDevices]
             }
             
-            console.log('DEBUG: Updating items with devices', {
-              nonDeviceItems,
-              existingDeviceItems,
-              newDevices
-            });
-            
-            return [...nonDeviceItems, ...existingDeviceItems, ...newDevices]
+            return [
+              ...newItems.slice(0, networkStatsIndex),
+              ...existingDeviceItems,
+              ...newDevices,
+              ...newItems.slice(networkStatsIndex)
+            ]
           })
         }
       })

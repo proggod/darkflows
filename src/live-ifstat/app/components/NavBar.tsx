@@ -27,7 +27,7 @@ export default function NavBar() {
         {/* Center - Description */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block">
           <p className="text-sm text-muted-foreground whitespace-nowrap">
-            A simple, easy to use elegant open source router interface
+            DarkFlows, have your CAKE and eat it too!
           </p>
         </div>
       </div>
