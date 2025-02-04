@@ -10,6 +10,16 @@
 - Uses PiHole for DNS
 - Visit web after at "http://192.168.58.1"
 
+## Installation
+```
+su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install.sh | bash
+```
+
+### Fast Reboot Command
+```
+/usr/local/darkflows/bin/reboot_server.sh
+``` 
+
 ## Changelog
 v 0.22
     - Changed default component order, made it so i can order network stats…
