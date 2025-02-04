@@ -1,3 +1,15 @@
+Welcome to DarkFlows Firewall/Router OS
+
+- Uses kea for DHCP
+- Uses Pihole for DNS
+- Full Web UI
+- Many scripts to do everything from port forwarding to client management
+- configs exist in /etc/darkflows
+- everything else is in /usr/local/darkflows
+- Uses PiHole for DNS
+
+
+
 
 v 0.22
     - Changed default component order, made it so i can order network stats…
