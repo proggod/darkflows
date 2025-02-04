@@ -1,5 +1,6 @@
-Welcome to DarkFlows Firewall/Router OS
+##Welcome to DarkFlows Firewall/Router OS
 
+###Features
 - Uses kea for DHCP
 - Uses Pihole for DNS
 - Full Web UI
@@ -7,7 +8,7 @@ Welcome to DarkFlows Firewall/Router OS
 - configs exist in /etc/darkflows
 - everything else is in /usr/local/darkflows
 - Uses PiHole for DNS
-
+- Visit web after at "http://192.168.58.1"
 
 
 
