@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Check if a commit message is provided
-if [ -z "$1" ]; then
-    echo "Usage: $0 \"commit message\""
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 commit message"
     exit 1
 fi
 
@@ -14,7 +14,7 @@ cp src/live-ifstat/LICENSE .
 git add *
 
 # Commit with the provided message
-git commit -am "$1"
+git commit -am "$*"
 
 # Push changes
 git push
