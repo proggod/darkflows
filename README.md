@@ -1,6 +1,6 @@
-##Welcome to DarkFlows Firewall/Router OS
+# Welcome to DarkFlows Firewall/Router OS
 
-###Features
+## Features
 - Uses kea for DHCP
 - Uses Pihole for DNS
 - Full Web UI
@@ -10,8 +10,7 @@
 - Uses PiHole for DNS
 - Visit web after at "http://192.168.58.1"
 
-
-
+## Changelog
 v 0.22
     - Changed default component order, made it so i can order network stats…
     - Added install verifications, added internet verification before running install
