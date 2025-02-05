@@ -45,13 +45,6 @@ import { usePingData } from '@/contexts/PingDataContext'
 import Clock from '@/components/Clock'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
-interface NetworkInterface {
-  name: string
-  speed?: string
-  label?: string
-  type?: 'primary' | 'secondary' | 'internal'
-}
-
 interface IfstatData {
   timestamp: string
   interface: string
@@ -65,7 +58,9 @@ const DEFAULT_ITEMS = [
   'interfaceStatus',
   'pingPrimary',
   'pingSecondary',
-  'networkStats',
+  'networkPrimary',
+  'networkSecondary',
+  'networkInternal',
   'connectionTuning',
   'systemSettings',
   'weather',
@@ -82,11 +77,9 @@ const DEFAULT_ITEMS = [
   'piholeLists',
   'bandwidth',
   'speedTest',
-
 ]
 
 const CombinedDashboard = () => {
-  const [interfaces, setInterfaces] = useState<NetworkInterface[]>([])
   const { networkStats } = useNetworkStats()
   const { isEditMode } = useEditMode()
   const { isDarkMode } = useTheme()
@@ -128,17 +121,21 @@ const CombinedDashboard = () => {
         
         if (savedOrder) {
           const parsedOrder = JSON.parse(savedOrder)
-          setItems(parsedOrder)
+          // Filter out any old device_ prefixed items
+          const filteredOrder = parsedOrder.filter((id: string) => !id.startsWith('device_'))
+          setItems(filteredOrder)
         }
 
         const savedHidden = localStorage.getItem('betaDashboardHidden')
         if (savedHidden) {
-          setHiddenItems(new Set(JSON.parse(savedHidden)))
+          const parsedHidden = JSON.parse(savedHidden)
+          // Filter out any old device_ prefixed items
+          const filteredHidden = parsedHidden.filter((id: string) => !id.startsWith('device_'))
+          setHiddenItems(new Set(filteredHidden))
         }
 
         initialLoadComplete.current = true
-        deviceUpdatePending.current = true
-        setIsLoading(false) // Hide loading state after layout is ready
+        setIsLoading(false)
       } catch (error) {
         console.error('DEBUG: Error loading saved dashboard state:', error)
         initialLoadComplete.current = true
@@ -152,44 +149,9 @@ const CombinedDashboard = () => {
   // Fetch devices after initial load
   useEffect(() => {
     if (!networkConfig || !initialLoadComplete.current || !deviceUpdatePending.current) return;
-
     deviceUpdatePending.current = false;
-    console.log('DEBUG: Fetching devices');
-
-    fetch('/api/devices')
-      .then(res => res.json())
-      .then(data => {
-        if (data.devices) {
-          const filteredDevices = data.devices.filter((device: NetworkInterface) => device.name !== 'ifb0')
-          setInterfaces(filteredDevices)
-          
-          setItems(current => {
-            const deviceItems = filteredDevices.map((device: NetworkInterface) => `device_${device.name}`)
-            const existingDeviceItems = current.filter((item: string) => 
-              item.startsWith('device_') && deviceItems.includes(item)
-            )
-            const newDevices = deviceItems.filter((item: string) => !current.includes(item))
-            
-            // Find the networkStats placeholder index
-            const networkStatsIndex = current.indexOf('networkStats')
-            
-            // Remove the networkStats placeholder and insert device cards in its place
-            const newItems = current.filter(item => item !== 'networkStats')
-            if (networkStatsIndex === -1) {
-              return [...newItems, ...existingDeviceItems, ...newDevices]
-            }
-            
-            return [
-              ...newItems.slice(0, networkStatsIndex),
-              ...existingDeviceItems,
-              ...newDevices,
-              ...newItems.slice(networkStatsIndex)
-            ]
-          })
-        }
-      })
-      .catch(() => console.error('Failed to load devices'))
-  }, [networkConfig])
+    setIsLoading(false);
+  }, [networkConfig]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode)
@@ -381,26 +343,53 @@ const CombinedDashboard = () => {
         return <ErrorBoundary><SshKeysCard /></ErrorBoundary>
       case 'clock':
         return <ErrorBoundary><Clock /></ErrorBoundary>
+      case 'networkPrimary':
+        console.log('Debug networkPrimary:', {
+          interface: networkConfig?.PRIMARY_INTERFACE,
+          label: networkConfig?.PRIMARY_LABEL
+        });
+        if (!networkConfig?.PRIMARY_INTERFACE) return null;
+        return (
+          <ErrorBoundary>
+            <NetworkStatsCard
+              data={getNetworkCardData(networkConfig.PRIMARY_INTERFACE)}
+              label={networkConfig.PRIMARY_LABEL || networkConfig.PRIMARY_INTERFACE}
+              color={isDarkMode ? colors[0].dark : colors[0].light}
+              fetchStats={() => {}}
+              error={null}
+              loading={false}
+            />
+          </ErrorBoundary>
+        );
+      case 'networkSecondary':
+        if (!networkConfig?.SECONDARY_INTERFACE) return null;
+        return (
+          <ErrorBoundary>
+            <NetworkStatsCard
+              data={getNetworkCardData(networkConfig.SECONDARY_INTERFACE)}
+              label={networkConfig.SECONDARY_LABEL || networkConfig.SECONDARY_INTERFACE}
+              color={isDarkMode ? colors[1].dark : colors[1].light}
+              fetchStats={() => {}}
+              error={null}
+              loading={false}
+            />
+          </ErrorBoundary>
+        );
+      case 'networkInternal':
+        if (!networkConfig?.INTERNAL_INTERFACE) return null;
+        return (
+          <ErrorBoundary>
+            <NetworkStatsCard
+              data={getNetworkCardData(networkConfig.INTERNAL_INTERFACE)}
+              label={networkConfig.INTERNAL_LABEL || networkConfig.INTERNAL_INTERFACE}
+              color={isDarkMode ? colors[2].dark : colors[2].light}
+              fetchStats={() => {}}
+              error={null}
+              loading={false}
+            />
+          </ErrorBoundary>
+        );
       default:
-        if (id.startsWith('device_')) {
-          const deviceName = id.replace('device_', '')
-          const device = interfaces.find(i => i.name === deviceName)
-          if (!device) return null
-          
-          const colorIndex = interfaces.findIndex(i => i.name === deviceName) % colors.length
-          return (
-            <ErrorBoundary>
-              <NetworkStatsCard
-                data={getNetworkCardData(deviceName)}
-                label={device.label || device.name}
-                color={isDarkMode ? colors[colorIndex].dark : colors[colorIndex].light}
-                fetchStats={() => {}}
-                error={null}
-                loading={false}
-              />
-            </ErrorBoundary>
-          )
-        }
         return null
     }
   }
@@ -408,11 +397,17 @@ const CombinedDashboard = () => {
   const visibleItems = items
     .filter(id => !hiddenItems.has(id))
     .filter(id => {
-      if (id === 'pingSecondary') {
-        return networkConfig?.SECONDARY_INTERFACE !== undefined && 
-               networkConfig?.SECONDARY_INTERFACE !== "";
+      switch (id) {
+        case 'pingSecondary':
+        case 'networkSecondary':
+          return networkConfig?.SECONDARY_INTERFACE !== undefined && 
+                 networkConfig?.SECONDARY_INTERFACE !== "";
+        case 'networkInternal':
+          return networkConfig?.INTERNAL_INTERFACE !== undefined && 
+                 networkConfig?.INTERNAL_INTERFACE !== "";
+        default:
+          return true;
       }
-      return true;
     });
 
   const getComponentLabel = (id: string) => {
@@ -457,12 +452,13 @@ const CombinedDashboard = () => {
         return 'SSH Keys'
       case 'clock':
         return 'Clock'
+      case 'networkPrimary':
+        return 'Primary Network Stats'
+      case 'networkSecondary':
+        return 'Secondary Network Stats'
+      case 'networkInternal':
+        return 'Internal Network Stats'
       default:
-        if (id.startsWith('device_')) {
-          const deviceName = id.replace('device_', '')
-          const device = interfaces.find(d => d.name === deviceName)
-          return device?.label || deviceName
-        }
         return id
     }
   }

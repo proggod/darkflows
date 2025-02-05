@@ -22,6 +22,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 
 ## Changelog
 
+v 0.24
+    - Changed logic on network stats card so we don't get duplicate network stats cards
+
 v 0.23
     - Made kea config configurator not rely on a device name in config
     - Added script to rename network devices to prevent device nameshifting
