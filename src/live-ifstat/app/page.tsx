@@ -57,8 +57,8 @@ const DEFAULT_ITEMS = [
   'clock',
   'interfaceStatus',
   'pingPrimary',
-  'pingSecondary',
   'networkPrimary',
+  'pingSecondary',
   'networkSecondary',
   'networkInternal',
   'connectionTuning',
@@ -78,6 +78,13 @@ const DEFAULT_ITEMS = [
   'bandwidth',
   'speedTest',
 ]
+
+console.log('Debug DEFAULT_ITEMS:', {
+  hasNetworkPrimary: DEFAULT_ITEMS.includes('networkPrimary'),
+  hasNetworkSecondary: DEFAULT_ITEMS.includes('networkSecondary'),
+  hasNetworkInternal: DEFAULT_ITEMS.includes('networkInternal'),
+  fullList: DEFAULT_ITEMS
+});
 
 const CombinedDashboard = () => {
   const { networkStats } = useNetworkStats()
@@ -113,18 +120,64 @@ const CombinedDashboard = () => {
         }
 
         if (networkConfig === null || isPingDataLoading) {
+          console.log('Debug loadSavedState: waiting for config', { 
+            hasConfig: networkConfig !== null, 
+            isPingDataLoading 
+          });
           return;
         }
 
+        console.log('Debug loadSavedState: config ready', networkConfig);
+
         const savedOrder = localStorage.getItem('betaDashboardOrder')
-        console.log('DEBUG: Loading saved state', { savedOrder });
+        console.log('DEBUG: Loading saved state', { 
+          savedOrder,
+          defaultItems: DEFAULT_ITEMS 
+        });
         
+        let newItems = DEFAULT_ITEMS;
         if (savedOrder) {
           const parsedOrder = JSON.parse(savedOrder)
-          // Filter out any old device_ prefixed items
-          const filteredOrder = parsedOrder.filter((id: string) => !id.startsWith('device_'))
-          setItems(filteredOrder)
+          // Filter out device_ items but preserve network cards
+          const filteredOrder = parsedOrder.filter((id: string) => 
+            !id.startsWith('device_') || 
+            ['networkPrimary', 'networkSecondary', 'networkInternal'].includes(id)
+          )
+          
+          // Ensure network cards are present
+          const networkCards = ['networkPrimary', 'networkSecondary', 'networkInternal']
+          const missingCards = networkCards.filter(card => !filteredOrder.includes(card))
+          
+          if (missingCards.length > 0) {
+            // Add missing network cards after their corresponding ping cards
+            const newOrder = [...filteredOrder]
+            missingCards.forEach(card => {
+              if (card === 'networkPrimary') {
+                const pingIndex = newOrder.indexOf('pingPrimary')
+                if (pingIndex !== -1) {
+                  newOrder.splice(pingIndex + 1, 0, card)
+                } else {
+                  newOrder.push(card)
+                }
+              } else if (card === 'networkSecondary') {
+                const pingIndex = newOrder.indexOf('pingSecondary')
+                if (pingIndex !== -1) {
+                  newOrder.splice(pingIndex + 1, 0, card)
+                } else {
+                  newOrder.push(card)
+                }
+              } else {
+                newOrder.push(card)
+              }
+            })
+            newItems = newOrder
+          } else {
+            newItems = filteredOrder
+          }
         }
+        
+        console.log('Debug: Final items after ensuring network cards:', newItems);
+        setItems(newItems);
 
         const savedHidden = localStorage.getItem('betaDashboardHidden')
         if (savedHidden) {
@@ -138,8 +191,10 @@ const CombinedDashboard = () => {
         setIsLoading(false)
       } catch (error) {
         console.error('DEBUG: Error loading saved dashboard state:', error)
-        initialLoadComplete.current = true
-        setIsLoading(false)
+        console.log('Debug: Falling back to DEFAULT_ITEMS');
+        setItems(DEFAULT_ITEMS);
+        initialLoadComplete.current = true;
+        setIsLoading(false);
       }
     }
 
@@ -157,24 +212,22 @@ const CombinedDashboard = () => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])
 
-  // Modify the version check effect to preserve layout if possible
+  // First, let's modify the version check effect to be more aggressive
   useEffect(() => {
     const checkVersion = async () => {
       try {
         const response = await fetch('/api/version');
         const { version } = await response.json();
-        const savedVersion = localStorage.getItem('betaDashboardVersion');
         
-        if (!savedVersion || savedVersion !== version) {
-          // Only reset if there's no saved version
-          if (!savedVersion) {
-            localStorage.removeItem('betaDashboardOrder');
-            localStorage.removeItem('betaDashboardHidden');
-            setItems(DEFAULT_ITEMS);
-            setHiddenItems(new Set());
-          }
-          localStorage.setItem('betaDashboardVersion', version);
-        }
+        // Always force a reset to ensure network cards are present
+        console.log('Debug: Forcing dashboard reset');
+        localStorage.clear(); // Clear all localStorage
+        setItems(DEFAULT_ITEMS);
+        setHiddenItems(new Set());
+        localStorage.setItem('betaDashboardVersion', version);
+        localStorage.setItem('betaDashboardOrder', JSON.stringify(DEFAULT_ITEMS));
+        console.log('Debug: Reset complete, new items:', DEFAULT_ITEMS);
+        
       } catch (error) {
         console.error('Failed to check version:', error);
       }
@@ -182,6 +235,25 @@ const CombinedDashboard = () => {
 
     checkVersion();
   }, []);
+
+  // Add debug logging for networkConfig and networkStats
+  useEffect(() => {
+    console.log('Debug networkConfig:', networkConfig)
+    console.log('Debug networkStats:', networkStats)
+  }, [networkConfig, networkStats])
+
+  // Add this debug effect
+  useEffect(() => {
+    console.log('Debug network cards:', {
+      networkConfig,
+      hasNetworkPrimary: items.includes('networkPrimary'),
+      hasNetworkSecondary: items.includes('networkSecondary'),
+      hasNetworkInternal: items.includes('networkInternal'),
+      primaryInterface: networkConfig?.PRIMARY_INTERFACE,
+      secondaryInterface: networkConfig?.SECONDARY_INTERFACE,
+      internalInterface: networkConfig?.INTERNAL_INTERFACE,
+    });
+  }, [networkConfig, items]);
 
   const colors = [
     { light: '#10b981', dark: '#059669' }, // green
@@ -272,9 +344,12 @@ const CombinedDashboard = () => {
     })
   }
 
+  // Add getNetworkCardData function that was missing
   const getNetworkCardData = (iface: string): IfstatData[] => {
+    console.log('Debug getNetworkCardData:', { iface, stats: networkStats[iface] })
     const stats = networkStats[iface]
     if (!stats || stats.length === 0) {
+      console.log('Debug: No stats found for interface', iface)
       return [{
         timestamp: new Date().toISOString(),
         interface: iface,
@@ -292,7 +367,22 @@ const CombinedDashboard = () => {
   }
 
   const renderComponent = (id: string) => {
-    if (hiddenItems.has(id)) return null
+    // Add debug log for every component render attempt
+    console.log('Debug renderComponent:', { 
+      id, 
+      isHidden: hiddenItems.has(id),
+      isInItems: items.includes(id),
+      networkConfig: networkConfig ? {
+        PRIMARY_INTERFACE: networkConfig.PRIMARY_INTERFACE,
+        SECONDARY_INTERFACE: networkConfig.SECONDARY_INTERFACE,
+        INTERNAL_INTERFACE: networkConfig.INTERNAL_INTERFACE
+      } : null
+    });
+
+    if (hiddenItems.has(id)) {
+      console.log('Debug: Component hidden:', id);
+      return null;
+    }
 
     switch (id) {
       case 'systemMonitor':
@@ -344,15 +434,30 @@ const CombinedDashboard = () => {
       case 'clock':
         return <ErrorBoundary><Clock /></ErrorBoundary>
       case 'networkPrimary':
-        console.log('Debug networkPrimary:', {
+        console.log('Debug networkPrimary detailed:', {
           interface: networkConfig?.PRIMARY_INTERFACE,
-          label: networkConfig?.PRIMARY_LABEL
+          label: networkConfig?.PRIMARY_LABEL,
+          hasConfig: !!networkConfig,
+          isPingDataLoading,
+          isInItems: items.includes('networkPrimary'),
+          isHidden: hiddenItems.has('networkPrimary'),
+          networkStats: networkStats[networkConfig?.PRIMARY_INTERFACE || ''],
+          items: items,
+          DEFAULT_ITEMS: DEFAULT_ITEMS
         });
-        if (!networkConfig?.PRIMARY_INTERFACE) return null;
+        
+        if (!networkConfig?.PRIMARY_INTERFACE) {
+          console.log('Debug: No PRIMARY_INTERFACE found');
+          return null;
+        }
+        
+        const primaryData = getNetworkCardData(networkConfig.PRIMARY_INTERFACE);
+        console.log('Debug: Primary network data:', primaryData);
+        
         return (
           <ErrorBoundary>
             <NetworkStatsCard
-              data={getNetworkCardData(networkConfig.PRIMARY_INTERFACE)}
+              data={primaryData}
               label={networkConfig.PRIMARY_LABEL || networkConfig.PRIMARY_INTERFACE}
               color={isDarkMode ? colors[0].dark : colors[0].light}
               fetchStats={() => {}}
@@ -394,17 +499,31 @@ const CombinedDashboard = () => {
     }
   }
 
+  // Add debug logging in visibleItems filter
   const visibleItems = items
-    .filter(id => !hiddenItems.has(id))
+    .filter(id => {
+      const isHidden = hiddenItems.has(id)
+      console.log('Debug visibility filter:', { 
+        id, 
+        isHidden,
+        isInItems: items.includes(id),
+        isNetworkCard: ['networkPrimary', 'networkSecondary', 'networkInternal'].includes(id)
+      })
+      return !isHidden
+    })
     .filter(id => {
       switch (id) {
         case 'pingSecondary':
         case 'networkSecondary':
-          return networkConfig?.SECONDARY_INTERFACE !== undefined && 
-                 networkConfig?.SECONDARY_INTERFACE !== "";
+          const hasSecondary = networkConfig?.SECONDARY_INTERFACE !== undefined && 
+                             networkConfig?.SECONDARY_INTERFACE !== "";
+          console.log('Debug secondary filter:', { id, hasSecondary, interface: networkConfig?.SECONDARY_INTERFACE })
+          return hasSecondary;
         case 'networkInternal':
-          return networkConfig?.INTERNAL_INTERFACE !== undefined && 
-                 networkConfig?.INTERNAL_INTERFACE !== "";
+          const hasInternal = networkConfig?.INTERNAL_INTERFACE !== undefined && 
+                            networkConfig?.INTERNAL_INTERFACE !== "";
+          console.log('Debug internal filter:', { id, hasInternal, interface: networkConfig?.INTERNAL_INTERFACE })
+          return hasInternal;
         default:
           return true;
       }

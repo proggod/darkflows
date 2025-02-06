@@ -38,12 +38,8 @@ sed -i "/\"lease-database\": {/,/}/ {
 #    /\"interfaces\": \[/,/\]/ s/\"enp2s0\"/\"$INTERNAL_INTERFACE\"/
 #}" $KEA_CONF
 
-# Replace the interface name in the Kea DHCP4 configuration file
-sed -i "/\"interfaces-config\": {/,/}/ {
-    /\"interfaces\": \[/,/\]/ {
-        s/\"[^\"]*\"/\"$INTERNAL_INTERFACE\"/
-    }
-}" "$KEA_CONF"
+
+/usr/local/darkflows/installer/update-kea-interface.sh "$INTERNAL_INTERFACE"
 
 
 sed -i '/^\[Unit\]/a After=mariadb.service\nRequires=mariadb.service' /usr/lib/systemd/system/kea-dhcp4-server.service

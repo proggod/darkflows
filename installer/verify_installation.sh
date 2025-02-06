@@ -73,7 +73,7 @@ echo
 # 3. Check required packages (install_packages.sh)
 echo "=== Checking Required Packages ==="
 packages=("python3-pexpect" "openssh-server" "mariadb-server" "nodejs" "npm" "nftables" 
-         "kea" "curl" "screen" "vlan" "irqbalance" "lightdm" "firefox-esr" "ethtool" 
+         "kea" "curl" "screen" "vlan" "irqbalance" "firefox-esr" "ethtool" 
          "samba" "iperf3" "ca-certificates" "iftop")
 
 for pkg in "${packages[@]}"; do

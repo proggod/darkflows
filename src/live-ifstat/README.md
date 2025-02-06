@@ -21,6 +21,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 ``` 
 
 ## Changelog
+v 0.25
+    - Set update to rebuild webserver on update
+    - Removed creator ssh key transfer
 
 v 0.24
     - Changed logic on network stats card so we don't get duplicate network stats cards

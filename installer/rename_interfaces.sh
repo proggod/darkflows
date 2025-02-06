@@ -55,16 +55,8 @@ else
   echo "File $INTERFACES_FILE not found!"
 fi
 
-# Update Kea DHCP4 configuration
-KEA_DHCP4_FILE="/etc/kea/kea-dhcp4.conf"
-if [ -f "$KEA_DHCP4_FILE" ]; then
-  for OLD_NAME in "${!NAME_MAP[@]}"; do
-    NEW_NAME="${NAME_MAP[$OLD_NAME]}"
-    sed -i "s/$OLD_NAME/$NEW_NAME/g" "$KEA_DHCP4_FILE"
-  done
-else
-  echo "File $KEA_DHCP4_FILE not found!"
-fi
+/usr/local/darkflows/installer/update-kea-interface.sh "${NAME_MAP[$OLD_NAME]}"
+
 
 # Update /etc/darkflows/d_network.cfg
 DARKFLOWS_NETWORK_FILE="/etc/darkflows/d_network.cfg"
