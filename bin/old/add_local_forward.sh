@@ -27,7 +27,7 @@ if ! [[ "$LOCAL_PORT" =~ ^[0-9]+$ ]] || [ "$LOCAL_PORT" -lt 1 ] || [ "$LOCAL_POR
 fi
 
 # Check for existing rules
-EXISTING=$(nft list ruleset 2>/dev/null | grep -c "tcp dport $EXT_PORT dnat to 127.0.0.1:$LOCAL_PORT") || true
+EXISTING=$(nft list ruleset  2>/dev/null | grep -c "tcp dport $EXT_PORT redirect to :$LOCAL_PORT") || true
 if [ "$EXISTING" -ne 0 ]; then
     echo "Port $EXT_PORT is already being forwarded to local port $LOCAL_PORT"
     exit 0
@@ -36,25 +36,15 @@ fi
 # Add local forwarding rules
 echo "Adding local port forwarding $EXT_PORT -> $LOCAL_PORT"
 
-# DNAT external traffic to local port (not just for localhost)
+# 1. REDIRECT external traffic to local port
 nft add rule ip nat prerouting \
-    iif != lo \
     tcp dport $EXT_PORT \
-    dnat to 127.0.0.1:$LOCAL_PORT 2>/dev/null
+    redirect to :$LOCAL_PORT 2>/dev/null
 
-# Allow incoming connections on external port
+# 2. Allow incoming connections on external port
 nft add rule inet filter input \
-    iifname != "lo" \
-    tcp dport $EXT_PORT \
+    tcp dport $EXT_PORT \  
     ct state new,established accept 2>/dev/null
 
 echo "Successfully added local port forward $EXT_PORT -> $LOCAL_PORT"
-
-# Check if the webserver is actually listening
-#echo "Checking if the webserver is listening on the correct port..."
-#LISTENING=$(ss -tlnp | grep -c "0.0.0.0:$LOCAL_PORT" || true)
-#if [ "$LISTENING" -eq 0 ]; then
-#    echo "Warning: The webserver is not listening on 0.0.0.0:$LOCAL_PORT. It may be bound to localhost."
-#    echo "Check with: ss -tlnp | grep $LOCAL_PORT"
-#fi
 

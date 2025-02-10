@@ -37,25 +37,14 @@ echo "" > /var/log/installer.log
 /usr/local/darkflows/installer/install_docker.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 /usr/local/darkflows/installer/setup_block_scheduler.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 /usr/local/darkflows/installer/update_ssh_key_location.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
+/usr/local/darkflows/installer/setup_vlan.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 
 # Add verification at end
 echo "Running post-install verification..." | tee -a /dev/tty1 /var/log/installer.log
 /usr/local/darkflows/installer/verify_installation.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 
 
-# Prompt to rename interfaces
-echo "We recommend to rename network interfaces, OK? This will require a reboot. (y/n)" | tee -a /dev/tty1 /var/log/installer.log
-read -r RENAME_INTERFACES
-
-if [[ "$RENAME_INTERFACES" =~ ^[Yy]$ ]]; then
-    echo "Renaming network interfaces and rebooting..." | tee -a /dev/tty1 /var/log/installer.log
-    /usr/local/darkflows/installer/rename_interfaces.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
-    echo "Rebooting the system..." | tee -a /dev/tty1 /var/log/installer.log
-    reboot
-else
-    echo "Network interfaces were not renamed. It is recommended to run the renaming script later." | tee -a /dev/tty1 /var/log/installer.log
-fi
-
+/usr/local/darkflows/installer/rename_interfaces.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 
 
 systemctl disable first-boot.service 2>&1 | tee -a /dev/tty1 /var/log/installer.log

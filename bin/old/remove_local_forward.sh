@@ -11,9 +11,9 @@ LOCAL_PORT=${2:-$1}
 
 echo "Removing local port forwarding $EXT_PORT -> $LOCAL_PORT"
 
-# Delete DNAT rule (instead of redirect)
+# Delete redirect rule
 nft -a list ruleset 2>/dev/null | awk -v port=$EXT_PORT -v lport=$LOCAL_PORT '
-/tcp dport .* dnat to/ {
+/tcp dport .* redirect to/ {
     match($0, /handle [0-9]+/)
     if (RLENGTH > 0 && $3 == port) {
         print "delete rule ip nat prerouting " substr($0, RSTART, RLENGTH)

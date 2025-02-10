@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Enable debug output
-set -x
+#set -x
 
 # Function for logging
 log() {
