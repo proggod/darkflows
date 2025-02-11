@@ -37,6 +37,20 @@ check_package() {
     fi
 }
 
+# Function to run installer
+run_installer() {
+    local script=$1
+    local description=$2
+    echo -e "\e[33m[!] Attempting to fix $description by running $script...\e[0m"
+    if [ -f "/usr/local/darkflows/installer/$script" ]; then
+        bash "/usr/local/darkflows/installer/$script"
+        return $?
+    else
+        echo -e "\e[31m[✗] Installer script $script not found!\e[0m"
+        return 1
+    fi
+}
+
 # Initialize error counter
 errors=0
 
@@ -53,10 +67,12 @@ if id "darkflows" >/dev/null 2>&1; then
     else
         print_status "FAIL" "DarkFlows user missing sudo privileges"
         ((errors++))
+        run_installer "change_passwords.sh" "user configuration"
     fi
 else
     print_status "FAIL" "DarkFlows user does not exist"
     ((errors++))
+    run_installer "change_passwords.sh" "user configuration"
 fi
 echo
 
@@ -67,18 +83,23 @@ if sysctl net.ipv4.ip_forward | grep -q "= 1"; then
 else
     print_status "FAIL" "IP forwarding is not enabled"
     ((errors++))
+    run_installer "change_variables.sh" "system configuration"
 fi
 echo
 
 # 3. Check required packages (install_packages.sh)
+package_errors=0
 echo "=== Checking Required Packages ==="
 packages=("python3-pexpect" "openssh-server" "mariadb-server" "nodejs" "npm" "nftables" 
-         "kea" "curl" "screen" "vlan" "irqbalance" "firefox-esr" "ethtool" 
+         "kea" "curl" "screen" "vlan" "irqbalance" "ethtool" 
          "samba" "iperf3" "ca-certificates" "iftop")
 
 for pkg in "${packages[@]}"; do
-    check_package "$pkg" "Required package" || ((errors++))
+    check_package "$pkg" "Required package" || ((package_errors++))
 done
+if [ $package_errors -gt 0 ]; then
+    run_installer "install_packages.sh" "package installation"
+fi
 echo
 
 # 4. Check MySQL/MariaDB (secure_mysql.sh)
@@ -88,17 +109,22 @@ if mysqladmin ping >/dev/null 2>&1; then
 else
     print_status "FAIL" "MariaDB is not running"
     ((errors++))
+    run_installer "secure_mysql.sh" "database configuration"
 fi
 echo
 
 # 5. Check Pi-hole (install_pihole.sh)
 echo "=== Checking Pi-hole Installation ==="
+pihole_error=0
 if [ -f "/usr/local/bin/pihole" ]; then
     print_status "OK" "Pi-hole is installed"
-    check_service "pihole-FTL" "Pi-hole FTL service" || ((errors++))
+    check_service "pihole-FTL" "Pi-hole FTL service" || ((pihole_error++))
 else
     print_status "FAIL" "Pi-hole is not installed"
-    ((errors++))
+    ((pihole_error++))
+fi
+if [ $pihole_error -gt 0 ]; then
+    run_installer "install_pihole.sh" "Pi-hole installation"
 fi
 echo
 
@@ -109,67 +135,87 @@ if [ -d "/usr/local/darkflows/src/live-ifstat/.next" ]; then
 else
     print_status "FAIL" "Next.js application build is missing"
     ((errors++))
+    run_installer "setup_web.sh" "web configuration"
 fi
 echo
 
 # 7. Check Network Configuration (detect_network.sh)
 echo "=== Checking Network Configuration ==="
+network_error=0
 if [ -f "/etc/darkflows/d_network.cfg" ]; then
     print_status "OK" "Network configuration file exists"
-    # Source the config file to check interfaces
     source /etc/darkflows/d_network.cfg
     if [ -n "$PRIMARY_INTERFACE" ] && [ -e "/sys/class/net/$PRIMARY_INTERFACE" ]; then
         print_status "OK" "Primary interface ($PRIMARY_INTERFACE) exists"
     else
         print_status "FAIL" "Primary interface configuration issue"
-        ((errors++))
+        ((network_error++))
     fi
 else
     print_status "FAIL" "Network configuration file is missing"
-    ((errors++))
+    ((network_error++))
+fi
+if [ $network_error -gt 0 ]; then
+    run_installer "detect_network.sh" "network configuration"
 fi
 echo
 
 # 8. Check KEA DHCP (create_kea_user.sh)
 echo "=== Checking KEA DHCP Configuration ==="
-check_service "kea-dhcp4-server" "KEA DHCP4 service" || ((errors++))
+kea_error=0
+check_service "kea-dhcp4-server" "KEA DHCP4 service" || ((kea_error++))
 if mysql -e "use kea;" >/dev/null 2>&1; then
     print_status "OK" "KEA database exists"
 else
     print_status "FAIL" "KEA database is missing"
-    ((errors++))
+    ((kea_error++))
+fi
+if [ $kea_error -gt 0 ]; then
+    run_installer "create_kea_user.sh" "KEA DHCP configuration"
 fi
 echo
 
 # 9. Check Services (setup_services.sh)
 echo "=== Checking Required Services ==="
+service_errors=0
 services=("nextjs-app" "irqbalance" "kea-dhcp4-server" 
          "lighttpd" "mariadb" "nmbd" "pihole-FTL" "ssh" "smbd")
 
 for svc in "${services[@]}"; do
-    check_service "$svc" "Required service" || ((errors++))
+    check_service "$svc" "Required service" || ((service_errors++))
 done
+if [ $service_errors -gt 0 ]; then
+    run_installer "setup_services.sh" "services configuration"
+fi
 echo
 
 # 10. Check Docker (install_docker.sh)
 echo "=== Checking Docker Installation ==="
-#check_package "docker-ce" "Docker CE" || ((errors++))
-check_service "docker" "Docker service" || ((errors++))
+docker_error=0
+#check_package "docker-ce" "Docker CE" || ((docker_error++))
+check_service "docker" "Docker service" || ((docker_error++))
+if [ $docker_error -gt 0 ]; then
+    run_installer "install_docker.sh" "Docker installation"
+fi
 echo
 
 # 11. Check Block Scheduler (setup_block_scheduler.sh)
 echo "=== Checking Block Scheduler ==="
+scheduler_error=0
 if [ -f "/usr/local/darkflows/bin/block_scheduler.py" ]; then
     print_status "OK" "Block scheduler script exists"
     if crontab -l 2>/dev/null | grep -q "block_scheduler.py"; then
         print_status "OK" "Block scheduler cron job is configured"
     else
         print_status "FAIL" "Block scheduler cron job is missing"
-        ((errors++))
+        ((scheduler_error++))
     fi
 else
     print_status "FAIL" "Block scheduler script is missing"
-    ((errors++))
+    ((scheduler_error++))
+fi
+if [ $scheduler_error -gt 0 ]; then
+    run_installer "setup_block_scheduler.sh" "block scheduler configuration"
 fi
 echo
 
@@ -180,6 +226,7 @@ if grep -q "AuthorizedKeysFile.*%h/.ssh/authorized_keys.*/etc/ssh/%u/authorized_
 else
     print_status "FAIL" "SSH authorized keys configuration is incorrect"
     ((errors++))
+    run_installer "update_ssh_key_location.sh" "SSH configuration"
 fi
 echo
 

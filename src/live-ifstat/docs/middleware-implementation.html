@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Middleware and Authentication Pages Implementation</title>
+  <!-- Prism CSS for Syntax Highlighting -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 20px;
+      background-color: #1a1a1a;
+      color: #ddd;
+    }
+    pre {
+      background-color: #2d2d2d;
+      border: 1px solid #444;
+      padding: 10px;
+      overflow-x: auto;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .file-path {
+      font-style: italic;
+      color: #aaa;
+      margin-bottom: 5px;
+    }
+    h1, h2, h3 {
+      color: #fff;
+    }
+    p {
+      margin-bottom: 1rem;
+    }
+    ul {
+      margin-left: 20px;
+    }
+    li {
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Middleware and Authentication Pages Implementation</h1>
+  <p>This guide provides step-by-step instructions on how to implement a global authentication middleware in your Next.js application, along with creating a login page, a logout API route, and a logout button component.</p>
+  
+  <h2>1. Implementing Global Middleware</h2>
+  <p>The global middleware is responsible for protecting API routes and pages by ensuring that only requests with a valid session are allowed (except for public routes like login or setup). Create the following file:</p>
+  
+  <pre><code class="language-typescript">/* File: app/middleware.ts */
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// List of public paths that do not require authentication
+const publicPaths = ['/login', '/api/auth/check-setup', '/api/login', '/api/auth/save-credentials'];
+
+export async function middleware(request: NextRequest) {
+  const isPublicPath = publicPaths.includes(request.nextUrl.pathname);
+  const session = request.cookies.get('session');
+
+  // If the user is not logged in and the path is protected, redirect to the login page
+  if (!session && !isPublicPath) {
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // If the user is logged in but trying to access a public path, redirect to the home page
+  if (session && isPublicPath) {
+    const homeUrl = new URL('/', request.url);
+    return NextResponse.redirect(homeUrl);
+  }
+
+  return NextResponse.next();
+}
+</code></pre>
+
+  <h2>2. Creating the Login Page</h2>
+  <p>The login page lets users enter their credentials. Upon successful authentication, a session (typically an HTTP-only cookie) is created. Create this page in your application at <code>app/login/page.tsx</code>:</p>
+  
+  <pre><code class="language-jsx">/* File: app/login/page.tsx */
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
+    // Call the login API endpoint
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Redirect to home after successful login
+      router.push('/');
+    } else {
+      // Display an error message if login fails
+      setError(data.error || 'Login failed. Please try again.');
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#1a1a1a' }}>
+      <div style={{ backgroundColor: '#333', padding: '2rem', borderRadius: '8px' }}>
+        <h2 style={{ color: '#fff', marginBottom: '1rem' }}>Login</h2>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label htmlFor="password" style={{ color: '#fff' }}>Password:</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem' }}
+            />
+          </div>
+          <button type="submit" style={{ padding: '0.5rem 1rem', backgroundColor: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px' }}>
+            Login
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+</code></pre>
+
+  <h2>3. Implementing the Logout API Route</h2>
+  <p>The logout API route is responsible for deleting the session cookie. Create the following file at <code>app/api/logout/route.ts</code>:</p>
+
+  <pre><code class="language-typescript">/* File: app/api/logout/route.ts */
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+
+export async function POST() {
+  const cookieStore = cookies();
+  cookieStore.delete('session');
+  return NextResponse.json({ success: true });
+}
+</code></pre>
+
+  <h2>4. Creating a Logout Button Component</h2>
+  <p>Include a logout button on your protected pages to allow users to log out. Here is a simple example component. Create this file at <code>app/components/LogoutButton.tsx</code>:</p>
+  
+  <pre><code class="language-jsx">/* File: app/components/LogoutButton.tsx */
+'use client';
+
+import { useRouter } from 'next/navigation';
+
+export default function LogoutButton() {
+  const router = useRouter();
+
+  async function handleLogout() {
+    const response = await fetch('/api/logout', { method: 'POST' });
+    if (response.ok) {
+      // After logout, redirect to the login page
+      router.push('/login');
+    }
+  }
+
+  return (
+    <button onClick={handleLogout} style={{ padding: '0.5rem 1rem', backgroundColor: '#f44336', color: '#fff', border: 'none', borderRadius: '4px' }}>
+      Logout
+    </button>
+  );
+}
+</code></pre>
+
+  <h2>5. Additional Considerations</h2>
+  <ul>
+    <li>
+      <strong>Session Creation:</strong>  
+      Ensure your login API endpoint (e.g., in <code>app/api/login/route.ts</code>) creates a session cookie (with httpOnly, secure, and sameSite flags in production) on successful authentication.
+    </li>
+    <li>
+      <strong>Session Validation:</strong>  
+      Your middleware and any in-route authentication helper functions (like <code>requireAuth</code>) should validate this session to protect sensitive operations.
+    </li>
+    <li>
+      <strong>Security:</strong>  
+      Protect credentials using secure hashing and follow best practices for cookie management.
+    </li>
+  </ul>
+
+  <p>By following these steps and integrating the code samples, you'll have a robust authentication system that utilizes global middleware to protect routes, a login page to create a session, and a logout API to clear user authentication.</p>
+
+  <!-- Prism JS for Syntax Highlighting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-jsx.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+</body>
+</html> 

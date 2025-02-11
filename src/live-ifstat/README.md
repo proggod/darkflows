@@ -21,6 +21,12 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 ``` 
 
 ## Changelog
+v 0.27
+    - Modified some of the port forwarding scripts
+    - Made installer smarter
+    - Added upnpn support framework
+    - Added vlan support framework
+
 v 0.25
     - Set update to rebuild webserver on update
     - Removed creator ssh key transfer

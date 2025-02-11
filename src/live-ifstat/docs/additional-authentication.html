@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Additional Authentication Integration Instructions</title>
+  <!-- Prism CSS for Syntax Highlighting -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 20px;
+    }
+    pre {
+      background-color: #2d2d2d;
+      border: 1px solid #444;
+      padding: 10px;
+      overflow-x: auto;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+    }
+    .file-path {
+      font-style: italic;
+      color: #555;
+      margin-bottom: 5px;
+    }   
+    h1, h2 {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Instructions for Adding Additional Authentication to API Routes</h1>
+
+  <p>This guide explains how to add explicit authentication checks to API routes that rely solely on global middleware for protecting requests.</p>
+
+  <h2>Step 1: Identify the API Route File</h2>
+  <p>Locate the API route file that executes system calls as root but does not use any in-route authentication helper (for example, <code>requireAuth</code>).</p>
+  <p>You might have a file like the following:</p>
+  <pre><code class="language-typescript">// File: app/api/some-system-call/route.ts
+export async function POST(request: NextRequest) {
+  // system call logic here
+}
+  </code></pre>
+
+  <h2>Step 2: Import the <code>requireAuth</code> Function</h2>
+  <p>At the top of the file, import the <code>requireAuth</code> function from your authentication utilities:</p>
+  <pre><code class="language-typescript">// File: app/api/some-system-call/route.ts
+import { requireAuth } from '@/lib/auth';
+  </code></pre>
+
+  <h2>Step 3: Add an Authentication Check at the Top of the Handler</h2>
+  <p>Before executing any system-level operation, insert an authentication check at the beginning of the handler. For example:</p>
+  <pre><code class="language-typescript">// File: app/api/some-system-call/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export async function POST(request: NextRequest) {
+  // Verify that the request is authenticated
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+
+  // Continue with executing the system command if authenticated
+  try {
+    await execAsync('your-root-command-here');
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error performing system call:', error);
+    return NextResponse.json({ error: 'Failed to perform system call' }, { status: 500 });
+  }
+}
+  </code></pre>
+
+  <h2>Step 4: Repeat for Other Routes</h2>
+  <p>For every API route that executes system calls or performs sensitive operations, repeat the following:</p>
+  <ul>
+    <li>Import <code>requireAuth</code> at the top of the file.</li>
+    <li>Call <code>requireAuth</code> as the first action in the handler.</li>
+    <li>Return immediately if the authentication fails.</li>
+  </ul>
+
+  <h2>Step 5: Test Your Changes</h2>
+  <p><strong>Without a Valid Session:</strong> Use a client tool (such as Postman) to call the updated API route without a valid session cookie. You should receive a 401 Unauthorized response (or a redirect to login).</p>
+  <p><strong>With a Valid Session:</strong> Log in to obtain a valid session cookie and then call the API route again to verify that it executes its intended logic.</p>
+
+  <h2>Step 6 (Optional): Enhance the <code>requireAuth</code> Function</h2>
+  <p>If necessary, update your <code>requireAuth</code> function (e.g., in <code>app/lib/auth.ts</code>) to include additional validations, such as checking for admin-level permissions. This enhancement will provide even finer control over which users are allowed to execute critical system commands.</p>
+
+  <p>By following these steps, you will ensure that every API route running system-level commands is explicitly protected by in-route authentication, providing a robust defense even in the event of a middleware misconfiguration.</p>
+
+  <!-- Prism JS for Syntax Highlighting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+</body>
+</html> 

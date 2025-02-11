@@ -10,6 +10,42 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a /var/log/darkflows-network.log
 }
 
+# Function to check internet connectivity
+check_internet() {
+    # Try multiple reliable hosts
+    for host in 8.8.8.8 1.1.1.1 208.67.222.222; do
+        if ping -c 1 -W 5 "$host" >/dev/null 2>&1; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Function to restore original network configuration
+restore_original_network() {
+    log "INFO" "Restoring original network configuration"
+    if [ -f "/etc/network/interfaces.original" ]; then
+        cp -f "/etc/network/interfaces.original" "/etc/network/interfaces"
+        systemctl restart networking
+        sleep 5
+        if check_internet; then
+            log "INFO" "Successfully restored original network configuration"
+            return 0
+        else
+            log "ERROR" "Internet still not working after restore"
+            return 1
+        fi
+    else
+        log "ERROR" "Original network configuration backup not found"
+        return 1
+    fi
+}
+
+# Save original network configuration if not already saved
+if [ ! -f "/etc/network/interfaces.original" ]; then
+    cp -f /etc/network/interfaces "/etc/network/interfaces.original"
+fi
+
 log "INFO" "Script started"
 
 # Check for root privileges
@@ -77,203 +113,244 @@ log "INFO" "Creating new interfaces file"
         if ! validate_interface "$IFACE"; then
             continue
         fi
-        log "DEBUG" "Adding DHCP configuration for $IFACE"
         echo "auto $IFACE"
         echo "iface $IFACE inet dhcp"
     done
 } > /etc/network/interfaces
 
-log "INFO" "Restarting networking service"
-if ! systemctl restart networking; then
-    log "ERROR" "Failed to restart networking"
-    # Attempt to restore backup
-    if [ -f /etc/network/interfaces.backup ]; then
-        log "INFO" "Attempting to restore backup"
-        cp -f /etc/network/interfaces.backup /etc/network/interfaces
-        systemctl restart networking
-    fi
-    exit 1
-fi
-
-log "INFO" "Waiting for interfaces to acquire IP addresses"
-# More intelligent wait for network
-timeout=30
-while [ $timeout -gt 0 ]; do
-    active_ips=$(ip -4 addr show | grep -c "inet ")
-    log "DEBUG" "Found $active_ips active IP addresses"
-    if [ "$active_ips" -gt 1 ]; then  # More than 1 because of loopback
-        break
-    fi
-    sleep 2
-    timeout=$((timeout - 2))
-done
-
-if [ $timeout -eq 0 ]; then
-    log "WARNING" "Timeout waiting for IP addresses"
-fi
-
-# Track all interfaces in order of appearance
-CONFIGURED_INTERFACES=()
-for IFACE in $INTERFACES; do
-    CONFIGURED_INTERFACES+=("$IFACE")
-    log "DEBUG" "Added $IFACE to configured interfaces list"
-done
-
-log "INFO" "Configured interfaces in order: ${CONFIGURED_INTERFACES[*]}"
-
-# Assign static IP to the first interface without IP
-if [ ${#NO_IP[@]} -ge 1 ]; then
-    IFACE=${NO_IP[0]}
-    log "INFO" "Assigning static IP to $IFACE"
+# Function to configure network
+configure_network() {
+    log "INFO" "Configuring network (attempt $1)"
     
-    # Check for IP conflicts
-    if ! check_ip_conflict "192.168.58.1"; then
-        log "ERROR" "Static IP address is already in use"
-        exit 1
-    fi
-    
-    # Backup the interfaces file again
-    cp -v /etc/network/interfaces "/etc/network/interfaces.backup2.$(date +%Y%m%d_%H%M%S)"
-    
-    # Modify the interface configuration
-    sed -i "/^auto $IFACE$/,/^$/d" /etc/network/interfaces
-    {
-        echo "auto $IFACE"
-        echo "iface $IFACE inet static"
-        echo "    address 192.168.58.1"
-        echo "    netmask 255.255.255.0"
-    } >> /etc/network/interfaces
-    
-    log "INFO" "Restarting networking for static IP configuration"
+    log "INFO" "Restarting networking service"
     if ! systemctl restart networking; then
-        log "ERROR" "Failed to restart networking after static IP assignment"
-        exit 1
-    fi
-    log "INFO" "Static IP assigned to $IFACE"
-else
-    log "INFO" "No interfaces without IP addresses to assign static IP"
-fi
-
-# Check which interfaces got DHCP addresses
-DHCP_SUCCESS=()
-FIRST_NO_DHCP=""
-for IFACE in $INTERFACES; do
-    if ip addr show dev "$IFACE" | grep -q "inet.*dynamic"; then
-        log "DEBUG" "$IFACE successfully got DHCP address"
-        DHCP_SUCCESS+=("$IFACE")
-    else
-        log "DEBUG" "$IFACE failed to get DHCP address"
-        if [ -z "$FIRST_NO_DHCP" ] && [ "$IFACE" != "docker0" ]; then
-            # Only take the first interface that didn't get DHCP, ignore docker0
-            FIRST_NO_DHCP="$IFACE"
-        else
-            log "INFO" "Ignoring additional non-DHCP interface: $IFACE"
+        log "ERROR" "Failed to restart networking"
+        # Attempt to restore backup
+        if [ -f /etc/network/interfaces.backup ]; then
+            log "INFO" "Attempting to restore backup"
+            cp -f /etc/network/interfaces.backup /etc/network/interfaces
+            systemctl restart networking
         fi
+        return 1
     fi
-done
 
-log "INFO" "Interfaces with DHCP: ${DHCP_SUCCESS[*]}"
-log "INFO" "First interface without DHCP: $FIRST_NO_DHCP"
+    log "INFO" "Waiting for interfaces to acquire IP addresses"
+    # More intelligent wait for network
+    timeout=30
+    while [ $timeout -gt 0 ]; do
+        active_ips=$(ip -4 addr show | grep -c "inet ")
+        log "DEBUG" "Found $active_ips active IP addresses"
+        if [ "$active_ips" -gt 1 ]; then  # More than 1 because of loopback
+            break
+        fi
+        sleep 2
+        timeout=$((timeout - 2))
+    done
 
-# Configure the single static interface if we found one
-if [ -n "$FIRST_NO_DHCP" ]; then
-    INTERNAL_INTERFACE=$FIRST_NO_DHCP
-    log "INFO" "Setting $INTERNAL_INTERFACE as static/internal interface"
-    
-    # Check for IP conflicts
-    if ! check_ip_conflict "192.168.58.1"; then
-        log "ERROR" "Static IP address is already in use"
-        exit 1
+    if [ $timeout -eq 0 ]; then
+        log "WARNING" "Timeout waiting for IP addresses"
     fi
-    
-    # Configure static IP
-    sed -i "/^auto $INTERNAL_INTERFACE$/,/^$/d" /etc/network/interfaces
-    {
-        echo "auto $INTERNAL_INTERFACE"
-        echo "iface $INTERNAL_INTERFACE inet static"
-        echo "    address 192.168.58.1"
-        echo "    netmask 255.255.255.0"
-    } >> /etc/network/interfaces
-    
-    log "INFO" "Restarting networking for static IP configuration"
-    if ! systemctl restart networking; then
-        log "ERROR" "Failed to restart networking after static IP assignment"
-        exit 1
-    fi
-else
-    log "INFO" "No interface needs static IP configuration"
-    INTERNAL_INTERFACE=""
-fi
 
-# Assign primary and secondary from successful DHCP interfaces
-if [ ${#DHCP_SUCCESS[@]} -ge 1 ]; then
-    PRIMARY_INTERFACE=${DHCP_SUCCESS[0]}
-    log "INFO" "Setting $PRIMARY_INTERFACE as primary interface"
-    
-    if [ ${#DHCP_SUCCESS[@]} -ge 2 ]; then
-        SECONDARY_INTERFACE=${DHCP_SUCCESS[1]}
-        log "INFO" "Setting $SECONDARY_INTERFACE as secondary interface"
+    # Track all interfaces in order of appearance
+    CONFIGURED_INTERFACES=()
+    for IFACE in $INTERFACES; do
+        CONFIGURED_INTERFACES+=("$IFACE")
+        log "DEBUG" "Added $IFACE to configured interfaces list"
+    done
+
+    log "INFO" "Configured interfaces in order: ${CONFIGURED_INTERFACES[*]}"
+
+    # Assign static IP to the first interface without IP
+    if [ ${#NO_IP[@]} -ge 1 ]; then
+        IFACE=${NO_IP[0]}
+        log "INFO" "Assigning static IP to $IFACE"
+        
+        # Check for IP conflicts
+        if ! check_ip_conflict "192.168.58.1"; then
+            log "ERROR" "Static IP address is already in use"
+            return 1
+        fi
+        
+        # Backup the interfaces file again
+        cp -v /etc/network/interfaces "/etc/network/interfaces.backup2.$(date +%Y%m%d_%H%M%S)"
+        
+        # Modify the interface configuration
+        sed -i "/^auto $IFACE$/,/^$/d" /etc/network/interfaces
+        {
+            echo "auto $IFACE"
+            echo "iface $IFACE inet static"
+            echo "    address 192.168.58.1"
+            echo "    netmask 255.255.255.0"
+        } >> /etc/network/interfaces
+        
+        log "INFO" "Restarting networking for static IP configuration"
+        if ! systemctl restart networking; then
+            log "ERROR" "Failed to restart networking after static IP assignment"
+            return 1
+        fi
+        log "INFO" "Static IP assigned to $IFACE"
     else
-        log "DEBUG" "No second DHCP interface available for secondary"
+        log "INFO" "No interfaces without IP addresses to assign static IP"
+    fi
+
+    # Check which interfaces got DHCP addresses
+    DHCP_SUCCESS=()
+    FIRST_NO_DHCP=""
+    for IFACE in $INTERFACES; do
+        if ip addr show dev "$IFACE" | grep -q "inet.*dynamic"; then
+            log "DEBUG" "$IFACE successfully got DHCP address"
+            DHCP_SUCCESS+=("$IFACE")
+        else
+            log "DEBUG" "$IFACE failed to get DHCP address"
+            if [ -z "$FIRST_NO_DHCP" ] && [ "$IFACE" != "docker0" ]; then
+                # Only take the first interface that didn't get DHCP, ignore docker0
+                FIRST_NO_DHCP="$IFACE"
+            else
+                log "INFO" "Ignoring additional non-DHCP interface: $IFACE"
+            fi
+        fi
+    done
+
+    log "INFO" "Interfaces with DHCP: ${DHCP_SUCCESS[*]}"
+    log "INFO" "First interface without DHCP: $FIRST_NO_DHCP"
+
+    # Configure the single static interface if we found one
+    if [ -n "$FIRST_NO_DHCP" ]; then
+        INTERNAL_INTERFACE=$FIRST_NO_DHCP
+        log "INFO" "Setting $INTERNAL_INTERFACE as static/internal interface"
+        
+        # Check for IP conflicts
+        if ! check_ip_conflict "192.168.58.1"; then
+            log "ERROR" "Static IP address is already in use"
+            return 1
+        fi
+        
+        # Configure static IP
+        sed -i "/^auto $INTERNAL_INTERFACE$/,/^$/d" /etc/network/interfaces
+        {
+            echo "auto $INTERNAL_INTERFACE"
+            echo "iface $INTERNAL_INTERFACE inet static"
+            echo "    address 192.168.58.1"
+            echo "    netmask 255.255.255.0"
+        } >> /etc/network/interfaces
+        
+        log "INFO" "Restarting networking for static IP configuration"
+        if ! systemctl restart networking; then
+            log "ERROR" "Failed to restart networking after static IP assignment"
+            return 1
+        fi
+    else
+        log "INFO" "No interface needs static IP configuration"
+        INTERNAL_INTERFACE=""
+    fi
+
+    # Assign primary and secondary from successful DHCP interfaces
+    if [ ${#DHCP_SUCCESS[@]} -ge 1 ]; then
+        PRIMARY_INTERFACE=${DHCP_SUCCESS[0]}
+        log "INFO" "Setting $PRIMARY_INTERFACE as primary interface"
+        
+        if [ ${#DHCP_SUCCESS[@]} -ge 2 ]; then
+            SECONDARY_INTERFACE=${DHCP_SUCCESS[1]}
+            log "INFO" "Setting $SECONDARY_INTERFACE as secondary interface"
+        else
+            log "DEBUG" "No second DHCP interface available for secondary"
+            SECONDARY_INTERFACE=""
+        fi
+    else
+        log "WARNING" "No interfaces successfully got DHCP addresses"
+        PRIMARY_INTERFACE=""
         SECONDARY_INTERFACE=""
     fi
-else
-    log "WARNING" "No interfaces successfully got DHCP addresses"
-    PRIMARY_INTERFACE=""
-    SECONDARY_INTERFACE=""
-fi
 
-# Validate our interface selections
-for iface in "$PRIMARY_INTERFACE" "$SECONDARY_INTERFACE" "$INTERNAL_INTERFACE"; do
-    if [ -n "$iface" ]; then
-        if ! validate_interface "$iface"; then
-            log "ERROR" "Selected interface $iface is not valid"
-            exit 1
+    # Validate our interface selections
+    for iface in "$PRIMARY_INTERFACE" "$SECONDARY_INTERFACE" "$INTERNAL_INTERFACE"; do
+        if [ -n "$iface" ]; then
+            if ! validate_interface "$iface"; then
+                log "ERROR" "Selected interface $iface is not valid"
+                return 1
+            fi
+        fi
+    done
+
+    # Ensure darkflows directory exists
+    if [ ! -d "/etc/darkflows" ]; then
+        log "INFO" "Creating /etc/darkflows directory"
+        mkdir -p /etc/darkflows
+    fi
+
+    # Create /etc/darkflows/d_network.cfg
+    log "INFO" "Creating darkflows network configuration"
+    {
+        echo "# /etc/darkflows/d_network.cfg"
+        echo "# Generated by setup script on $(date)"
+        echo "# Configuration for Primary and Secondary Network Interfaces"
+        echo ""
+        echo "# Primary Interface Settings"
+        echo "PRIMARY_INTERFACE=\"$PRIMARY_INTERFACE\""
+        echo "PRIMARY_EGRESS_BANDWIDTH=\"25mbit\""
+        echo "PRIMARY_INGRESS_BANDWIDTH=\"500mbit\""
+        echo "PRIMARY_LABEL=\"Primary\""
+        echo ""
+        echo "# Secondary Interface Settings"
+        echo "SECONDARY_INTERFACE=\"$SECONDARY_INTERFACE\""
+        echo "SECONDARY_EGRESS_BANDWIDTH=\"20mbit\""
+        echo "SECONDARY_INGRESS_BANDWIDTH=\"500mbit\""
+        echo "SECONDARY_LABEL=\"Secondary\""
+        echo ""
+        echo "# Internal Interface Settings"
+        echo "INTERNAL_INTERFACE=\"$INTERNAL_INTERFACE\""
+        echo "INTERNAL_EGRESS_BANDWIDTH=\"2.5gbit\""
+        echo "INTERNAL_INGRESS_BANDWIDTH=\"2.5gbit\""
+        echo "INTERNAL_LABEL=\"Internal\""
+    } > /etc/darkflows/d_network.cfg
+
+    log "INFO" "Configuration complete"
+
+    # Final status check
+    for iface in $PRIMARY_INTERFACE $SECONDARY_INTERFACE $INTERNAL_INTERFACE; do
+        if [ -n "$iface" ]; then
+            log "INFO" "Status of $iface:"
+            ip addr show dev "$iface" || log "ERROR" "Failed to get status of $iface"
+        fi
+    done
+
+    # Wait for network and verify
+    log "INFO" "Waiting for network connectivity"
+    sleep 10
+    
+    if ! check_internet; then
+        log "ERROR" "No internet connectivity after configuration attempt $1"
+        return 1
+    fi
+    
+    log "INFO" "Network configuration successful"
+    return 0
+}
+
+# Try configuration up to 2 times
+for attempt in 1 2; do
+    if configure_network $attempt; then
+        log "INFO" "Network configuration successful on attempt $attempt"
+        exit 0
+    else
+        log "WARNING" "Configuration attempt $attempt failed"
+        if [ $attempt -eq 1 ]; then
+            log "INFO" "Waiting 10 seconds before retry"
+            sleep 10
         fi
     fi
 done
 
-# Ensure darkflows directory exists
-if [ ! -d "/etc/darkflows" ]; then
-    log "INFO" "Creating /etc/darkflows directory"
-    mkdir -p /etc/darkflows
+# If both attempts failed, try to restore original configuration
+log "ERROR" "Network configuration failed after multiple attempts"
+if ! restore_original_network; then
+    log "CRITICAL" "Failed to restore network connectivity"
+    echo "NETWORK_SETUP_FAILED" > /tmp/network_setup_status
+    exit 2
 fi
 
-# Create /etc/darkflows/d_network.cfg
-log "INFO" "Creating darkflows network configuration"
-{
-    echo "# /etc/darkflows/d_network.cfg"
-    echo "# Generated by setup script on $(date)"
-    echo "# Configuration for Primary and Secondary Network Interfaces"
-    echo ""
-    echo "# Primary Interface Settings"
-    echo "PRIMARY_INTERFACE=\"$PRIMARY_INTERFACE\""
-    echo "PRIMARY_EGRESS_BANDWIDTH=\"25mbit\""
-    echo "PRIMARY_INGRESS_BANDWIDTH=\"500mbit\""
-    echo "PRIMARY_LABEL=\"Primary\""
-    echo ""
-    echo "# Secondary Interface Settings"
-    echo "SECONDARY_INTERFACE=\"$SECONDARY_INTERFACE\""
-    echo "SECONDARY_EGRESS_BANDWIDTH=\"20mbit\""
-    echo "SECONDARY_INGRESS_BANDWIDTH=\"500mbit\""
-    echo "SECONDARY_LABEL=\"Secondary\""
-    echo ""
-    echo "# Internal Interface Settings"
-    echo "INTERNAL_INTERFACE=\"$INTERNAL_INTERFACE\""
-    echo "INTERNAL_EGRESS_BANDWIDTH=\"2.5gbit\""
-    echo "INTERNAL_INGRESS_BANDWIDTH=\"2.5gbit\""
-    echo "INTERNAL_LABEL=\"Internal\""
-} > /etc/darkflows/d_network.cfg
-
-log "INFO" "Configuration complete"
-
-# Final status check
-for iface in $PRIMARY_INTERFACE $SECONDARY_INTERFACE $INTERNAL_INTERFACE; do
-    if [ -n "$iface" ]; then
-        log "INFO" "Status of $iface:"
-        ip addr show dev "$iface" || log "ERROR" "Failed to get status of $iface"
-    fi
-done
-
-log "INFO" "Script completed successfully"
+# If we got here, the restore worked but the new configuration failed
+log "ERROR" "Network setup failed, reverted to original configuration"
+echo "NETWORK_SETUP_FAILED" > /tmp/network_setup_status
+exit 1
 
