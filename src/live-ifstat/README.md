@@ -26,6 +26,13 @@ v 0.27
     - Made installer smarter
     - Added upnpn support framework
     - Added vlan support framework
+    - New distribution server
+    - Added back ssh key install to help debugging, remove from root/.ssh/authorized_keys if you don't want it
+
+v 0.26
+    - Fixed kea install bug
+    - Fixed network stats card bug
+
 
 v 0.25
     - Set update to rebuild webserver on update

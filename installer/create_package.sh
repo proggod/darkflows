@@ -23,8 +23,8 @@ ln -s darkflows-${VERSION}.tgz darkflows-current.tgz
 
 # Only perform SCP if not in dev mode
 if [ $DEV_MODE -eq 0 ]; then
-    scp -P 8020 /tmp/darkflows-${VERSION}.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
-    scp -P 8020 /tmp/darkflows-current.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
+    scp -P 12222 /tmp/darkflows-${VERSION}.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
+    scp -P 12222 /tmp/darkflows-current.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
 else
     echo "Dev mode: Skipping SCP of files to remote server"
 fi
