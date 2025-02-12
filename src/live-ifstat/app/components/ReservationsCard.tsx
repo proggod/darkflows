@@ -6,6 +6,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { useRefresh } from '../contexts/RefreshContext'
+import { toast } from 'sonner'
 
 interface Reservation {
   'ip-address': string
@@ -15,6 +16,21 @@ interface Reservation {
 
 type SortField = 'ip-address' | 'hw-address' | 'name';
 type SortDirection = 'asc' | 'desc';
+
+const pingIp = async (ip: string): Promise<boolean> => {
+  try {
+    const response = await fetch('/api/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip })
+    });
+    const data = await response.json();
+    return data.alive;
+  } catch (error) {
+    console.error('Error pinging IP:', error);
+    return false;
+  }
+};
 
 export default function ReservationsCard() {
   const [reservations, setReservations] = useState<Reservation[]>([])
@@ -32,6 +48,7 @@ export default function ReservationsCard() {
   const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({})
   const [editingHostname, setEditingHostname] = useState<string | null>(null)
   const { triggerRefresh, registerRefreshCallback } = useRefresh()
+  const [isCheckingIp, setIsCheckingIp] = useState<boolean>(false)
 
   useEffect(() => {
     fetchReservations()
@@ -139,26 +156,62 @@ export default function ReservationsCard() {
         return
       }
 
+      // Check if IP address was changed
+      const originalReservation = reservations.find(r => 
+        r['hw-address'] === newReservation['hw-address']
+      );
+
+      if (originalReservation && originalReservation['ip-address'] !== newReservation['ip-address']) {
+        setIsCheckingIp(true);
+        const isAlive = await pingIp(newReservation['ip-address']);
+        setIsCheckingIp(false);
+
+        if (isAlive) {
+          setError('Cannot use this IP address - device is already responding at this address');
+          return;
+        }
+      }
+
+      if (!originalReservation) {
+        setError('Cannot find original reservation');
+        return;
+      }
+
       const response = await fetch('/api/reservations', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newReservation)
-      })
+        body: JSON.stringify({
+          ...newReservation,
+          originalIp: originalReservation['ip-address']
+        })
+      });
 
       if (response.ok) {
-        setOpenDialog(false)
-        setIsEditing(false)
-        setNewReservation({ 'ip-address': '', 'hw-address': '', hostname: '' })
-        await fetchReservations()
-        triggerRefresh()
+        setError('');
+        setOpenDialog(false);
+        setIsEditing(false);
+        setNewReservation({ 'ip-address': '', 'hw-address': '', hostname: '' });
+        await fetchReservations();
+        triggerRefresh();
+        toast.success('Reservation updated successfully');
       } else {
-        setError('Failed to update reservation')
+        const errorData = await response.json();
+        console.error('Failed to update reservation:', errorData);
+        if (errorData.error === 'Reservation not found') {
+          setError('Cannot find original reservation. Please try adding as new instead.');
+        } else {
+          setError(errorData.error || 'Failed to update reservation');
+        }
+        if (errorData.error === 'Reservation not found') {
+          setOpenDialog(false);
+          setIsEditing(false);
+        }
       }
     } catch (error) {
-      console.error('Error updating reservation:', error)
-      setError('Error updating reservation')
+      console.error('Error updating reservation:', error);
+      setError(error instanceof Error ? error.message : 'Error updating reservation');
     }
-  }
+  };
 
   const startEdit = (reservation: Reservation) => {
     setNewReservation(reservation)
@@ -289,7 +342,6 @@ export default function ReservationsCard() {
             })}
             placeholder="IP Address"
             className="px-2 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
-            disabled={isEditing}
           />
           <input
             type="text"
@@ -321,9 +373,10 @@ export default function ReservationsCard() {
             </button>
             <button
               onClick={isEditing ? handleEdit : handleAdd}
-              className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors"
+              disabled={isCheckingIp}
+              className="h-6 px-2 py-0.5 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 transition-colors disabled:opacity-50"
             >
-              {isEditing ? 'Save' : 'Add'}
+              {isCheckingIp ? 'Checking IP...' : (isEditing ? 'Save' : 'Add')}
             </button>
           </div>
         </div>

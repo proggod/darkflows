@@ -111,12 +111,11 @@ export async function PUT(request: NextRequest) {
   if (authResponse) return authResponse;
 
   try {
-    const reservation = await request.json();
+    const { originalIp, ...reservation } = await request.json();
     const config = await readConfig();
     
-    // Find existing reservation
+    // Find existing reservation using only MAC address
     const existing = config.Dhcp4.subnet4[0].reservations.find(r => 
-      r['ip-address'] === reservation['ip-address'] && 
       r['hw-address'] === reservation['hw-address']
     );
 
@@ -124,17 +123,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
     }
 
-    if (existing.hostname !== reservation.hostname) {
-      // Hostname changed - update DNS
-      await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${existing.hostname}`);
-      await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${reservation['ip-address']} ${reservation.hostname}`);
-    }
-
-    // Update reservation
+    // Update the reservation with new values
     Object.assign(existing, reservation);
-    await writeConfig(config);
     
-
+    await writeConfig(config);
+    await syncAllSystems(); // Make sure DNS is updated
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating reservation:', error);
