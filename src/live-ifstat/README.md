@@ -21,6 +21,10 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 ``` 
 
 ## Changelog
+
+v 0.28
+    - Fixed route to secondary interface bug
+
 v 0.27
     - Modified some of the port forwarding scripts
     - Made installer smarter

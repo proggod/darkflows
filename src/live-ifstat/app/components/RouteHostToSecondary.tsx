@@ -15,15 +15,29 @@ export default function RouteHostToSecondary() {
   const fetchIps = async () => {
     try {
       setLoading(true)
+      console.log('Fetching IPs...')
       const response = await fetch('/api/secondary-routes')
+      console.log('Response status:', response.status)
+      console.log('Response headers:', Object.fromEntries(response.headers))
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch routes')
+        const errorText = await response.text()
+        console.error('Error response:', errorText)
+        throw new Error(`Failed to fetch routes: ${response.status} ${errorText}`)
       }
+      
       const data = await response.json()
-      setIps(data.ips || [])
+      console.log('Fetched data:', data)
+      
+      if (!Array.isArray(data.routes)) {
+        console.error('Invalid data format:', data)
+        throw new Error('Invalid data format received')
+      }
+      
+      setIps(data.routes)
     } catch (error) {
       console.error('Error fetching IPs:', error)
-      setError('Failed to load routes')
+      setError(error instanceof Error ? error.message : 'Failed to load routes')
       setIps([])
     } finally {
       setLoading(false)

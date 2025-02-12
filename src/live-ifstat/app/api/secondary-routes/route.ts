@@ -81,15 +81,21 @@ async function ensureDir(filePath: string) {
 // Helper to read routes
 async function readRoutes(): Promise<string[]> {
   try {
+    console.log('Attempting to read routes from:', ROUTES_FILE)
     await fs.access(ROUTES_FILE)
     const content = await fs.readFile(ROUTES_FILE, 'utf-8')
-    return content.split('\n').filter(line => line.trim())
+    console.log('Read content:', content)
+    const routes = content.split('\n').filter(line => line.trim())
+    console.log('Parsed routes:', routes)
+    return routes
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      console.log('Routes file not found, creating empty file')
       await ensureDir(ROUTES_FILE)
       await fs.writeFile(ROUTES_FILE, '', { mode: 0o644 })
       return []
     }
+    console.error('Error in readRoutes:', error)
     throw error
   }
 }
@@ -116,16 +122,26 @@ async function updateRoutes(): Promise<void> {
 
 // GET handler
 export async function GET(request: NextRequest) {
+  console.log('GET request received for secondary-routes')
   const authResponse = await requireAuth(request);
-  if (authResponse) return authResponse;
+  if (authResponse) {
+    console.log('Auth failed:', authResponse)
+    return authResponse;
+  }
 
   try {
+    console.log('Reading routes...')
     const routes = await readRoutes();
-    return NextResponse.json({ routes });
+    console.log('Routes read successfully:', routes)
+    const response = { routes };
+    console.log('Sending response:', response)
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error reading routes:', error);
+    console.error('Error in GET handler:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error details:', errorMessage);
     return NextResponse.json(
-      { error: 'Failed to read routes' },
+      { error: 'Failed to read routes', details: errorMessage },
       { status: 500 }
     );
   }
