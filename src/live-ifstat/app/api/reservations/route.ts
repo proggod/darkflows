@@ -123,11 +123,19 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
     }
 
+    // If IP address changed and we have a hostname, update DNS
+    if (originalIp !== reservation['ip-address'] && existing.hostname) {
+      // Remove old DNS entry
+      await syncDNSEntry(originalIp, existing.hostname, true);
+      // Add new DNS entry
+      await syncDNSEntry(reservation['ip-address'], existing.hostname);
+    }
+
     // Update the reservation with new values
     Object.assign(existing, reservation);
     
     await writeConfig(config);
-    await syncAllSystems(); // Make sure DNS is updated
+    await syncAllSystems();
     
     return NextResponse.json({ success: true });
   } catch (error) {

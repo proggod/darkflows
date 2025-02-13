@@ -23,7 +23,8 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 ## Changelog
 v 0.29
     - Fixed edit reservation so you could change IP address
-
+    - Update script fixed
+    
 v 0.28
     - Fixed route to secondary interface bug
 

@@ -10,8 +10,7 @@ if [ "$1" == "--dev" ]; then
 fi
 
 rm $PACKAGE_DIR/*
-echo cp $DARKFLOWS_DIR/installer/install_darkflows.sh $PACKAGE_DIR/
-echo cp $DARKFLOWS_DIR/installer/update_darkflows.sh $PACKAGE_DIR/
+cp $DARKFLOWS_DIR/installer/update_darkflows.sh $PACKAGE_DIR/
 cp $DARKFLOWS_DIR/installer/install_darkflows.sh $PACKAGE_DIR/
 $DARKFLOWS_DIR/installer/create_backup.sh
 cd $PACKAGE_DIR
