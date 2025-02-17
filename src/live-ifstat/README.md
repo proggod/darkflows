@@ -21,6 +21,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 ``` 
 
 ## Changelog
+v 0.30
+    - Removed test SSH keys from root
+
 v 0.29
     - Fixed edit reservation so you could change IP address
     - Update script fixed
