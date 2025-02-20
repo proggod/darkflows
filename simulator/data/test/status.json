@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-02-19T15:53:32Z",
+  "interfaces": {
+    "lan1": {
+      "new_drops": 689,
+      "backlog": 0,
+      "memory": 8389888
+    },
+    "lan0": {
+      "new_drops": 0,
+      "backlog": 0,
+      "memory": 837138
+    },
+    "ifb0": {
+      "new_drops": 7334,
+      "backlog": 0,
+      "memory": 8456908
+    },
+    "lan2": {
+      "new_drops": 0,
+      "backlog": 0,
+      "memory": 576000
+    }
+  }
+}

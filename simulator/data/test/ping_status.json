@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-02-19T15:53:34Z",
+  "servers": {
+    "PRIMARY": {
+      "ping_delay_ms": 44,
+      "rolling_avg_ms": 45,
+      "packet_loss": false,
+      "highest_ping": 3767,
+      "lowest_ping": 36,
+      "samples": "[46, 46, 44, 44, 51, 44, 46, 52, 45, 44, 48, 45, 42, 47, 52, 45, 44, 46, 48, 47, 44, 45, 47, 45, 44]"
+    },
+    "SECONDARY": {
+      "ping_delay_ms": 55,
+      "rolling_avg_ms": 49,
+      "packet_loss": false,
+      "highest_ping": 935,
+      "lowest_ping": 23,
+      "samples": "[45, 45, 46, 51, 35, 40, 36, 40, 46, 53, 35, 50, 45, 46, 44, 37, 59, 42, 38, 55, 36, 49, 40, 52, 55]"
+    }
+  }
+}
