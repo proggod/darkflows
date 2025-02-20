@@ -44,6 +44,9 @@ import SshKeysCard from '@/components/SshKeysCard'
 import { usePingData } from '@/contexts/PingDataContext'
 import Clock from '@/components/Clock'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { CategoryMenu } from '@/components/CategoryMenu'
+import { ComponentCategory, CATEGORIES } from '@/types/dashboard'
+import { DEFAULT_ITEMS } from '@/constants/dashboard'
 
 interface IfstatData {
   timestamp: string
@@ -51,33 +54,6 @@ interface IfstatData {
   kbIn: number
   kbOut: number
 }
-
-const DEFAULT_ITEMS = [
-  'systemMonitor',
-  'clock',
-  'interfaceStatus',
-  'pingPrimary',
-  'networkPrimary',
-  'pingSecondary',
-  'networkSecondary',
-  'networkInternal',
-  'connectionTuning',
-  'systemSettings',
-  'weather',
-  'reservations',
-  'leases',
-  'processes',
-  'sambaShares',
-  'sshKeys',
-  'dnsClients',
-  'blockClients',
-  'routeToSecondary',
-  'portForwards',
-  'dnsHosts',
-  'piholeLists',
-  'bandwidth',
-  'speedTest',
-]
 
 console.log('Debug DEFAULT_ITEMS:', {
   hasNetworkPrimary: DEFAULT_ITEMS.includes('networkPrimary'),
@@ -95,21 +71,85 @@ const CombinedDashboard = () => {
   const deviceUpdatePending = useRef(false)
   const [isLoading, setIsLoading] = useState(true)
   
-  const [items, setItems] = useState<string[]>(DEFAULT_ITEMS)
-  const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set())
+  const [currentCategory, setCurrentCategory] = useState<ComponentCategory>(() => {
+    try {
+      const saved = localStorage.getItem('selectedCategory')
+      return saved ? JSON.parse(saved) : 'all'
+    } catch {
+      return 'all'
+    }
+  })
+
+  const [categoryLayouts, setCategoryLayouts] = useState<Record<ComponentCategory, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem('categoryLayouts')
+      return saved ? JSON.parse(saved) : CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
+      }), {})
+    } catch (e) {
+      console.error('Failed to load category layouts:', e)
+      return CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
+      }), {})
+    }
+  })
+
+  const [categoryHiddenItems, setCategoryHiddenItems] = useState<Record<ComponentCategory, Set<string>>>(() => {
+    try {
+      const saved = localStorage.getItem('categoryHiddenItems')
+      const parsed = saved ? JSON.parse(saved) : {}
+      return CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: new Set(parsed[cat.id] || [])
+      }), {} as Record<ComponentCategory, Set<string>>)
+    } catch (e) {
+      console.error('Failed to load category hidden items:', e)
+      return CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: new Set()
+      }), {} as Record<ComponentCategory, Set<string>>)
+    }
+  })
+
+  // Add state for custom layout names
+  const [customLayoutNames, setCustomLayoutNames] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('customLayoutNames')
+      return saved ? JSON.parse(saved) : {
+        custom_1: 'Custom Layout 1',
+        custom_2: 'Custom Layout 2',
+        custom_3: 'Custom Layout 3'
+      }
+    } catch {
+      return {
+        custom_1: 'Custom Layout 1',
+        custom_2: 'Custom Layout 2',
+        custom_3: 'Custom Layout 3'
+      }
+    }
+  })
 
   // Save layout changes to localStorage
   useEffect(() => {
-    if (!initialLoadComplete.current) return; // Don't save during initial load
+    if (!initialLoadComplete.current) return;
     
     try {
-      console.log('DEBUG: Saving layout to localStorage', items);
-      localStorage.setItem('betaDashboardOrder', JSON.stringify(items));
-      localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)));
+      localStorage.setItem('categoryLayouts', JSON.stringify(categoryLayouts))
+      const hiddenItemsObj = Object.fromEntries(
+        Object.entries(categoryHiddenItems).map(([key, value]) => [key, Array.from(value)])
+      )
+      localStorage.setItem('categoryHiddenItems', JSON.stringify(hiddenItemsObj))
     } catch (e) {
-      console.error('Failed to save dashboard state:', e);
+      console.error('Failed to save category state:', e)
     }
-  }, [items, hiddenItems]);
+  }, [categoryLayouts, categoryHiddenItems])
+
+  // Save custom names to localStorage
+  useEffect(() => {
+    localStorage.setItem('customLayoutNames', JSON.stringify(customLayoutNames))
+  }, [customLayoutNames])
 
   // Load saved state from localStorage
   useEffect(() => {
@@ -177,14 +217,20 @@ const CombinedDashboard = () => {
         }
         
         console.log('Debug: Final items after ensuring network cards:', newItems);
-        setItems(newItems);
+        setCategoryLayouts(layouts => ({
+          ...layouts,
+          [currentCategory]: newItems
+        }));
 
         const savedHidden = localStorage.getItem('betaDashboardHidden')
         if (savedHidden) {
           const parsedHidden = JSON.parse(savedHidden)
           // Filter out any old device_ prefixed items
           const filteredHidden = parsedHidden.filter((id: string) => !id.startsWith('device_'))
-          setHiddenItems(new Set(filteredHidden))
+          setCategoryHiddenItems(hiddenItems => ({
+            ...hiddenItems,
+            [currentCategory]: new Set(filteredHidden)
+          }));
         }
 
         initialLoadComplete.current = true
@@ -192,14 +238,21 @@ const CombinedDashboard = () => {
       } catch (error) {
         console.error('DEBUG: Error loading saved dashboard state:', error)
         console.log('Debug: Falling back to DEFAULT_ITEMS');
-        setItems(DEFAULT_ITEMS);
+        setCategoryLayouts(layouts => ({
+          ...layouts,
+          [currentCategory]: DEFAULT_ITEMS
+        }));
+        setCategoryHiddenItems(hiddenItems => ({
+          ...hiddenItems,
+          [currentCategory]: new Set()
+        }));
         initialLoadComplete.current = true;
         setIsLoading(false);
       }
     }
 
     loadSavedState()
-  }, [networkConfig, isPingDataLoading])
+  }, [networkConfig, isPingDataLoading, currentCategory])
 
   // Fetch devices after initial load
   useEffect(() => {
@@ -212,22 +265,29 @@ const CombinedDashboard = () => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])
 
-  // First, let's modify the version check effect to be more aggressive
+  // Modify the version check effect
   useEffect(() => {
     const checkVersion = async () => {
       try {
         const response = await fetch('/api/version');
         const { version } = await response.json();
+        const savedVersion = localStorage.getItem('betaDashboardVersion');
         
-        // Always force a reset to ensure network cards are present
-        console.log('Debug: Forcing dashboard reset');
-        localStorage.clear(); // Clear all localStorage
-        setItems(DEFAULT_ITEMS);
-        setHiddenItems(new Set());
-        localStorage.setItem('betaDashboardVersion', version);
-        localStorage.setItem('betaDashboardOrder', JSON.stringify(DEFAULT_ITEMS));
-        console.log('Debug: Reset complete, new items:', DEFAULT_ITEMS);
-        
+        // Only reset if version is different
+        if (savedVersion !== version) {
+          console.log('Debug: Version changed, resetting dashboard');
+          localStorage.clear();
+          setCategoryLayouts(() => CATEGORIES.reduce((acc, cat) => ({
+            ...acc,
+            [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
+          }), {} as Record<ComponentCategory, string[]>));
+          setCategoryHiddenItems(() => CATEGORIES.reduce((acc, cat) => ({
+            ...acc,
+            [cat.id]: new Set()
+          }), {} as Record<ComponentCategory, Set<string>>));
+          localStorage.setItem('betaDashboardVersion', version);
+          localStorage.setItem('betaDashboardOrder', JSON.stringify(DEFAULT_ITEMS));
+        }
       } catch (error) {
         console.error('Failed to check version:', error);
       }
@@ -246,14 +306,14 @@ const CombinedDashboard = () => {
   useEffect(() => {
     console.log('Debug network cards:', {
       networkConfig,
-      hasNetworkPrimary: items.includes('networkPrimary'),
-      hasNetworkSecondary: items.includes('networkSecondary'),
-      hasNetworkInternal: items.includes('networkInternal'),
+      hasNetworkPrimary: categoryLayouts[currentCategory].includes('networkPrimary'),
+      hasNetworkSecondary: categoryLayouts[currentCategory].includes('networkSecondary'),
+      hasNetworkInternal: categoryLayouts[currentCategory].includes('networkInternal'),
       primaryInterface: networkConfig?.PRIMARY_INTERFACE,
       secondaryInterface: networkConfig?.SECONDARY_INTERFACE,
       internalInterface: networkConfig?.INTERNAL_INTERFACE,
     });
-  }, [networkConfig, items]);
+  }, [networkConfig, categoryLayouts, currentCategory]);
 
   const colors = [
     { light: '#10b981', dark: '#059669' }, // green
@@ -273,15 +333,16 @@ const CombinedDashboard = () => {
     const { active, over } = event;
     
     if (over && active.id !== over.id) {
-      setItems((items) => {
-        const oldIndex = items.indexOf(active.id.toString());
-        const newIndex = items.indexOf(over.id.toString());
-        const newOrder = arrayMove(items, oldIndex, newIndex);
+      setCategoryLayouts(layouts => {
+        const currentLayout = layouts[currentCategory]
+        const oldIndex = currentLayout.indexOf(active.id.toString());
+        const newIndex = currentLayout.indexOf(over.id.toString());
+        const newOrder = arrayMove(currentLayout, oldIndex, newIndex);
         
         console.log('DEBUG: Drag end - updating order', {
           oldIndex,
           newIndex,
-          oldOrder: items,
+          oldOrder: currentLayout,
           newOrder
         });
         
@@ -293,7 +354,10 @@ const CombinedDashboard = () => {
           console.error('Failed to save order after drag:', e);
         }
         
-        return newOrder;
+        return {
+          ...layouts,
+          [currentCategory]: newOrder
+        };
       });
     }
   }
@@ -301,10 +365,10 @@ const CombinedDashboard = () => {
   // Add a debug effect to monitor items changes
   useEffect(() => {
     console.log('DEBUG: Items changed', {
-      items,
+      categoryLayouts,
       savedOrder: localStorage.getItem('betaDashboardOrder')
     });
-  }, [items]);
+  }, [categoryLayouts]);
 
   // Modify the save effect to be more robust
   useEffect(() => {
@@ -315,32 +379,35 @@ const CombinedDashboard = () => {
     
     try {
       const currentSaved = localStorage.getItem('betaDashboardOrder');
-      const newOrder = JSON.stringify(items);
+      const newOrder = JSON.stringify(categoryLayouts[currentCategory]);
       
       if (currentSaved !== newOrder) {
         console.log('DEBUG: Saving new layout', {
           old: JSON.parse(currentSaved || '[]'),
-          new: items
+          new: categoryLayouts[currentCategory]
         });
         localStorage.setItem('betaDashboardOrder', newOrder);
-        localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(hiddenItems)));
+        localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(categoryHiddenItems[currentCategory])));
       } else {
         console.log('DEBUG: Skipping save - no changes');
       }
     } catch (e) {
       console.error('Failed to save dashboard state:', e);
     }
-  }, [items, hiddenItems]);
+  }, [categoryLayouts, categoryHiddenItems, currentCategory]);
 
   const toggleVisibility = (id: string) => {
-    setHiddenItems(current => {
-      const newHidden = new Set(current)
+    setCategoryHiddenItems(current => {
+      const newHidden = new Set(current[currentCategory])
       if (newHidden.has(id)) {
         newHidden.delete(id)
       } else {
         newHidden.add(id)
       }
-      return newHidden
+      return {
+        ...current,
+        [currentCategory]: newHidden
+      }
     })
   }
 
@@ -370,8 +437,8 @@ const CombinedDashboard = () => {
     // Add debug log for every component render attempt
     console.log('Debug renderComponent:', { 
       id, 
-      isHidden: hiddenItems.has(id),
-      isInItems: items.includes(id),
+      isHidden: categoryHiddenItems[currentCategory].has(id),
+      isInItems: categoryLayouts[currentCategory].includes(id),
       networkConfig: networkConfig ? {
         PRIMARY_INTERFACE: networkConfig.PRIMARY_INTERFACE,
         SECONDARY_INTERFACE: networkConfig.SECONDARY_INTERFACE,
@@ -379,7 +446,7 @@ const CombinedDashboard = () => {
       } : null
     });
 
-    if (hiddenItems.has(id)) {
+    if (categoryHiddenItems[currentCategory].has(id)) {
       console.log('Debug: Component hidden:', id);
       return null;
     }
@@ -439,10 +506,10 @@ const CombinedDashboard = () => {
           label: networkConfig?.PRIMARY_LABEL,
           hasConfig: !!networkConfig,
           isPingDataLoading,
-          isInItems: items.includes('networkPrimary'),
-          isHidden: hiddenItems.has('networkPrimary'),
+          isInItems: categoryLayouts[currentCategory].includes('networkPrimary'),
+          isHidden: categoryHiddenItems[currentCategory].has('networkPrimary'),
           networkStats: networkStats[networkConfig?.PRIMARY_INTERFACE || ''],
-          items: items,
+          items: categoryLayouts[currentCategory],
           DEFAULT_ITEMS: DEFAULT_ITEMS
         });
         
@@ -500,34 +567,9 @@ const CombinedDashboard = () => {
   }
 
   // Add debug logging in visibleItems filter
-  const visibleItems = items
-    .filter(id => {
-      const isHidden = hiddenItems.has(id)
-      console.log('Debug visibility filter:', { 
-        id, 
-        isHidden,
-        isInItems: items.includes(id),
-        isNetworkCard: ['networkPrimary', 'networkSecondary', 'networkInternal'].includes(id)
-      })
-      return !isHidden
-    })
-    .filter(id => {
-      switch (id) {
-        case 'pingSecondary':
-        case 'networkSecondary':
-          const hasSecondary = networkConfig?.SECONDARY_INTERFACE !== undefined && 
-                             networkConfig?.SECONDARY_INTERFACE !== "";
-          console.log('Debug secondary filter:', { id, hasSecondary, interface: networkConfig?.SECONDARY_INTERFACE })
-          return hasSecondary;
-        case 'networkInternal':
-          const hasInternal = networkConfig?.INTERNAL_INTERFACE !== undefined && 
-                            networkConfig?.INTERNAL_INTERFACE !== "";
-          console.log('Debug internal filter:', { id, hasInternal, interface: networkConfig?.INTERNAL_INTERFACE })
-          return hasInternal;
-        default:
-          return true;
-      }
-    });
+  const visibleItems = categoryLayouts[currentCategory]?.filter(
+    id => !categoryHiddenItems[currentCategory].has(id)
+  ) || []
 
   const getComponentLabel = (id: string) => {
     switch (id) {
@@ -583,7 +625,17 @@ const CombinedDashboard = () => {
   }
 
   // Add back hiddenItemsList
-  const hiddenItemsList = items.filter(id => hiddenItems.has(id))
+  const hiddenItemsList = categoryLayouts[currentCategory].filter(id => categoryHiddenItems[currentCategory].has(id))
+
+  // Add category change handler
+  const handleCategoryChange = (category: ComponentCategory) => {
+    setCurrentCategory(category)
+  }
+
+  // Add effect to save category changes
+  useEffect(() => {
+    localStorage.setItem('selectedCategory', JSON.stringify(currentCategory))
+  }, [currentCategory])
 
   if (isLoading) {
     return <div className="p-4">Loading dashboard...</div>
@@ -591,6 +643,15 @@ const CombinedDashboard = () => {
 
   return (
     <>
+      <CategoryMenu 
+        currentCategory={currentCategory}
+        onCategoryChange={handleCategoryChange}
+        customLayoutNames={customLayoutNames}
+        onCustomNameChange={(id, name) => {
+          setCustomLayoutNames(prev => ({...prev, [id]: name}))
+        }}
+        isEditMode={isEditMode}
+      />
       <div className="p-4">
         <div className="space-y-8">
           <DndContext
