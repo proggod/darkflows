@@ -75,24 +75,23 @@ export default function RouteHostToSecondary() {
     setRouteMeLoading(true)
     setError(null)
     try {
-      // First fetch the client's IP address
       const ipResponse = await fetch('/api/client-ip')
       if (!ipResponse.ok) {
-        throw new Error('Failed to fetch your IP address')
+        const errorText = await ipResponse.text()
+        throw new Error(`Failed to fetch your IP address: ${ipResponse.status} ${errorText}`)
       }
-      const { ip } = await ipResponse.json()
+      const ipData = await ipResponse.json()
 
-      // Then add it to the routes
       const response = await fetch('/api/secondary-routes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip })
+        body: JSON.stringify({ ip: ipData.ip })
       })
       
-      const data = await response.json()
+      const responseData = await response.json()
       
       if (!response.ok) {
-        setError(data.error || 'Failed to add route')
+        setError(responseData.error || 'Failed to add route')
         return
       }
       
