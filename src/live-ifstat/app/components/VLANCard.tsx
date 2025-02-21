@@ -498,10 +498,45 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                     const selectedCard = filteredCards.find(card => card.deviceName === e.target.value);
                     setNetworkCard(selectedCard || { deviceName: e.target.value });
                   }}
-                  className="w-[120px] text-[10px]"
+                  className="w-[120px] text-[10px] bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  sx={{
+                    height: '24px',
+                    '.MuiSelect-select': {
+                      padding: '1px 6px',
+                    },
+                    '.MuiSelect-icon': {
+                      color: 'currentColor',
+                    },
+                    '.MuiOutlinedInput-notchedOutline': {
+                      borderColor: 'rgb(209 213 219)',
+                      borderWidth: '1px',
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      className: 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100',
+                      sx: {
+                        '& .MuiMenuItem-root': {
+                          fontSize: '10px',
+                          padding: '4px 8px',
+                          color: 'currentColor',
+                          '&:hover': {
+                            backgroundColor: 'rgb(243 244 246)',
+                          },
+                          '&.dark:hover': {
+                            backgroundColor: 'rgb(55 65 81)',
+                          }
+                        }
+                      }
+                    }
+                  }}
                 >
                   {filteredCards.map(card => (
-                    <MenuItem key={card.deviceName} value={card.deviceName}>
+                    <MenuItem 
+                      key={card.deviceName} 
+                      value={card.deviceName}
+                      className="text-gray-900 dark:text-gray-100"
+                    >
                       {card.label || card.deviceName}
                     </MenuItem>
                   ))}
