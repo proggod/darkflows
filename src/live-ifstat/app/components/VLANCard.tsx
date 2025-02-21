@@ -424,13 +424,29 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     
     // Only proceed if we have a valid subnet format
     if (isValidSubnet(newSubnet)) {
-      // Calculate default gateway and IP range
-      const range = calculateIpRange(gateway, newSubnet)
+      // Calculate default gateway - use first usable IP in subnet
+      const [networkIp] = newSubnet.split('/')
+      const ipParts = networkIp.split('.')
+      ipParts[3] = '1' // Set last octet to 1 for gateway
+      const defaultGateway = ipParts.join('.')
+      
+      // Set gateway if it's not already set
+      if (!gateway) {
+        setGateway(defaultGateway)
+      }
+      
+      // Calculate default IP range
+      const range = calculateIpRange(defaultGateway, newSubnet)
       if (range) {
-        setGateway(gateway) // Keep existing gateway if it's set
         setIpRange(range)
       }
     }
+  }
+
+  // Add this handler function
+  const handleIdChange = (value: string) => {
+    const parsedId = parseInt(value);
+    setId(isNaN(parsedId) ? 1 : parsedId); // Default to 1 if NaN
   }
 
   return (
@@ -458,9 +474,11 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                 <input
                   type="number"
                   value={id}
-                  onChange={(e) => setId(parseInt(e.target.value))}
+                  onChange={(e) => handleIdChange(e.target.value)}
                   disabled={!!vlan}
                   placeholder="1-4094"
+                  min="1"
+                  max="4094"
                   className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
