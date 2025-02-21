@@ -524,22 +524,24 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                           fontSize: '10px',
                           padding: '4px 8px',
                           '&:hover': {
-                            backgroundColor: '#f3f4f6',
+                            backgroundColor: 'rgb(243 244 246)',
                           },
                           '&.Mui-selected': {
-                            backgroundColor: '#f3f4f6',
+                            backgroundColor: 'rgb(37 99 235)',
+                            color: 'rgb(255 255 255)',
                             '&:hover': {
-                              backgroundColor: '#e5e7eb',
+                              backgroundColor: 'rgb(29 78 216)',
                             },
                           },
                           '@media (prefers-color-scheme: dark)': {
                             '&:hover': {
-                              backgroundColor: '#4b5563',
+                              backgroundColor: 'rgb(75 85 99)',
                             },
                             '&.Mui-selected': {
-                              backgroundColor: '#4b5563',
+                              backgroundColor: 'rgb(37 99 235)',
+                              color: 'rgb(255 255 255)',
                               '&:hover': {
-                                backgroundColor: '#6b7280',
+                                backgroundColor: 'rgb(29 78 216)',
                               },
                             },
                           }
