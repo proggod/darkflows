@@ -498,7 +498,7 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                     const selectedCard = filteredCards.find(card => card.deviceName === e.target.value);
                     setNetworkCard(selectedCard || { deviceName: e.target.value });
                   }}
-                  className="w-[120px] text-[10px] bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  className="w-[120px] text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                   sx={{
                     height: '24px',
                     '.MuiSelect-select': {
@@ -508,9 +508,13 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                       color: 'currentColor',
                     },
                     '.MuiOutlinedInput-notchedOutline': {
-                      borderColor: 'rgb(209 213 219)',
-                      borderWidth: '1px',
+                      border: 'none',
                     },
+                    '&.Mui-focused': {
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        border: 'none',
+                      },
+                    }
                   }}
                   MenuProps={{
                     PaperProps: {
@@ -519,12 +523,25 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                         '& .MuiMenuItem-root': {
                           fontSize: '10px',
                           padding: '4px 8px',
-                          color: 'currentColor',
                           '&:hover': {
-                            backgroundColor: 'rgb(243 244 246)',
+                            backgroundColor: '#f3f4f6',
                           },
-                          '&.dark:hover': {
-                            backgroundColor: 'rgb(55 65 81)',
+                          '&.Mui-selected': {
+                            backgroundColor: '#f3f4f6',
+                            '&:hover': {
+                              backgroundColor: '#e5e7eb',
+                            },
+                          },
+                          '@media (prefers-color-scheme: dark)': {
+                            '&:hover': {
+                              backgroundColor: '#4b5563',
+                            },
+                            '&.Mui-selected': {
+                              backgroundColor: '#4b5563',
+                              '&:hover': {
+                                backgroundColor: '#6b7280',
+                              },
+                            },
                           }
                         }
                       }
