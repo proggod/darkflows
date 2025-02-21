@@ -49,7 +49,6 @@ export default function InterfaceStatusCard({ title = 'Cake Status' }: Interface
     try {
       const response = await fetch('/api/status')
       const data = await response.json()
-      console.log('Status data:', data)
       setStatus(data)
       setError(null)
     } catch (error) {

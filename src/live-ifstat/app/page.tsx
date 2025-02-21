@@ -47,6 +47,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { CategoryMenu } from '@/components/CategoryMenu'
 import { ComponentCategory, CATEGORIES } from '@/types/dashboard'
 import { DEFAULT_ITEMS } from '@/constants/dashboard'
+import VLANCard from '@/components/VLANCard'
 
 interface IfstatData {
   timestamp: string
@@ -55,12 +56,7 @@ interface IfstatData {
   kbOut: number
 }
 
-console.log('Debug DEFAULT_ITEMS:', {
-  hasNetworkPrimary: DEFAULT_ITEMS.includes('networkPrimary'),
-  hasNetworkSecondary: DEFAULT_ITEMS.includes('networkSecondary'),
-  hasNetworkInternal: DEFAULT_ITEMS.includes('networkInternal'),
-  fullList: DEFAULT_ITEMS
-});
+
 
 const CombinedDashboard = () => {
   const { networkStats } = useNetworkStats()
@@ -70,6 +66,7 @@ const CombinedDashboard = () => {
   const initialLoadComplete = useRef(false)
   const deviceUpdatePending = useRef(false)
   const [isLoading, setIsLoading] = useState(true)
+  const versionCheckComplete = useRef(false)
   
   const [currentCategory, setCurrentCategory] = useState<ComponentCategory>(() => {
     try {
@@ -160,21 +157,11 @@ const CombinedDashboard = () => {
         }
 
         if (networkConfig === null || isPingDataLoading) {
-          console.log('Debug loadSavedState: waiting for config', { 
-            hasConfig: networkConfig !== null, 
-            isPingDataLoading 
-          });
           return;
         }
 
-        console.log('Debug loadSavedState: config ready', networkConfig);
-
         const savedOrder = localStorage.getItem('betaDashboardOrder')
-        console.log('DEBUG: Loading saved state', { 
-          savedOrder,
-          defaultItems: DEFAULT_ITEMS 
-        });
-        
+
         let newItems = DEFAULT_ITEMS;
         if (savedOrder) {
           const parsedOrder = JSON.parse(savedOrder)
@@ -216,7 +203,6 @@ const CombinedDashboard = () => {
           }
         }
         
-        console.log('Debug: Final items after ensuring network cards:', newItems);
         setCategoryLayouts(layouts => ({
           ...layouts,
           [currentCategory]: newItems
@@ -236,8 +222,7 @@ const CombinedDashboard = () => {
         initialLoadComplete.current = true
         setIsLoading(false)
       } catch (error) {
-        console.error('DEBUG: Error loading saved dashboard state:', error)
-        console.log('Debug: Falling back to DEFAULT_ITEMS');
+        console.error('Error loading saved dashboard state:', error)
         setCategoryLayouts(layouts => ({
           ...layouts,
           [currentCategory]: DEFAULT_ITEMS
@@ -268,39 +253,50 @@ const CombinedDashboard = () => {
   // Modify the version check effect
   useEffect(() => {
     const checkVersion = async () => {
+      // Skip if we've already done the check or if initial state isn't loaded
+      if (versionCheckComplete.current || !initialLoadComplete.current) return;
+      
       try {
         const response = await fetch('/api/version');
         const { version } = await response.json();
         const savedVersion = localStorage.getItem('betaDashboardVersion');
+        const currentLayout = categoryLayouts[currentCategory];
         
-        // Only reset if version is different
-        if (savedVersion !== version) {
-          console.log('Debug: Version changed, resetting dashboard');
+        // Reset if version changed or if vlans component is missing
+        const needsReset = savedVersion !== version || 
+                          !currentLayout.includes('vlans') ||
+                          !DEFAULT_ITEMS.includes('vlans');
+
+        if (needsReset) {
+          console.log('Debug: Version changed or missing vlans component, resetting dashboard');
           localStorage.clear();
-          setCategoryLayouts(() => CATEGORIES.reduce((acc, cat) => ({
+          
+          const newLayouts = CATEGORIES.reduce((acc, cat) => ({
             ...acc,
             [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
-          }), {} as Record<ComponentCategory, string[]>));
-          setCategoryHiddenItems(() => CATEGORIES.reduce((acc, cat) => ({
+          }), {} as Record<ComponentCategory, string[]>);
+          
+          setCategoryLayouts(newLayouts);
+          setCategoryHiddenItems(CATEGORIES.reduce((acc, cat) => ({
             ...acc,
             [cat.id]: new Set()
           }), {} as Record<ComponentCategory, Set<string>>));
+          
           localStorage.setItem('betaDashboardVersion', version);
           localStorage.setItem('betaDashboardOrder', JSON.stringify(DEFAULT_ITEMS));
         }
+        
+        // Mark check as complete
+        versionCheckComplete.current = true;
       } catch (error) {
         console.error('Failed to check version:', error);
       }
     };
 
     checkVersion();
-  }, []);
+  }, [categoryLayouts, currentCategory, initialLoadComplete]); // Added initialLoadComplete
 
   // Add debug logging for networkConfig and networkStats
-  useEffect(() => {
-    console.log('Debug networkConfig:', networkConfig)
-    console.log('Debug networkStats:', networkStats)
-  }, [networkConfig, networkStats])
 
   // Add this debug effect
   useEffect(() => {
@@ -339,17 +335,8 @@ const CombinedDashboard = () => {
         const newIndex = currentLayout.indexOf(over.id.toString());
         const newOrder = arrayMove(currentLayout, oldIndex, newIndex);
         
-        console.log('DEBUG: Drag end - updating order', {
-          oldIndex,
-          newIndex,
-          oldOrder: currentLayout,
-          newOrder
-        });
-        
-        // Force a save to localStorage immediately after drag
         try {
           localStorage.setItem('betaDashboardOrder', JSON.stringify(newOrder));
-          console.log('DEBUG: Saved new order after drag');
         } catch (e) {
           console.error('Failed to save order after drag:', e);
         }
@@ -370,26 +357,17 @@ const CombinedDashboard = () => {
     });
   }, [categoryLayouts]);
 
-  // Modify the save effect to be more robust
+  // Modify the save effect to only log errors
   useEffect(() => {
-    if (!initialLoadComplete.current) {
-      console.log('DEBUG: Skipping save - initial load not complete');
-      return;
-    }
+    if (!initialLoadComplete.current) return;
     
     try {
       const currentSaved = localStorage.getItem('betaDashboardOrder');
       const newOrder = JSON.stringify(categoryLayouts[currentCategory]);
       
       if (currentSaved !== newOrder) {
-        console.log('DEBUG: Saving new layout', {
-          old: JSON.parse(currentSaved || '[]'),
-          new: categoryLayouts[currentCategory]
-        });
         localStorage.setItem('betaDashboardOrder', newOrder);
         localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(categoryHiddenItems[currentCategory])));
-      } else {
-        console.log('DEBUG: Skipping save - no changes');
       }
     } catch (e) {
       console.error('Failed to save dashboard state:', e);
@@ -413,10 +391,8 @@ const CombinedDashboard = () => {
 
   // Add getNetworkCardData function that was missing
   const getNetworkCardData = (iface: string): IfstatData[] => {
-    console.log('Debug getNetworkCardData:', { iface, stats: networkStats[iface] })
     const stats = networkStats[iface]
     if (!stats || stats.length === 0) {
-      console.log('Debug: No stats found for interface', iface)
       return [{
         timestamp: new Date().toISOString(),
         interface: iface,
@@ -434,20 +410,7 @@ const CombinedDashboard = () => {
   }
 
   const renderComponent = (id: string) => {
-    // Add debug log for every component render attempt
-    console.log('Debug renderComponent:', { 
-      id, 
-      isHidden: categoryHiddenItems[currentCategory].has(id),
-      isInItems: categoryLayouts[currentCategory].includes(id),
-      networkConfig: networkConfig ? {
-        PRIMARY_INTERFACE: networkConfig.PRIMARY_INTERFACE,
-        SECONDARY_INTERFACE: networkConfig.SECONDARY_INTERFACE,
-        INTERNAL_INTERFACE: networkConfig.INTERNAL_INTERFACE
-      } : null
-    });
-
     if (categoryHiddenItems[currentCategory].has(id)) {
-      console.log('Debug: Component hidden:', id);
       return null;
     }
 
@@ -501,25 +464,11 @@ const CombinedDashboard = () => {
       case 'clock':
         return <ErrorBoundary><Clock /></ErrorBoundary>
       case 'networkPrimary':
-        console.log('Debug networkPrimary detailed:', {
-          interface: networkConfig?.PRIMARY_INTERFACE,
-          label: networkConfig?.PRIMARY_LABEL,
-          hasConfig: !!networkConfig,
-          isPingDataLoading,
-          isInItems: categoryLayouts[currentCategory].includes('networkPrimary'),
-          isHidden: categoryHiddenItems[currentCategory].has('networkPrimary'),
-          networkStats: networkStats[networkConfig?.PRIMARY_INTERFACE || ''],
-          items: categoryLayouts[currentCategory],
-          DEFAULT_ITEMS: DEFAULT_ITEMS
-        });
-        
         if (!networkConfig?.PRIMARY_INTERFACE) {
-          console.log('Debug: No PRIMARY_INTERFACE found');
           return null;
         }
         
         const primaryData = getNetworkCardData(networkConfig.PRIMARY_INTERFACE);
-        console.log('Debug: Primary network data:', primaryData);
         
         return (
           <ErrorBoundary>
@@ -561,6 +510,8 @@ const CombinedDashboard = () => {
             />
           </ErrorBoundary>
         );
+      case 'vlans':
+        return <ErrorBoundary><VLANCard /></ErrorBoundary>
       default:
         return null
     }
@@ -619,6 +570,8 @@ const CombinedDashboard = () => {
         return 'Secondary Network Stats'
       case 'networkInternal':
         return 'Internal Network Stats'
+      case 'vlans':
+        return 'VLANs'
       default:
         return id
     }

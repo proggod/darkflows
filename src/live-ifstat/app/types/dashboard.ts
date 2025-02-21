@@ -66,7 +66,8 @@ export const CATEGORIES: CategoryDefinition[] = [
       'reservations',
       'leases',
       'piholeLists',
-      'blockClients'
+      'blockClients',
+      'vlans'
     ]
   },
   {
@@ -92,4 +93,64 @@ export const CATEGORIES: CategoryDefinition[] = [
     label: 'Custom Layout 3',
     defaultComponents: DEFAULT_ITEMS
   }
-]; 
+];
+
+export interface NetworkCard {
+  deviceName: string;
+  label?: string; // Optional label from network config
+}
+
+export interface IPRange {
+  start: string;
+  end: string;
+  available: number;
+  used: number;
+}
+
+export interface DHCPConfig {
+  enabled: boolean;
+  leaseTime: number;
+  dnsServers: string[];
+  defaultGateway: string;
+  reservations: {
+    macAddress: string;
+    ipAddress: string;
+    hostname?: string;
+  }[];
+}
+
+export interface CommunicationGroup {
+  name: string;
+  allowedGroups: string[];
+}
+
+export interface VLANConfig {
+  id: number;
+  name: string;
+  networkCard: NetworkCard;
+  subnet: string;
+  gateway: string;
+  ipRange: IPRange;
+  dhcp: DHCPConfig;
+  communicationGroup: CommunicationGroup;
+  created: Date;
+  modified: Date;
+}
+
+export interface NetworkDevice {
+  name: string;
+  type?: 'primary' | 'secondary' | 'internal';
+  label?: string;
+}
+
+export interface NetworkInterfaceConfig {
+  name: string;
+  ipRange?: {
+    start: string;
+    end: string;
+  };
+}
+
+export interface NetworkConfig {
+  interfaces?: NetworkInterfaceConfig[];
+} 

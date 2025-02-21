@@ -2,6 +2,7 @@ export const DEFAULT_ITEMS = [
   'systemMonitor',
   'clock',
   'interfaceStatus',
+  'vlans',
   'pingPrimary',
   'networkPrimary',
   'pingSecondary',

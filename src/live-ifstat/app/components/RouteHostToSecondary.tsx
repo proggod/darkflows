@@ -7,6 +7,7 @@ export default function RouteHostToSecondary() {
   const [newIp, setNewIp] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [routeMeLoading, setRouteMeLoading] = useState(false)
 
   useEffect(() => {
     fetchIps()
@@ -67,6 +68,40 @@ export default function RouteHostToSecondary() {
       setError('Failed to delete route')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRouteMe = async () => {
+    setRouteMeLoading(true)
+    setError(null)
+    try {
+      // First fetch the client's IP address
+      const ipResponse = await fetch('/api/client-ip')
+      if (!ipResponse.ok) {
+        throw new Error('Failed to fetch your IP address')
+      }
+      const { ip } = await ipResponse.json()
+
+      // Then add it to the routes
+      const response = await fetch('/api/secondary-routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setError(data.error || 'Failed to add route')
+        return
+      }
+      
+      await fetchIps()
+    } catch (error) {
+      console.error('Error adding current IP:', error)
+      setError(error instanceof Error ? error.message : 'Failed to add route')
+    } finally {
+      setRouteMeLoading(false)
     }
   }
 
@@ -147,22 +182,31 @@ export default function RouteHostToSecondary() {
           </div>
         )}
 
-        <form onSubmit={handleAdd} className="mt-2 flex gap-2">
-          <input
-            type="text"
-            value={newIp}
-            onChange={(e) => setNewIp(e.target.value)}
-            placeholder="Enter IP address"
-            className="flex-1 px-2 py-1 text-xs rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-          />
+        <div className="mt-2 flex gap-2">
+          <form onSubmit={handleAdd} className="flex gap-2 flex-1">
+            <input
+              type="text"
+              value={newIp}
+              onChange={(e) => setNewIp(e.target.value)}
+              placeholder="Enter IP address"
+              className="flex-1 px-2 py-1 text-xs rounded bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+            />
+            <button
+              type="submit"
+              disabled={loading || !newIp}
+              className="px-3 py-1 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Add
+            </button>
+          </form>
           <button
-            type="submit"
-            disabled={loading || !newIp}
-            className="px-3 py-1 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            onClick={handleRouteMe}
+            disabled={routeMeLoading || loading}
+            className="px-3 py-1 bg-green-500 dark:bg-green-600 text-white rounded text-xs font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-1 focus:ring-green-500 dark:focus:ring-green-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Add
+            {routeMeLoading ? 'Adding...' : 'Route Me'}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   )

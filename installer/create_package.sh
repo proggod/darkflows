@@ -19,11 +19,11 @@ echo "package is in /tmp/darkflows-${VERSION}.tgz"
 cd /tmp
 rm -f darkflows-current.tgz
 ln -s darkflows-${VERSION}.tgz darkflows-current.tgz
-
+echo "trying to scp"
 # Only perform SCP if not in dev mode
 if [ $DEV_MODE -eq 0 ]; then
-    scp -P 12222 /tmp/darkflows-${VERSION}.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
-    scp -P 12222 /tmp/darkflows-current.tgz root@darkflows.com:/var/www/darkflows.com/downloads/
+    scp -P 12222 /tmp/darkflows-${VERSION}.tgz root@ny:/var/www/darkflows.com/downloads/
+    scp -P 12222 /tmp/darkflows-current.tgz root@ny:/var/www/darkflows.com/downloads/
 else
     echo "Dev mode: Skipping SCP of files to remote server"
 fi
