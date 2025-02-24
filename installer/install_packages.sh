@@ -8,7 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 # Install the packages without prompting
 # apt-get install -y nftables kea mariadb-server curl screen vlan irqbalance
-apt -o Dpkg::Options::="--force-confold" --assume-yes install -y sudo unbound jq python3-pexpect openssh-server mariadb-server nodejs npm nftables kea curl screen vlan irqbalance ethtool samba iperf3 ca-certificates iftop
+apt -o Dpkg::Options::="--force-confold" --assume-yes install -y sudo unbound jq python3-pexpect python3-mysqldb openssh-server mariadb-server nodejs npm nftables kea curl screen vlan irqbalance ethtool samba iperf3 ca-certificates iftop
 
 #activate
 systemctl enable irqbalance --now
