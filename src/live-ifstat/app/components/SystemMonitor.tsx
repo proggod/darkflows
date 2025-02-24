@@ -32,34 +32,57 @@ interface NetworkDevice {
   name: string;
   type?: 'primary' | 'secondary' | 'internal';
   label?: string;
+  id?: string;
 }
 
 const SystemMonitor: React.FC = () => {
+  console.log('SystemMonitor: Component rendering');
+
   const [sysData, setSysData] = useState<SysData | null>(null);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null);
   const [devices, setDevices] = useState<NetworkDevice[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [sseConnected, setSseConnected] = useState(false);
 
   useEffect(() => {
+    console.log('SystemMonitor: Main useEffect running');
+
     // Fetch devices first
     const fetchDevices = async () => {
+      console.log('SystemMonitor: Fetching devices');
       try {
         const response = await fetch('/api/devices');
+        console.log('SystemMonitor: Devices response status:', response.status);
         const data = await response.json();
-        setDevices(data.devices || []);
-      } catch {
-        // Error handling is preserved but without logging
+        console.log('SystemMonitor: Devices data:', data);
+        
+        // Add validation and default value
+        if (!data || !Array.isArray(data.devices)) {
+          console.warn('SystemMonitor: Invalid devices data format, using empty array');
+          setDevices([]);
+          return;
+        }
+        
+        setDevices(data.devices);
+      } catch (err) {
+        console.error('SystemMonitor: Error fetching devices:', err);
+        setDevices([]); // Set empty array on error
       }
     };
 
     fetchDevices();
 
     // Fetch server info once
+    console.log('SystemMonitor: Fetching server info');
     fetch('/api/server-info')
-      .then(res => res.json())
+      .then(res => {
+        console.log('SystemMonitor: Server info response status:', res.status);
+        return res.json();
+      })
       .then(data => {
+        console.log('SystemMonitor: Server info data:', data);
         setServerInfo({
           cpuModel: data.serverInfo.cpuModel,
           osName: data.serverInfo.osName,
@@ -70,7 +93,9 @@ const SystemMonitor: React.FC = () => {
           diskAvailable: data.serverInfo.diskAvailable
         });
       })
-      .catch(() => {/* Error handling preserved but without logging */})
+      .catch((err) => {
+        console.error('SystemMonitor: Error fetching server info:', err);
+      })
       .finally(() => setLoading(false));
 
     // Fetch connection status
@@ -84,21 +109,56 @@ const SystemMonitor: React.FC = () => {
       .catch(() => {/* Error handling preserved but without logging */})
       .finally(() => setLoading(false));
 
-    // Set up SSE for real-time stats
-    const eventSource = new EventSource('/api/sys-stats');
+    let retryTimeout: NodeJS.Timeout;
+    let eventSource: EventSource | null = null;
 
-    eventSource.onmessage = (event) => {
+    const setupSSE = () => {
+      console.log('SystemMonitor: Setting up SSE connection');
       try {
-        const data = JSON.parse(event.data);
-        setSysData(data);
-      } catch {
-        // Error handling preserved but without logging
+        const timestamp = new Date().getTime();
+        const url = `/api/sys-stats?t=${timestamp}`;
+        console.log('SystemMonitor: SSE URL:', url);
+        
+        eventSource = new EventSource(url);
+        
+        eventSource.onopen = () => {
+          console.log('SystemMonitor: SSE connection opened');
+          setSseConnected(true);
+          setError(null);
+        };
+
+        eventSource.onmessage = (event) => {
+          console.log('SystemMonitor: SSE message received:', event.data);
+          try {
+            const data = JSON.parse(event.data);
+            console.log('SystemMonitor: Parsed SSE data:', data);
+            setSysData(data);
+          } catch (err) {
+            console.error('SystemMonitor: Error parsing SSE data:', err);
+            setError('Failed to parse system stats data');
+          }
+        };
+
+        eventSource.onerror = (err) => {
+          console.error('SystemMonitor: SSE error:', err);
+          console.log('SystemMonitor: EventSource readyState:', eventSource?.readyState);
+          setSseConnected(false);
+          setError('Lost connection to system stats. Retrying...');
+          eventSource?.close();
+          
+          retryTimeout = setTimeout(() => {
+            console.log('SystemMonitor: Attempting to reconnect SSE');
+            setupSSE();
+          }, 5000);
+        };
+      } catch (err) {
+        console.error('SystemMonitor: Error in setupSSE:', err);
+        setError('Failed to connect to system stats');
+        setSseConnected(false);
       }
     };
 
-    eventSource.onerror = () => {
-      eventSource.close();
-    };
+    setupSSE();
 
     // Set up interval to refresh connection status
     const intervalId = setInterval(() => {
@@ -109,11 +169,30 @@ const SystemMonitor: React.FC = () => {
         .finally(() => setLoading(false));
     }, NETWORK_UPDATE_INTERVAL);
 
+    // Cleanup
     return () => {
-      eventSource.close();
+      console.log('SystemMonitor: Cleaning up');
+      clearTimeout(retryTimeout);
+      if (eventSource) {
+        console.log('SystemMonitor: Closing EventSource');
+        eventSource.close();
+      }
       clearInterval(intervalId);
     };
   }, []);
+
+  // Add debug logging for state changes
+  useEffect(() => {
+    console.log('SystemMonitor: sysData updated:', sysData);
+  }, [sysData]);
+
+  useEffect(() => {
+    console.log('SystemMonitor: serverInfo updated:', serverInfo);
+  }, [serverInfo]);
+
+  useEffect(() => {
+    console.log('SystemMonitor: error state updated:', error);
+  }, [error]);
 
   const getBarWidth = (percentage: number) => {
     if (percentage <= 0) return 'w-0';
@@ -139,9 +218,20 @@ const SystemMonitor: React.FC = () => {
   // Calculate memory usage percentage
   const memoryUsage = sysData ? 100 - sysData.percentFree : 0;
 
-  // Get the label for the active connection
-  const activeDevice = devices.find(device => device.type?.toUpperCase() === connectionStatus?.active)
-  const activeLabel = activeDevice?.label || activeDevice?.name || connectionStatus?.active || 'Unknown'
+  // Modify the active device lookup to be more defensive
+  const getActiveLabel = () => {
+    if (!Array.isArray(devices) || !connectionStatus?.active) {
+      return 'Unknown';
+    }
+
+    const activeDevice = devices.find(device => 
+      device && device.type && device.type.toUpperCase() === connectionStatus.active
+    );
+
+    return activeDevice?.label || activeDevice?.name || connectionStatus.active || 'Unknown';
+  };
+
+  const activeLabel = getActiveLabel();
 
   const fetchStats = async () => {
     setLoading(true);
@@ -162,7 +252,8 @@ const SystemMonitor: React.FC = () => {
         <h3 className="text-label">System Monitor</h3>
         <RefreshCw 
           onClick={fetchStats}
-          className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
+          className={`w-2 h-2 btn-icon btn-icon-blue transform scale-25 
+            ${!sseConnected ? 'animate-spin' : ''}`}
         />
       </div>
 

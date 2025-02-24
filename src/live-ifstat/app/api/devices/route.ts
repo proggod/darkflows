@@ -68,9 +68,24 @@ function getInterfaceForType(lines: string[], type: string): string {
 export async function GET() {
   try {
     const configDevices = await parseNetworkConfig()
-    return NextResponse.json({ devices: configDevices })
+    
+    // Convert the devices object into an array
+    const deviceArray = Object.entries(configDevices).map(([name, device]) => ({
+      name,
+      type: device.type,
+      label: device.label,
+      egressBandwidth: device.egressBandwidth,
+      ingressBandwidth: device.ingressBandwidth
+    }));
+
+
+    return NextResponse.json({
+      devices: deviceArray
+    })
   } catch (error) {
-    console.error('Error fetching network devices:', error)
-    return NextResponse.json({ devices: [] }, { status: 500 })
+    console.error('Error fetching devices:', error)
+    return NextResponse.json({ 
+      devices: [] 
+    })
   }
 } 

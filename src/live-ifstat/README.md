@@ -36,6 +36,8 @@ v 0.33
     - Added VLAN Web Interface
     - Created Unbound DNS Mysql System
     - Created UnBound blacklist management system
+    - Fixed System Monitor to not use SSE
+    
 
 
     

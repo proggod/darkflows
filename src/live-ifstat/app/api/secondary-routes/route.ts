@@ -81,12 +81,9 @@ async function ensureDir(filePath: string) {
 // Helper to read routes
 async function readRoutes(): Promise<string[]> {
   try {
-    console.log('Attempting to read routes from:', ROUTES_FILE)
     await fs.access(ROUTES_FILE)
     const content = await fs.readFile(ROUTES_FILE, 'utf-8')
-    console.log('Read content:', content)
     const routes = content.split('\n').filter(line => line.trim())
-    console.log('Parsed routes:', routes)
     return routes
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -122,7 +119,6 @@ async function updateRoutes(): Promise<void> {
 
 // GET handler
 export async function GET(request: NextRequest) {
-  console.log('GET request received for secondary-routes')
   const authResponse = await requireAuth(request);
   if (authResponse) {
     console.log('Auth failed:', authResponse)

@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
+
   const encoder = new TextEncoder();
   let intervalId: NodeJS.Timeout | null = null;
   let isStreamActive = true;
@@ -25,15 +26,23 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (err) {
-    console.error('Error getting total memory:', err);
+    console.error('sys-stats: Error getting total memory:', err);
   }
+
+  const headers = new Headers({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+
 
   const stream = new ReadableStream({
     start: async (controller) => {
+      
       try {
-        // Handle client disconnection
         request.signal.addEventListener('abort', () => {
-          console.log('Client disconnected from sys-stats, cleaning up');
+          console.log('sys-stats: Client disconnected, cleaning up');
           isStreamActive = false;
           if (intervalId) {
             clearInterval(intervalId);
@@ -42,9 +51,9 @@ export async function GET(request: NextRequest) {
           controller.close();
         });
 
-        // Set up interval for data collection
         intervalId = setInterval(async () => {
           if (!isStreamActive) {
+            console.log('sys-stats: Stream no longer active, clearing interval');
             if (intervalId) {
               clearInterval(intervalId);
               intervalId = null;
@@ -87,18 +96,18 @@ export async function GET(request: NextRequest) {
               percentFree,
             };
 
-            // Only send data if the stream is still active
+
             if (isStreamActive) {
               try {
-                // Send data
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+                const message = `data: ${JSON.stringify(data)}\n\n`;
+                controller.enqueue(encoder.encode(message));
 
                 // Send heartbeat every 30 seconds
                 if (Date.now() % 30000 < 1000) {
                   controller.enqueue(encoder.encode('event: heartbeat\ndata: {}\n\n'));
                 }
               } catch (enqueueError) {
-                console.log('Stream closed, stopping sys-stats collection:', enqueueError);
+                console.error('sys-stats: Error enqueueing data:', enqueueError);
                 isStreamActive = false;
                 if (intervalId) {
                   clearInterval(intervalId);
@@ -107,7 +116,7 @@ export async function GET(request: NextRequest) {
               }
             }
           } catch (error) {
-            console.error('Error collecting system stats:', error);
+            console.error('sys-stats: Error in interval:', error);
             if (isStreamActive) {
               try {
                 controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: String(error) })}\n\n`));
@@ -123,7 +132,7 @@ export async function GET(request: NextRequest) {
           }
         }, 5000);
       } catch (error) {
-        console.error('Stream setup error:', error);
+        console.error('sys-stats: Stream setup error:', error);
         isStreamActive = false;
         if (intervalId) {
           clearInterval(intervalId);
@@ -133,7 +142,7 @@ export async function GET(request: NextRequest) {
       }
     },
     cancel: () => {
-      console.log('System stats stream cancelled');
+      console.log('sys-stats: Stream cancelled');
       isStreamActive = false;
       if (intervalId) {
         clearInterval(intervalId);
@@ -142,11 +151,5 @@ export async function GET(request: NextRequest) {
     }
   });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    }
-  });
+  return new Response(stream, { headers });
 }

@@ -30,27 +30,21 @@ function parseListOutput(output: string): DnsEntry[] {
   }
 }
 
-// Near the top of the file
-console.log('DNS Hosts API called at:', new Date().toISOString());
 
 // GET handler to list all DNS entries
 export async function GET() {
   try {
-    console.log('DNS Hosts API: Starting execution...');
     
     // Execute with full path and debug output
     const scriptPath = DNS_MANAGER_SCRIPT;
-    console.log(`Running script: python3 ${scriptPath} list`);
     
     const { stdout, stderr } = await execAsync(`python3 ${scriptPath} list`);
     
-    console.log('Script stdout:', stdout);
     if (stderr) {
       console.error('Script stderr:', stderr);
     }
     
     const entries = parseListOutput(stdout);
-    console.log('Parsed entries:', entries);
     
     return NextResponse.json(
       { entries },
