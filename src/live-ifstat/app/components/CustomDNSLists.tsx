@@ -15,7 +15,7 @@ interface ListState {
   newDomain: string
 }
 
-export default function PiholeLists() {
+export default function CustomDNSLists() {
   const [whitelist, setWhitelist] = useState<ListState>({
     entries: [],
     loading: false,
@@ -35,7 +35,7 @@ export default function PiholeLists() {
     const setState = type === 'whitelist' ? setWhitelist : setBlacklist
     
     try {
-      const response = await fetch(`/api/pihole-lists?type=${type}`)
+      const response = await fetch(`/api/dns-lists?type=${type}`)
       const data = await response.json()
       if (data.error) throw new Error(data.error)
       setState(prev => ({ ...prev, entries: data.entries }))
@@ -58,7 +58,7 @@ export default function PiholeLists() {
 
     setState(prev => ({ ...prev, loading: true, error: null }))
     try {
-      const response = await fetch('/api/pihole-lists', {
+      const response = await fetch('/api/dns-lists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, domain: state.newDomain })
@@ -85,7 +85,7 @@ export default function PiholeLists() {
     
     setState(prev => ({ ...prev, loading: true, error: null }))
     try {
-      const response = await fetch('/api/pihole-lists', {
+      const response = await fetch('/api/dns-lists', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, domain })
@@ -177,7 +177,7 @@ export default function PiholeLists() {
     <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between mb-2 px-1">
-          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Pi-hole Lists</h3>
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Custom Blocklists</h3>
           <button
             onClick={() => window.open(`${window.location.protocol}//${window.location.hostname}/admin`, '_blank')}
             className="btn btn-blue flex items-center gap-1"

@@ -5,7 +5,7 @@ import { readConfig, writeConfig } from '@/lib/config'
 import { syncAllSystems } from '@/lib/sync'
 
 const execAsync = promisify(exec)
-const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-dns-manager.py'
+const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py'
 
 interface DnsEntry {
   ip: string
@@ -30,19 +30,45 @@ function parseListOutput(output: string): DnsEntry[] {
   }
 }
 
+// Near the top of the file
+console.log('DNS Hosts API called at:', new Date().toISOString());
+
 // GET handler to list all DNS entries
 export async function GET() {
   try {
-    const { stdout, stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`)
+    console.log('DNS Hosts API: Starting execution...');
+    
+    // Execute with full path and debug output
+    const scriptPath = DNS_MANAGER_SCRIPT;
+    console.log(`Running script: python3 ${scriptPath} list`);
+    
+    const { stdout, stderr } = await execAsync(`python3 ${scriptPath} list`);
+    
+    console.log('Script stdout:', stdout);
     if (stderr) {
-      console.error('Script stderr:', stderr)
+      console.error('Script stderr:', stderr);
     }
-    const entries = parseListOutput(stdout)
-    return NextResponse.json({ entries })
+    
+    const entries = parseListOutput(stdout);
+    console.log('Parsed entries:', entries);
+    
+    return NextResponse.json(
+      { entries },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Surrogate-Control': 'no-store'
+        }
+      }
+    );
   } catch (error) {
-    console.error('Error in GET:', error)
-    // Return an empty list that won't break the UI
-    return NextResponse.json({ entries: [] })
+    console.error('Error in GET:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
+      { status: 500 }
+    );
   }
 }
 

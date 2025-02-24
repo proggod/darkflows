@@ -1,34 +1,38 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { getSqliteDb } from '@/lib/db';
+import mysql from 'mysql2/promise';
 import { lookupHostnames } from '@/lib/hostname-lookup';
 import { DnsClient } from '@/types/dns';
 
 export async function GET(request: NextRequest) {
+  
   const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
+  let connection: mysql.Connection | undefined;
+
   try {
-    const db = await getSqliteDb();
+    connection = await mysql.createConnection({
+      socketPath: '/var/run/mysqld/mysqld.sock',
+      user: 'root',
+      database: 'dns_logs'
+    });
     
-    // Get all DNS queries
-    const queries = await db.all<Array<{
-      lastSeen: number;
-      ip: string;
-    }>>(`
+
+    const [queries] = await connection.execute<mysql.RowDataPacket[]>(`
       SELECT 
-        timestamp as lastSeen,
-        client as ip
-      FROM queries 
-      WHERE timestamp >= strftime('%s', 'now') - 86400
-      GROUP BY client 
-      ORDER BY timestamp DESC
+        UNIX_TIMESTAMP(ts) as lastSeen,
+        client_ip as ip
+      FROM dns_queries 
+      WHERE ts >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      GROUP BY client_ip 
+      ORDER BY ts DESC
     `);
+    
 
-    // Look up all hostnames at once
     const hostInfoMap = await lookupHostnames(queries.map(q => q.ip));
+    
 
-    // Map results
     const clients: DnsClient[] = queries
       .map(query => {
         const hostInfo = hostInfoMap.get(query.ip);
@@ -57,13 +61,19 @@ export async function GET(request: NextRequest) {
         return 0;
       });
 
+
+
     return NextResponse.json(clients);
   } catch (error) {
-    console.error('Error fetching DNS clients:', error);
+    console.error('Error in DNS clients API:', error);
     return NextResponse.json(
       { error: 'Failed to fetch DNS clients' },
       { status: 500 }
     );
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
   }
 }
 

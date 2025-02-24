@@ -9,7 +9,7 @@ import { requireAuth } from '../../lib/auth';
 process.stdout.write('=== Reservations API module loaded ===\n');
 
 const execAsync = promisify(exec);
-const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-dns-manager.py';
+const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py';
 
 async function syncDNSEntry(ip: string, hostname: string, shouldDelete = false) {
   const timestamp = new Date().toISOString();

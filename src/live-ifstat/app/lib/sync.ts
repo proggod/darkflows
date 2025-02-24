@@ -3,7 +3,7 @@ import { exec } from 'child_process';
 import { readConfig } from './config';
 
 const execAsync = promisify(exec);
-const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-dns-manager.py';
+const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py';
 
 export async function syncAllSystems() {
   const config = await readConfig();

@@ -26,9 +26,6 @@ export async function POST(request: NextRequest) {
       // Update Samba password
       await execAsync(`(echo "${password}"; echo "${password}") | smbpasswd -s -a darkflows`);
 
-      // Update Pi-hole password
-      await execAsync(`pihole -a -p "${password}"`);
-
       return NextResponse.json({ success: true });
     }
   } catch (error) {

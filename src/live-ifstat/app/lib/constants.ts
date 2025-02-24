@@ -1,1 +1,0 @@
-export const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/pihole-dns-manager.py'; 

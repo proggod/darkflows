@@ -31,12 +31,26 @@ export function DnsClientsCard() {
 
   const fetchClients = async () => {
     try {
+      console.log('Fetching DNS clients at:', new Date().toISOString());
       setLoading(true);
-      const response = await fetch('/api/dns-clients');
+      const response = await fetch('/api/dns-clients', {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data = await response.json();
+      console.log('Received DNS clients data:', {
+        timestamp: new Date().toISOString(),
+        clientCount: Array.isArray(data) ? data.length : 0,
+        firstFewClients: Array.isArray(data) ? data.slice(0, 3) : null
+      });
+
       if (Array.isArray(data)) {
         const formattedClients = data.map((client: DnsClient) => ({
           ip: client.ip,
@@ -46,6 +60,11 @@ export function DnsClientsCard() {
           isReserved: client.isReserved,
           status: client.status as 'static' | 'reserved' | 'dynamic'
         }));
+        console.log('Formatted clients:', {
+          timestamp: new Date().toISOString(),
+          clientCount: formattedClients.length,
+          firstFewClients: formattedClients.slice(0, 3)
+        });
         setClients(formattedClients);
         setEditedNames({});
       } else {
@@ -325,8 +344,18 @@ export function DnsClientsCard() {
   };
 
   useEffect(() => {
+    console.log('DnsClientsCard mounted/refreshed at:', new Date().toISOString());
     fetchClients();
-    return registerRefreshCallback(fetchClients);
+    
+    const cleanup = registerRefreshCallback(() => {
+      console.log('Refresh callback triggered at:', new Date().toISOString());
+      return fetchClients();
+    });
+
+    return () => {
+      console.log('DnsClientsCard unmounted at:', new Date().toISOString());
+      cleanup();
+    };
   }, [registerRefreshCallback]);
 
   return (

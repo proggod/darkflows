@@ -21,7 +21,7 @@ export const DEFAULT_ITEMS = [
   'routeToSecondary',
   'portForwards',
   'dnsHosts',
-  'piholeLists',
+  'CustomDNSLists',
   'bandwidth',
   'speedTest',
 ]; 

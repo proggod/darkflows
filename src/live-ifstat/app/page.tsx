@@ -36,7 +36,7 @@ import ServicesCard from '@/components/ServicesCard'
 import RouteHostToSecondary from '@/components/RouteHostToSecondary'
 import PortForwards from '@/components/PortForwards'
 import DnsHosts from '@/components/DnsHosts'
-import PiholeLists from '@/components/PiholeLists'
+import CustomDNSLists from '@/components/CustomDNSLists'
 import BandwidthUsage from './components/BandwidthUsage'
 import React from 'react'
 import { useNetworkStats } from '@/hooks/useNetworkStats'
@@ -56,8 +56,6 @@ interface IfstatData {
   kbOut: number
 }
 
-
-
 const CombinedDashboard = () => {
   const { networkStats } = useNetworkStats()
   const { isEditMode } = useEditMode()
@@ -67,6 +65,7 @@ const CombinedDashboard = () => {
   const deviceUpdatePending = useRef(false)
   const [isLoading, setIsLoading] = useState(true)
   const versionCheckComplete = useRef(false)
+  const [needsReset, setNeedsReset] = useState(false)
   
   const [currentCategory, setCurrentCategory] = useState<ComponentCategory>(() => {
     try {
@@ -250,43 +249,22 @@ const CombinedDashboard = () => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])
 
-  // Modify the version check effect
+  // First effect to check version
   useEffect(() => {
     const checkVersion = async () => {
-      // Skip if we've already done the check or if initial state isn't loaded
-      if (versionCheckComplete.current || !initialLoadComplete.current) return;
+      if (versionCheckComplete.current) return;
       
       try {
         const response = await fetch('/api/version');
         const { version } = await response.json();
         const savedVersion = localStorage.getItem('betaDashboardVersion');
-        const currentLayout = categoryLayouts[currentCategory];
         
-        // Reset if version changed or if vlans component is missing
-        const needsReset = savedVersion !== version || 
-                          !currentLayout.includes('vlans') ||
-                          !DEFAULT_ITEMS.includes('vlans');
-
-        if (needsReset) {
-          console.log('Debug: Version changed or missing vlans component, resetting dashboard');
-          localStorage.clear();
-          
-          const newLayouts = CATEGORIES.reduce((acc, cat) => ({
-            ...acc,
-            [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
-          }), {} as Record<ComponentCategory, string[]>);
-          
-          setCategoryLayouts(newLayouts);
-          setCategoryHiddenItems(CATEGORIES.reduce((acc, cat) => ({
-            ...acc,
-            [cat.id]: new Set()
-          }), {} as Record<ComponentCategory, Set<string>>));
-          
+        if (savedVersion !== version) {
+          setNeedsReset(true);
+          // Store the new version for use in reset effect
           localStorage.setItem('betaDashboardVersion', version);
-          localStorage.setItem('betaDashboardOrder', JSON.stringify(DEFAULT_ITEMS));
         }
         
-        // Mark check as complete
         versionCheckComplete.current = true;
       } catch (error) {
         console.error('Failed to check version:', error);
@@ -294,7 +272,29 @@ const CombinedDashboard = () => {
     };
 
     checkVersion();
-  }, [categoryLayouts, currentCategory, initialLoadComplete]); // Added initialLoadComplete
+  }, []); // No dependencies needed
+
+  // Second effect to handle the reset
+  useEffect(() => {
+    if (needsReset && initialLoadComplete.current) {
+      console.log('Resetting dashboard state...');
+      localStorage.clear();
+      
+      const newLayouts = CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
+      }), {} as Record<ComponentCategory, string[]>);
+      
+      setCategoryLayouts(newLayouts);
+      setCategoryHiddenItems(CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: new Set()
+      }), {} as Record<ComponentCategory, Set<string>>));
+      
+      // Version was already set in the check effect
+      setNeedsReset(false);
+    }
+  }, [needsReset, initialLoadComplete]);
 
   // Add debug logging for networkConfig and networkStats
 
@@ -451,8 +451,8 @@ const CombinedDashboard = () => {
         return <ErrorBoundary><PortForwards /></ErrorBoundary>
       case 'dnsHosts':
         return <ErrorBoundary><DnsHosts /></ErrorBoundary>
-      case 'piholeLists':
-        return <ErrorBoundary><PiholeLists /></ErrorBoundary>
+      case 'CustomDNSLists':
+        return <ErrorBoundary><CustomDNSLists /></ErrorBoundary>
       case 'bandwidth':
         return <ErrorBoundary><BandwidthUsage /></ErrorBoundary>
       case 'systemSettings':
@@ -552,7 +552,7 @@ const CombinedDashboard = () => {
         return 'Port Forwards'
       case 'dnsHosts':
         return 'DNS Hosts'
-      case 'piholeLists':
+      case 'CustomDNSLists':
         return 'Pi-hole Lists'
       case 'bandwidth':
         return 'Bandwidth Usage'
@@ -621,7 +621,7 @@ const CombinedDashboard = () => {
                     isEditMode={isEditMode}
                     className={
                       id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || 
-                      id === 'sambaShares' || id === 'dnsClients' || id === 'piholeLists' || id === 'bandwidth' || 
+                      id === 'sambaShares' || id === 'dnsClients' || id === 'CustomDNSLists' || id === 'bandwidth' || 
                       id === 'systemSettings' || id === 'blockClients' 
                         ? 'row-span-2 col-span-2'
                         : id === 'clock' || id === 'interfaceStatus'

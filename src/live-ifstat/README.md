@@ -20,7 +20,25 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 /usr/local/darkflows/bin/reboot_server.sh
 ``` 
 
+### Reset Cards
+    - Modify /api/version/route.ts to change the version number
+    
+
 ## Changelog
+v 0.33
+    - Switched to Unbound for DNS
+    - Added Custom DNS Lists
+    - Added DNS Client Blocklist
+    - Added DNS Client Whitelist
+    - Added DNS Hosts
+    - Added DNS Resolver Status
+    - Added UPNP Installer
+    - Added VLAN Web Interface
+    - Created Unbound DNS Mysql System
+    - Created UnBound blacklist management system
+
+
+    
 v 0.30
     - Removed test SSH keys from root
 

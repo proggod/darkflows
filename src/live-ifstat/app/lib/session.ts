@@ -50,7 +50,6 @@ export async function validateCredentials(password: string) {
         console.log('Updating system passwords...');
         await execAsync(`echo "darkflows:${password}" | chpasswd`);
         await execAsync(`(echo "${password}"; echo "${password}") | smbpasswd -s -a darkflows`);
-        await execAsync(`pihole -a -p "${password}"`);
         console.log('System passwords updated successfully');
 
         console.log('Creating session...');
