@@ -20,8 +20,7 @@ async function writeVLANs(vlans: VLANConfig[]): Promise<void> {
 }
 
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest
 ) {
   const authResponse = await requireAuth(request)
   if (authResponse) return authResponse
@@ -29,7 +28,7 @@ export async function PUT(
   try {
     const vlans = await readVLANs()
     const updatedVlan = await request.json()
-    const { id } = await params
+    const id = decodeURIComponent(request.url.split('/').pop() || '')
     const vlanId = parseInt(id)
 
     console.log('Updating VLAN:', {
@@ -59,14 +58,13 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest
 ) {
   const authResponse = await requireAuth(request)
   if (authResponse) return authResponse
 
   try {
-    const { id } = await params
+    const id = decodeURIComponent(request.url.split('/').pop() || '')
     const vlanId = parseInt(id)
     const vlans = await readVLANs()
     

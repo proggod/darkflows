@@ -1,0 +1,30 @@
+Captain, here's the plain text instructions without code blocks:
+NEXT.JS 15 DYNAMIC ROUTE HANDLER GUIDE
+PROBLEM:
+The current implementation in services/[name]/logs/route.ts uses an outdated pattern with Promise-based params and RouteContext interface. This is not the correct way to handle dynamic routes in Next.js 15.
+WHAT'S WRONG:
+Using interface RouteContext with Promise<params>
+Using a second context parameter in the route handler
+3. Awaiting params with await context.params
+4. Overcomplicated parameter access
+CORRECT PATTERN:
+Route handlers should only take NextRequest parameter
+Dynamic segments should be accessed via request.url
+3. Use URL parsing methods (split, pop) to get dynamic values
+No Promise wrapping or awaiting of params needed
+HOW TO FIX:
+Remove the RouteContext interface entirely
+Modify route handler to only accept request: NextRequest
+Get dynamic segment using request.url.split('/').pop()
+Use decodeURIComponent on the value if needed
+Remove all await calls on params
+EXAMPLE STRUCTURE (in plain text):
+Remove interface RouteContext
+Export async function GET with only request parameter
+Parse URL to get dynamic segment
+Rest of the logic remains the same
+KEY POINTS:
+Dynamic segments come from the URL, not a params object
+No need for Promise wrapping or async param access
+Simpler, more direct access to route parameters
+Follows Next.js 15 conventions
