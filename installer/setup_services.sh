@@ -8,10 +8,8 @@ systemctl restart nextjs-app.service
 systemctl restart iperf3.service
 systemctl restart irqbalance.service
 systemctl restart kea-dhcp4-server.service
-systemctl restart lighttpd.service
 systemctl restart mariadb.service
 systemctl restart nmbd.service
-systemctl restart pihole-FTL.service
 systemctl restart ssh.service
 systemctl restart smbd.service
 

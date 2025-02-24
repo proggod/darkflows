@@ -1,0 +1,42 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+
+
+# WAN T-Mobile (enp4s0)
+#auto enp45s0
+#iface enp45s0 inet dhcp
+#    dns-nameservers 1.1.1.1 8.8.8.8
+#    metric 100
+#    post-up ip route del default dev enp4s0 || true
+
+# WAN Spectrum (enp3s0)
+auto lan1
+iface lan1 inet dhcp
+    dns-nameservers 1.1.1.1 8.8.8.8
+    metric 200
+    post-up ip route del default dev lan1 || true
+
+auto lan2
+iface lan2 inet dhcp
+    dns-nameservers 1.1.1.1 8.8.8.8
+    metric 200
+    post-up ip route del default dev lan2 || true
+
+
+allow-hotplug lan0
+iface lan0 inet static
+  address 192.168.1.1
+  netmask 255.255.254.0
+
+auto lan0.12
+iface lan0.12 inet static
+    vlan-raw-device lan0
+    address 192.168.20.1
+    netmask 255.255.255.0

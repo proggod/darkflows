@@ -1,0 +1,64 @@
+[
+  {
+    "id": 10,
+    "name": "SLOW",
+    "networkCard": {
+      "deviceName": "enp46s0",
+      "label": "Internal"
+    },
+    "subnet": "192.168.20.1/24",
+    "gateway": "192.168.20.1",
+    "ipRange": {
+      "start": "192.168.20.2",
+      "end": "192.168.20.254",
+      "available": 253,
+      "used": 0
+    },
+    "dhcp": {
+      "enabled": true,
+      "leaseTime": 86400,
+      "dnsServers": [
+        "192.168.20.1"
+      ],
+      "defaultGateway": "192.168.20.1",
+      "reservations": []
+    },
+    "communicationGroup": {
+      "name": "default",
+      "allowedGroups": []
+    },
+    "created": "2025-02-21T18:24:37.009Z",
+    "modified": "2025-02-21T18:30:01.937Z"
+  },
+  {
+    "id": 20,
+    "name": "HOMEAUTOMATION",
+    "networkCard": {
+      "deviceName": "enp46s0",
+      "label": "Internal"
+    },
+    "subnet": "192.168.21.1/24",
+    "gateway": "192.168.21.1",
+    "ipRange": {
+      "start": "192.168.21.2",
+      "end": "192.168.21.254",
+      "available": 253,
+      "used": 0
+    },
+    "dhcp": {
+      "enabled": true,
+      "leaseTime": 86400,
+      "dnsServers": [
+        "192.168.21.1"
+      ],
+      "defaultGateway": "192.168.21.1",
+      "reservations": []
+    },
+    "communicationGroup": {
+      "name": "default",
+      "allowedGroups": []
+    },
+    "created": "2025-02-21T18:50:58.337Z",
+    "modified": "2025-02-21T18:50:58.337Z"
+  }
+]

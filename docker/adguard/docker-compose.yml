@@ -1,0 +1,25 @@
+services:
+  adguardhome:
+    container_name: adguardhome
+    image: adguard/adguardhome
+    restart: unless-stopped
+    volumes:
+      - /usr/local/darkflows/docker/adguard/data/work:/opt/adguardhome/work
+      - /usr/local/darkflows/docker/adguard/data/conf:/opt/adguardhome/conf
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # Mount Let's Encrypt certificates (Read-Only)
+    ports:
+      - "10053:53/tcp"
+      - "10053:53/udp"
+#      - "10067:67/udp"
+#      - "10068:68/udp"
+      - "10443:443/tcp"   # SSL will run on port 2443 instead of 443
+      - "10443:443/udp"
+      - "10853:853/tcp"
+#      - "10784:784/udp"
+#      - "10853:853/udp"
+#      - "18853:8853/udp"
+#      - "5443:5443/tcp"
+#      - "5443:5443/udp"
+#      - "3000:3000/tcp"
+      - "10080:80/tcp"
+

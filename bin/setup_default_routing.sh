@@ -5,8 +5,8 @@ cd /usr/local/darkflows/bin
 #/usr/local/darkflows/bin/min.sh
 
 /usr/local/darkflows/bin/nftables.sh
-
 /usr/local/darkflows/bin/setup_secondwan.sh
+/usr/local/darkflows/bin/verify_dns.sh
 /usr/local/darkflows/bin/update_external_forwards.sh
 /usr/local/darkflows/bin/update_local_forwards.sh
 /usr/local/darkflows/bin/update_secondary_routes.sh

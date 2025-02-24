@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem } from '@mui/material'
+import { Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, OutlinedInput } from '@mui/material'
 import { VLANConfig, NetworkCard, NetworkDevice, NetworkConfig, NetworkInterfaceConfig } from '@/types/dashboard'
 
 interface VLANDialogProps {
@@ -39,24 +39,17 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     if (vlan) {
       setId(vlan.id)
       setName(vlan.name)
-      setNetworkCard(vlan.networkCard)
+      const matchingCard = networkCards.find(card => card.deviceName === vlan.networkCard.deviceName) || 
+                          { deviceName: vlan.networkCard.deviceName, label: vlan.networkCard.label }
+      setNetworkCard(matchingCard)
       setSubnet(vlan.subnet)
       setGateway(vlan.gateway)
       setIpRange(vlan.ipRange)
+      setDhcpEnabled(vlan.dhcp?.enabled ?? true)
     } else {
-      setId(1)
-      setName('')
-      setNetworkCard({ deviceName: '' })
-      setSubnet('')
-      setGateway('')
-      setIpRange({
-        start: '',
-        end: '',
-        available: 0,
-        used: 0
-      })
+      resetForm()
     }
-  }, [vlan])
+  }, [vlan, networkCards])
 
   // Validation functions
   const isValidIp = (ip: string): boolean => {
@@ -413,11 +406,6 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     }
   }, [open])
 
-  // Filter out ifb interfaces and prepare cards with labels
-  const filteredCards = networkCards.filter(card => 
-    !card.deviceName.startsWith('ifb')
-  )
-
   // Update subnet handler to auto-fill
   const handleSubnetChange = (newSubnet: string) => {
     setSubnet(newSubnet)
@@ -511,16 +499,18 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                   Network Interface
                 </label>
                 <Select
-                  value={networkCard.deviceName}
+                  value={networkCard.deviceName || ''}
                   onChange={(e) => {
-                    const selectedCard = filteredCards.find(card => card.deviceName === e.target.value);
+                    const selectedCard = networkCards.find(card => card.deviceName === e.target.value);
                     setNetworkCard(selectedCard || { deviceName: e.target.value });
                   }}
+                  input={<OutlinedInput />}
                   className="w-[120px] text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                   sx={{
                     height: '24px',
                     '.MuiSelect-select': {
                       padding: '1px 6px',
+                      fontSize: '10px',
                     },
                     '.MuiSelect-icon': {
                       color: 'currentColor',
@@ -568,7 +558,10 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                     }
                   }}
                 >
-                  {filteredCards.map(card => (
+                  <MenuItem value="">
+                    <em>Select Interface</em>
+                  </MenuItem>
+                  {networkCards.map(card => (
                     <MenuItem 
                       key={card.deviceName} 
                       value={card.deviceName}
@@ -697,11 +690,6 @@ export default function VLANCard() {
   const [vlans, setVlans] = useState<VLANConfig[]>([])
   const [networkCards, setNetworkCards] = useState<NetworkCard[]>([])
   const [networkConfig, setNetworkConfig] = useState<NetworkConfig>()
-  const [networkSettings, setNetworkSettings] = useState<{
-    gatewayIp: string;
-    subnetMask: string;
-    ipPools: Array<{ start: string; end: string; }>;
-  }>()
   const [error, setError] = useState<string>('')
   const [showAddVlan, setShowAddVlan] = useState(false)
   const [editingVlan, setEditingVlan] = useState<VLANConfig | undefined>()
@@ -710,56 +698,33 @@ export default function VLANCard() {
     try {
       setError('')
       
-      // Load network settings
-      const networkConfigResponse = await fetch('/api/network-settings')
-      if (!networkConfigResponse.ok) throw new Error('Failed to load network config')
-      const networkConfigData = await networkConfigResponse.json()
-      setNetworkSettings(networkConfigData)
-      
-      // Load network interfaces
-      const interfacesResponse = await fetch('/api/network-interfaces')
-      if (!interfacesResponse.ok) throw new Error('Failed to load network interfaces')
-      const interfaces = await interfacesResponse.json()
-      
-      console.log('Raw network interfaces:', interfaces)
-      
-      // Filter out virtual interfaces
-      const physicalInterfaces = interfaces.filter((iface: NetworkInterfaceConfig) => 
-        !iface.name.startsWith('br-') && 
-        !iface.name.startsWith('docker') && 
-        !iface.name.startsWith('veth') &&
-        !iface.name.startsWith('ifb') &&
-        iface.name !== 'tailscale0' &&
-        iface.name !== 'lo'
-      )
-      
-      console.log('Physical interfaces:', physicalInterfaces)
-      setNetworkConfig({ interfaces: physicalInterfaces })
-
       // Load VLANs
       const vlansResponse = await fetch('/api/vlans')
       if (!vlansResponse.ok) throw new Error('Failed to load VLANs')
       const vlansData = await vlansResponse.json()
       setVlans(vlansData)
 
-      // Use devices API with labels
-      const devicesResponse = await fetch('/api/devices')
+      // Load network interfaces
+      const devicesResponse = await fetch('/api/devices', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
       if (!devicesResponse.ok) throw new Error('Failed to load network cards')
-      const { devices } = await devicesResponse.json() as { devices: NetworkDevice[] }
+      const { devices } = await devicesResponse.json() as { devices: Record<string, NetworkDevice> }
       
-      // Convert devices to NetworkCard format with labels
-      const cards: NetworkCard[] = devices
-        .filter((device: NetworkDevice) => 
-          device.name !== 'lo' && 
-          !device.name.includes('@') &&
-          !device.name.startsWith('ifb')
-        )
-        .map((device: NetworkDevice) => ({
-          deviceName: device.name,
-          label: device.label || device.name // Use label if available, fallback to name
-        }))
+      // Map devices using the actual interface names from config
+      const cards: NetworkCard[] = Object.entries(devices).map(([interfaceName, device]) => ({
+        deviceName: interfaceName, // This will be "lan0", "lan1", etc.
+        label: device.label || interfaceName
+      }))
       
       setNetworkCards(cards)
+      setNetworkConfig({
+        interfaces: cards.map(card => ({
+          name: card.deviceName,
+          label: card.label
+        }))
+      })
     } catch (error) {
       console.error('Error loading data:', error)
       setError('Failed to load data')
@@ -775,12 +740,12 @@ export default function VLANCard() {
   const handleSaveVlan = async (vlan: VLANConfig) => {
     try {
       setError('')
-      const response = await fetch('/api/vlans' + (editingVlan ? `/${vlan.id}` : ''), {
+      const response = await fetch('/api/vlans' + (editingVlan ? `/${editingVlan.id}` : ''), {
         method: editingVlan ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(vlan),
+        body: JSON.stringify(editingVlan ? { ...vlan, id: editingVlan.id } : vlan),
       })
 
       if (!response.ok) {
@@ -793,14 +758,14 @@ export default function VLANCard() {
       await loadData()
     } catch (error) {
       console.error('Error saving VLAN:', error)
-      setError('Failed to save VLAN')
+      setError(error instanceof Error ? error.message : 'Failed to save VLAN')
     }
   }
 
-  const handleDeleteVlan = async (id: number) => {
+  const handleDeleteVlan = async (id: string) => {
     try {
       setError('')
-      const response = await fetch(`/api/vlans/${id}`, {
+      const response = await fetch(`/api/vlans/${parseInt(id) || 1}`, {
         method: 'DELETE',
       })
 
@@ -872,7 +837,7 @@ export default function VLANCard() {
                       Edit
                     </button>
                     <button
-                      onClick={() => handleDeleteVlan(vlan.id)}
+                      onClick={() => handleDeleteVlan(vlan.id.toString())}
                       className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                     >
                       Delete
@@ -894,9 +859,8 @@ export default function VLANCard() {
         onSave={handleSaveVlan}
         vlan={editingVlan}
         networkCards={networkCards}
-        vlans={vlans}
         networkConfig={networkConfig}
-        networkSettings={networkSettings}
+        vlans={[]}
       />
     </div>
   )

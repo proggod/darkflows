@@ -27,26 +27,30 @@ export async function PUT(
   if (authResponse) return authResponse
 
   try {
-    // Await params before using
+    const vlans = await readVLANs()
+    const updatedVlan = await request.json()
     const { id } = await params
     const vlanId = parseInt(id)
-    
-    const updatedVlan: VLANConfig = await request.json()
-    const vlans = await readVLANs()
-    
+
+    console.log('Updating VLAN:', {
+      vlanId,
+      existingVlans: vlans,
+      updatedVlan
+    })
+
     const index = vlans.findIndex(v => v.id === vlanId)
     if (index === -1) {
+      console.log('VLAN not found:', vlanId)
       return NextResponse.json({ error: 'VLAN not found' }, { status: 404 })
     }
 
-    // Update modified timestamp
+    // Preserve created date and update modified date
     updatedVlan.modified = new Date()
-    // Preserve created timestamp
     updatedVlan.created = vlans[index].created
     
     vlans[index] = updatedVlan
     await writeVLANs(vlans)
-    
+
     return NextResponse.json(updatedVlan)
   } catch (error) {
     console.error('Error updating VLAN:', error)
@@ -62,10 +66,8 @@ export async function DELETE(
   if (authResponse) return authResponse
 
   try {
-    // Await params before using
     const { id } = await params
     const vlanId = parseInt(id)
-    
     const vlans = await readVLANs()
     
     const index = vlans.findIndex(v => v.id === vlanId)

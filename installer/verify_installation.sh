@@ -114,19 +114,19 @@ fi
 echo
 
 # 5. Check Pi-hole (install_pihole.sh)
-echo "=== Checking Pi-hole Installation ==="
-pihole_error=0
-if [ -f "/usr/local/bin/pihole" ]; then
-    print_status "OK" "Pi-hole is installed"
-    check_service "pihole-FTL" "Pi-hole FTL service" || ((pihole_error++))
-else
-    print_status "FAIL" "Pi-hole is not installed"
-    ((pihole_error++))
-fi
-if [ $pihole_error -gt 0 ]; then
-    run_installer "install_pihole.sh" "Pi-hole installation"
-fi
-echo
+#echo "=== Checking Pi-hole Installation ==="
+#pihole_error=0
+#if [ -f "/usr/local/bin/pihole" ]; then
+#    print_status "OK" "Pi-hole is installed"
+#    check_service "pihole-FTL" "Pi-hole FTL service" || ((pihole_error++))
+#else
+#    print_status "FAIL" "Pi-hole is not installed"
+#    ((pihole_error++))
+#fi
+#if [ $pihole_error -gt 0 ]; then
+#    run_installer "install_pihole.sh" "Pi-hole installation"
+#fi
+#echo
 
 # 6. Check Web Setup (setup_web.sh)
 echo "=== Checking Web Configuration ==="
@@ -179,7 +179,7 @@ echo
 echo "=== Checking Required Services ==="
 service_errors=0
 services=("nextjs-app" "irqbalance" "kea-dhcp4-server" 
-         "lighttpd" "mariadb" "nmbd" "pihole-FTL" "ssh" "smbd")
+         "mariadb" "nmbd" "ssh" "smbd")
 
 for svc in "${services[@]}"; do
     check_service "$svc" "Required service" || ((service_errors++))

@@ -1,3 +1,5 @@
+'use server'
+
 import { NextResponse } from 'next/server'
 import { readFile } from 'fs/promises'
 
@@ -6,6 +8,7 @@ interface NetworkDevice {
   label?: string
   egressBandwidth?: string
   ingressBandwidth?: string
+  name?: string
 }
 
 async function parseNetworkConfig(): Promise<Record<string, NetworkDevice>> {
@@ -28,7 +31,8 @@ async function parseNetworkConfig(): Promise<Record<string, NetworkDevice>> {
         if (value.trim() === '') continue
         
         devices[value] = {
-          type: deviceType
+          type: deviceType,
+          name: value
         }
       } else if (key === 'LABEL' && devices[getInterfaceForType(lines, deviceType)]) {
         const iface = getInterfaceForType(lines, deviceType)
@@ -64,20 +68,7 @@ function getInterfaceForType(lines: string[], type: string): string {
 export async function GET() {
   try {
     const configDevices = await parseNetworkConfig()
-    
-    // Add ifb0 interface
-    configDevices['ifb0'] = {
-      type: 'internal',
-      label: 'InBound'
-    }
-    
-    const devices = Object.entries(configDevices).map(([name, config]) => ({
-      name,
-      ...config
-    }))
-    
-//    console.log('Devices API response:', JSON.stringify(devices, null, 2))
-    return NextResponse.json({ devices })
+    return NextResponse.json({ devices: configDevices })
   } catch (error) {
     console.error('Error fetching network devices:', error)
     return NextResponse.json({ devices: [] }, { status: 500 })
