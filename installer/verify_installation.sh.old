@@ -28,7 +28,7 @@ check_service() {
 check_package() {
     local package=$1
     local description=$2
-    if dpkg -l | grep -q "^ii\s\+$package\s"; then
+    if dpkg -l | grep -q "^ii.*$package "; then
         print_status "OK" "$description (Package: $package)"
         return 0
     else
@@ -102,16 +102,6 @@ if [ $package_errors -gt 0 ]; then
 fi
 echo
 
-# 3.5. Check Nginx Installation
-echo "=== Checking Nginx Installation ==="
-if check_package "nginx" "Nginx web server"; then
-    print_status "OK" "Nginx is installed"
-else
-    print_status "FAIL" "Nginx is not installed"
-    run_installer "install_nginx.sh" "nginx installation"
-fi
-echo
-
 # 4. Check MySQL/MariaDB (secure_mysql.sh)
 echo "=== Checking Database Configuration ==="
 if mysqladmin ping >/dev/null 2>&1; then
@@ -123,7 +113,22 @@ else
 fi
 echo
 
-# 5. Check Web Setup (setup_web.sh)
+# 5. Check Pi-hole (install_pihole.sh)
+#echo "=== Checking Pi-hole Installation ==="
+#pihole_error=0
+#if [ -f "/usr/local/bin/pihole" ]; then
+#    print_status "OK" "Pi-hole is installed"
+#    check_service "pihole-FTL" "Pi-hole FTL service" || ((pihole_error++))
+#else
+#    print_status "FAIL" "Pi-hole is not installed"
+#    ((pihole_error++))
+#fi
+#if [ $pihole_error -gt 0 ]; then
+#    run_installer "install_pihole.sh" "Pi-hole installation"
+#fi
+#echo
+
+# 6. Check Web Setup (setup_web.sh)
 echo "=== Checking Web Configuration ==="
 if [ -d "/usr/local/darkflows/src/live-ifstat/.next" ]; then
     print_status "OK" "Next.js application is built"
@@ -134,7 +139,7 @@ else
 fi
 echo
 
-# 6. Check Network Configuration (detect_network.sh)
+# 7. Check Network Configuration (detect_network.sh)
 echo "=== Checking Network Configuration ==="
 network_error=0
 if [ -f "/etc/darkflows/d_network.cfg" ]; then
@@ -155,7 +160,7 @@ if [ $network_error -gt 0 ]; then
 fi
 echo
 
-# 7. Check KEA DHCP (create_kea_user.sh)
+# 8. Check KEA DHCP (create_kea_user.sh)
 echo "=== Checking KEA DHCP Configuration ==="
 kea_error=0
 check_service "kea-dhcp4-server" "KEA DHCP4 service" || ((kea_error++))
@@ -170,7 +175,7 @@ if [ $kea_error -gt 0 ]; then
 fi
 echo
 
-# 8. Check Services (setup_services.sh)
+# 9. Check Services (setup_services.sh)
 echo "=== Checking Required Services ==="
 service_errors=0
 services=("nextjs-app" "irqbalance" "kea-dhcp4-server" 
@@ -184,16 +189,17 @@ if [ $service_errors -gt 0 ]; then
 fi
 echo
 
-# 9. Check Docker (install_docker.sh)
+# 10. Check Docker (install_docker.sh)
 echo "=== Checking Docker Installation ==="
 docker_error=0
+#check_package "docker-ce" "Docker CE" || ((docker_error++))
 check_service "docker" "Docker service" || ((docker_error++))
 if [ $docker_error -gt 0 ]; then
     run_installer "install_docker.sh" "Docker installation"
 fi
 echo
 
-# 10. Check Block Scheduler (setup_block_scheduler.sh)
+# 11. Check Block Scheduler (setup_block_scheduler.sh)
 echo "=== Checking Block Scheduler ==="
 scheduler_error=0
 if [ -f "/usr/local/darkflows/bin/block_scheduler.py" ]; then
@@ -213,7 +219,7 @@ if [ $scheduler_error -gt 0 ]; then
 fi
 echo
 
-# 11. Check SSH Configuration (update_ssh_key_location.sh)
+# 12. Check SSH Configuration (update_ssh_key_location.sh)
 echo "=== Checking SSH Configuration ==="
 if grep -q "AuthorizedKeysFile.*%h/.ssh/authorized_keys.*/etc/ssh/%u/authorized_keys" /etc/ssh/sshd_config; then
     print_status "OK" "SSH authorized keys configuration is correct"
@@ -233,6 +239,4 @@ else
     echo -e "\e[31mVerification completed with $errors error(s)\e[0m"
     echo "Please check the installation logs for more details"
     exit 1
-fi
-
-
+fi 
