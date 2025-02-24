@@ -37,6 +37,7 @@ v 0.33
     - Created Unbound DNS Mysql System
     - Created UnBound blacklist management system
     - Fixed System Monitor to not use SSE
+    - Made ISO pull dynamic installer
     
 
 

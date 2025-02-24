@@ -34,7 +34,6 @@ export default function ConnectionTuningNew() {
           throw new Error(`Failed to fetch config: ${response.status}`)
         }
         const data = await response.json()
-        console.log('Initial config:', data)
         setConfig(data)
       } catch (error) {
         console.error('Failed to fetch config:', error)

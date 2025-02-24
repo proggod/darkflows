@@ -36,7 +36,6 @@ interface NetworkDevice {
 }
 
 const SystemMonitor: React.FC = () => {
-  console.log('SystemMonitor: Component rendering');
 
   const [sysData, setSysData] = useState<SysData | null>(null);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
@@ -47,16 +46,12 @@ const SystemMonitor: React.FC = () => {
   const [sseConnected, setSseConnected] = useState(false);
 
   useEffect(() => {
-    console.log('SystemMonitor: Main useEffect running');
 
     // Fetch devices first
     const fetchDevices = async () => {
-      console.log('SystemMonitor: Fetching devices');
       try {
         const response = await fetch('/api/devices');
-        console.log('SystemMonitor: Devices response status:', response.status);
         const data = await response.json();
-        console.log('SystemMonitor: Devices data:', data);
         
         // Add validation and default value
         if (!data || !Array.isArray(data.devices)) {
@@ -74,15 +69,11 @@ const SystemMonitor: React.FC = () => {
 
     fetchDevices();
 
-    // Fetch server info once
-    console.log('SystemMonitor: Fetching server info');
     fetch('/api/server-info')
       .then(res => {
-        console.log('SystemMonitor: Server info response status:', res.status);
         return res.json();
       })
       .then(data => {
-        console.log('SystemMonitor: Server info data:', data);
         setServerInfo({
           cpuModel: data.serverInfo.cpuModel,
           osName: data.serverInfo.osName,
@@ -113,25 +104,20 @@ const SystemMonitor: React.FC = () => {
     let eventSource: EventSource | null = null;
 
     const setupSSE = () => {
-      console.log('SystemMonitor: Setting up SSE connection');
       try {
         const timestamp = new Date().getTime();
         const url = `/api/sys-stats?t=${timestamp}`;
-        console.log('SystemMonitor: SSE URL:', url);
         
         eventSource = new EventSource(url);
         
         eventSource.onopen = () => {
-          console.log('SystemMonitor: SSE connection opened');
           setSseConnected(true);
           setError(null);
         };
 
         eventSource.onmessage = (event) => {
-          console.log('SystemMonitor: SSE message received:', event.data);
           try {
             const data = JSON.parse(event.data);
-            console.log('SystemMonitor: Parsed SSE data:', data);
             setSysData(data);
           } catch (err) {
             console.error('SystemMonitor: Error parsing SSE data:', err);
@@ -141,13 +127,11 @@ const SystemMonitor: React.FC = () => {
 
         eventSource.onerror = (err) => {
           console.error('SystemMonitor: SSE error:', err);
-          console.log('SystemMonitor: EventSource readyState:', eventSource?.readyState);
           setSseConnected(false);
           setError('Lost connection to system stats. Retrying...');
           eventSource?.close();
           
           retryTimeout = setTimeout(() => {
-            console.log('SystemMonitor: Attempting to reconnect SSE');
             setupSSE();
           }, 5000);
         };
@@ -171,28 +155,14 @@ const SystemMonitor: React.FC = () => {
 
     // Cleanup
     return () => {
-      console.log('SystemMonitor: Cleaning up');
       clearTimeout(retryTimeout);
       if (eventSource) {
-        console.log('SystemMonitor: Closing EventSource');
         eventSource.close();
       }
       clearInterval(intervalId);
     };
   }, []);
 
-  // Add debug logging for state changes
-  useEffect(() => {
-    console.log('SystemMonitor: sysData updated:', sysData);
-  }, [sysData]);
-
-  useEffect(() => {
-    console.log('SystemMonitor: serverInfo updated:', serverInfo);
-  }, [serverInfo]);
-
-  useEffect(() => {
-    console.log('SystemMonitor: error state updated:', error);
-  }, [error]);
 
   const getBarWidth = (percentage: number) => {
     if (percentage <= 0) return 'w-0';

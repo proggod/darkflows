@@ -276,12 +276,7 @@ const WeatherWidget = forwardRef((props, ref) => {
     return getMetricData();
   }, [weatherData, getMetricData]);
 
-  useEffect(() => {
-    if (chartData) {
-      console.log('Chart Data:', chartData)
-    }
-  }, [chartData])
-
+ 
   useEffect(() => {
     if (location) {
       fetchWeather();

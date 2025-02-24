@@ -31,7 +31,6 @@ export function DnsClientsCard() {
 
   const fetchClients = async () => {
     try {
-      console.log('Fetching DNS clients at:', new Date().toISOString());
       setLoading(true);
       const response = await fetch('/api/dns-clients', {
         headers: {
@@ -45,11 +44,6 @@ export function DnsClientsCard() {
       }
       
       const data = await response.json();
-      console.log('Received DNS clients data:', {
-        timestamp: new Date().toISOString(),
-        clientCount: Array.isArray(data) ? data.length : 0,
-        firstFewClients: Array.isArray(data) ? data.slice(0, 3) : null
-      });
 
       if (Array.isArray(data)) {
         const formattedClients = data.map((client: DnsClient) => ({
@@ -60,11 +54,7 @@ export function DnsClientsCard() {
           isReserved: client.isReserved,
           status: client.status as 'static' | 'reserved' | 'dynamic'
         }));
-        console.log('Formatted clients:', {
-          timestamp: new Date().toISOString(),
-          clientCount: formattedClients.length,
-          firstFewClients: formattedClients.slice(0, 3)
-        });
+
         setClients(formattedClients);
         setEditedNames({});
       } else {
@@ -201,14 +191,7 @@ export function DnsClientsCard() {
         'hostname': hostname
       };
 
-      console.log('Client reservation request:', {
-        ip: client.ip,
-        mac: client.mac,
-        hostname: hostname,
-        originalName: client.name,
-        editedName: editedNames[client.ip]
-      });
-
+ 
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -313,7 +296,6 @@ export function DnsClientsCard() {
   const handleSyncDNS = async () => {
     try {
       setIsSyncing(true);
-      console.log('Starting DNS sync request...');
       
       const response = await fetch('/api/reservations', {
         method: 'PUT',
@@ -322,10 +304,8 @@ export function DnsClientsCard() {
         }
       });
       
-      console.log('Sync response status:', response.status);
       const text = await response.text();
-      console.log('Response text:', text);
-
+ 
       if (!response.ok) {
         throw new Error(text || 'Failed to sync DNS entries');
       }
@@ -344,16 +324,13 @@ export function DnsClientsCard() {
   };
 
   useEffect(() => {
-    console.log('DnsClientsCard mounted/refreshed at:', new Date().toISOString());
     fetchClients();
     
     const cleanup = registerRefreshCallback(() => {
-      console.log('Refresh callback triggered at:', new Date().toISOString());
       return fetchClients();
     });
 
     return () => {
-      console.log('DnsClientsCard unmounted at:', new Date().toISOString());
       cleanup();
     };
   }, [registerRefreshCallback]);

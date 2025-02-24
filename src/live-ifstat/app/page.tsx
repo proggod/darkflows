@@ -298,18 +298,6 @@ const CombinedDashboard = () => {
 
   // Add debug logging for networkConfig and networkStats
 
-  // Add this debug effect
-  useEffect(() => {
-    console.log('Debug network cards:', {
-      networkConfig,
-      hasNetworkPrimary: categoryLayouts[currentCategory].includes('networkPrimary'),
-      hasNetworkSecondary: categoryLayouts[currentCategory].includes('networkSecondary'),
-      hasNetworkInternal: categoryLayouts[currentCategory].includes('networkInternal'),
-      primaryInterface: networkConfig?.PRIMARY_INTERFACE,
-      secondaryInterface: networkConfig?.SECONDARY_INTERFACE,
-      internalInterface: networkConfig?.INTERNAL_INTERFACE,
-    });
-  }, [networkConfig, categoryLayouts, currentCategory]);
 
   const colors = [
     { light: '#10b981', dark: '#059669' }, // green
@@ -349,13 +337,6 @@ const CombinedDashboard = () => {
     }
   }
 
-  // Add a debug effect to monitor items changes
-  useEffect(() => {
-    console.log('DEBUG: Items changed', {
-      categoryLayouts,
-      savedOrder: localStorage.getItem('betaDashboardOrder')
-    });
-  }, [categoryLayouts]);
 
   // Modify the save effect to only log errors
   useEffect(() => {

@@ -126,11 +126,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log('Reading routes...')
     const routes = await readRoutes();
-    console.log('Routes read successfully:', routes)
     const response = { routes };
-    console.log('Sending response:', response)
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error in GET handler:', error);

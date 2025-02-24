@@ -35,18 +35,12 @@ export default function DnsHosts() {
         next: { revalidate: 0 }
       })
       
-      console.log('DNS Hosts fetch response:', {
-        status: response.status,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
       
-      console.log('DNS Hosts data received:', data); // Debug log
       
       if (data.error) {
         throw new Error(data.error)
@@ -74,7 +68,6 @@ export default function DnsHosts() {
     try {
       setIsSyncing(true)
       setError(null)
-      console.log('Starting DNS sync request...')
       
       const response = await fetch('/api/reservations', {
         method: 'PUT',

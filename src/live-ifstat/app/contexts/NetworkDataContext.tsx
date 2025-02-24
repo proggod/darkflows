@@ -39,7 +39,6 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     const es = new EventSource(url)
 
     es.onopen = () => {
-      console.log('SSE connection opened')
       setConnectionStatus('connected')
       setLastError(null)
     }
