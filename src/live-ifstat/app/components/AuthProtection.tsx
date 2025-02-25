@@ -1,15 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export default function AuthProtection({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Don't check auth on login page
     if (pathname === '/login') {
       setIsLoading(false);
       return;
@@ -20,12 +19,13 @@ export default function AuthProtection({ children }: { children: React.ReactNode
       .then(data => {
         if (!data.authenticated) {
           router.push('/login');
-        } else {
-          setIsLoading(false);
         }
+        setIsLoading(false);
       })
-      .catch(() => router.push('/login'));
-  }, [router, pathname]);
+      .catch(() => {
+        router.push('/login');
+      });
+  }, [pathname, router]);
 
   if (isLoading && pathname !== '/login') {
     return (

@@ -4,14 +4,8 @@ import { isLoggedIn } from '@/lib/session'
 export const runtime = 'nodejs'
 
 export async function GET() {
-  try {
-    const authenticated = await isLoggedIn()
-    return NextResponse.json({ authenticated })
-  } catch (error) {
-    console.error('Auth check error:', error)
-    return NextResponse.json(
-      { error: 'Authentication check failed' },
-      { status: 500 }
-    )
-  }
+  console.log('Auth check endpoint called')
+  const authenticated = await isLoggedIn()
+  console.log('Auth check result:', authenticated)
+  return NextResponse.json({ authenticated })
 } 

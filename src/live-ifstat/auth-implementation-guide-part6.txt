@@ -1,0 +1,182 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION - PART 6
+=============================================
+
+23. TROUBLESHOOTING GUIDE
+-----------------------
+
+23.1. Common Issues and Solutions
+
+a) Cookie Not Setting
+Problem: Session cookie not being set after login
+Solutions:
+- Check response headers in browser dev tools
+- Verify cookie options match environment
+- Ensure all three cookie setting methods are used
+- Check domain and path settings
+
+Example Debug Steps:
+# # Check cookie in response
+# curl -v -X POST http://localhost:4080/api/login \
+#   -H "Content-Type: application/json" \
+#   -d '{"password":"testpass123"}' \
+#   2>&1 | grep -i "set-cookie"
+
+b) Session Verification Failing
+Problem: Valid session being rejected
+Solutions:
+- Verify SESSION_SECRET consistency
+- Check JWT expiration times
+- Validate token format
+- Ensure middleware is catching all routes
+
+Debug Code:
+# export async function debugToken(token: string) {
+#   try {
+#     const decoded = await jwtVerify(
+#       token,
+#       new TextEncoder().encode(process.env.SESSION_SECRET)
+#     );
+#     console.log('Token debug:', {
+#       payload: decoded.payload,
+#       header: decoded.protectedHeader
+#     });
+#   } catch (error) {
+#     console.error('Token debug error:', error);
+#   }
+# }
+
+23.2. Recovery Procedures
+
+a) Reset Admin Password
+# #!/bin/bash
+# # reset-admin.sh
+#
+# # Backup current credentials
+# cp /etc/darkflows/admin_credentials.json \
+#    /etc/darkflows/admin_credentials.json.bak
+#
+# # Remove credentials to trigger first-time setup
+# rm /etc/darkflows/admin_credentials.json
+#
+# # Restart service
+# systemctl restart darkflows.service
+#
+# echo "Admin credentials reset. Access web UI to set new password."
+
+b) Recover from Corrupted Session Secret
+# #!/bin/bash
+# # recover-session.sh
+#
+# if [ -f .session-secret.bak ]; then
+#   # Restore from backup
+#   cp .session-secret.bak .session-secret
+# else
+#   # Generate new secret
+#   openssl rand -base64 32 > .session-secret
+# fi
+#
+# # Restart service
+# systemctl restart darkflows.service
+
+24. DEBUGGING TOOLS
+----------------
+
+24.1. Authentication Flow Debug Logger
+# export function debugAuth(
+#   stage: 'request' | 'verify' | 'response',
+#   details: Record<string, unknown>
+# ) {
+#   const entry = {
+#     timestamp: new Date().toISOString(),
+#     stage,
+#     ...details
+#   };
+#
+#   if (process.env.DEBUG) {
+#     console.log(JSON.stringify(entry, null, 2));
+#   }
+#
+#   if (process.env.DEBUG_FILE) {
+#     fs.appendFileSync(
+#       '/var/log/darkflows/auth-debug.log',
+#       JSON.stringify(entry) + '\n'
+#     );
+#   }
+# }
+
+24.2. Cookie Inspector
+# export function inspectCookies(request: NextRequest) {
+#   const cookies = request.cookies.getAll();
+#   console.log('Cookie inspection:', cookies.map(c => ({
+#     name: c.name,
+#     value: c.value ? '(present)' : '(empty)',
+#     attributes: {
+#       path: c.path,
+#       expires: c.expires,
+#       maxAge: c.maxAge,
+#       httpOnly: c.httpOnly,
+#       secure: c.secure,
+#       sameSite: c.sameSite
+#     }
+#   })));
+# }
+
+25. EMERGENCY PROCEDURES
+---------------------
+
+25.1. Emergency Access Recovery
+# #!/bin/bash
+# # emergency-access.sh
+#
+# # Backup current state
+# BACKUP_DIR="/etc/darkflows/emergency-backup-$(date +%Y%m%d_%H%M%S)"
+# mkdir -p "$BACKUP_DIR"
+# cp /etc/darkflows/admin_credentials.json "$BACKUP_DIR/"
+# cp .session-secret "$BACKUP_DIR/"
+#
+# # Reset to known state
+# echo "Resetting to emergency state..."
+# rm -f /etc/darkflows/admin_credentials.json
+# openssl rand -base64 32 > .session-secret
+#
+# # Restart service
+# systemctl restart darkflows.service
+#
+# echo "Emergency access enabled. Use web UI to set new password."
+# echo "Backup created in: $BACKUP_DIR"
+
+25.2. Security Incident Response
+# #!/bin/bash
+# # security-incident.sh
+#
+# # Collect system state
+# mkdir -p /var/log/darkflows/incidents
+# INCIDENT_DIR="/var/log/darkflows/incidents/$(date +%Y%m%d_%H%M%S)"
+# mkdir "$INCIDENT_DIR"
+#
+# # Gather logs
+# cp /var/log/darkflows/auth.log "$INCIDENT_DIR/"
+# cp /var/log/darkflows/auth-debug.log "$INCIDENT_DIR/" 2>/dev/null
+# journalctl -u darkflows > "$INCIDENT_DIR/service.log"
+#
+# # Check file permissions
+# ls -la /etc/darkflows > "$INCIDENT_DIR/permissions.log"
+# ls -la .session-secret >> "$INCIDENT_DIR/permissions.log"
+#
+# # Create incident report
+# cat > "$INCIDENT_DIR/README.txt" << EOF
+# Incident Report
+# Date: $(date)
+# System: $(hostname)
+# User: $(whoami)
+# 
+# Files collected:
+# - Authentication logs
+# - Debug logs
+# - Service logs
+# - Permission states
+# EOF
+#
+# echo "Incident report created in: $INCIDENT_DIR"
+
+[End of Part 6] 

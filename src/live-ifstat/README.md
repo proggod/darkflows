@@ -38,6 +38,7 @@ v 0.33
     - Created UnBound blacklist management system
     - Fixed System Monitor to not use SSE
     - Made ISO pull dynamic installer
+    - Major security and authentication updates
     
 
 

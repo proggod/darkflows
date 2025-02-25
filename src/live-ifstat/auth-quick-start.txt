@@ -1,0 +1,596 @@
+DARKFLOWS AUTHENTICATION QUICK START GUIDE
+=======================================
+
+1. INITIAL SETUP
+--------------
+1. Install dependencies:
+   ```
+   npm install jose bcrypt next
+   ```
+
+2. Create essential files:
+   - /app/lib/session.ts (See Part 1, Section 4.2)
+   - middleware.ts (See Part 1, Section 4.3)
+   - /app/api/login/route.ts (See Part 2, Section 7.3)
+   - /app/login/page.tsx (See Part 3, Section 12.1)
+
+3. Set up environment:
+   ```bash
+   # Generate session secret
+   openssl rand -base64 32 > .session-secret
+   
+   # Create credentials directory
+   sudo mkdir -p /etc/darkflows
+   sudo chown darkflows:darkflows /etc/darkflows
+   sudo chmod 700 /etc/darkflows
+   ```
+
+2. CORE IMPLEMENTATION STEPS
+-------------------------
+1. Configure next.config.js (See Part 1, Section 4.1):
+   - Add security headers
+   - Configure CORS
+   - Set up cookie handling
+
+2. Implement session management:
+   - Copy cookie configuration (Part 2, Section 7.1)
+   - Implement JWT token handling (Part 4, Section 15.1)
+   - Set up session verification (Part 4, Section 15.2)
+
+3. Set up middleware protection:
+   - Define protected routes
+   - Add API vs web route handling
+   - Implement token verification
+
+3. TESTING
+---------
+1. Run the test script:
+   ```bash
+   ./test-auth.sh
+   ```
+   (See Part 3, Section 14.3 for test script details)
+
+2. Verify functionality:
+   - First-time setup works
+   - Login succeeds
+   - Protected routes are secure
+   - Logout clears session
+
+4. TROUBLESHOOTING
+----------------
+Common issues and solutions in Part 6, Section 23.1:
+- Cookie not setting
+- Session verification failing
+- Login not working
+
+For debugging tools, see Part 6, Section 24.
+
+5. SECURITY CHECKLIST
+------------------
+Essential checks (from Part 7, Section 29.1):
+- [ ] Session secret is secure
+- [ ] Cookie settings are correct
+- [ ] File permissions set
+- [ ] Error handling implemented
+
+6. REFERENCE GUIDE SECTIONS
+------------------------
+- Basic Setup: Part 1
+- Session Management: Part 2
+- First-time Setup: Part 3
+- Advanced Features: Part 4
+- Deployment: Part 5
+- Troubleshooting: Part 6
+- Security Features: Part 7
+
+7. MINIMUM VIABLE IMPLEMENTATION
+----------------------------
+0. Required Imports:
+   ```typescript
+   # For session.ts
+   import { cookies } from 'next/headers';
+   import { SignJWT, jwtVerify } from 'jose';
+   import bcrypt from 'bcrypt';
+   import { NextResponse } from 'next/server';
+   import fs from 'fs/promises';
+
+   # For middleware.ts
+   import { NextResponse } from 'next/server';
+   import type { NextRequest } from 'next/server';
+   import { jwtVerify } from 'jose';
+
+   # For login/page.tsx
+   import { useState, FormEvent } from 'react';
+   import { useRouter } from 'next/navigation';
+   ```
+
+1. Session Management (lib/session.ts):
+   ```typescript
+   # Basic cookie configuration:
+   const COOKIE_NAME = 'session';
+   const COOKIE_OPTIONS = {
+     httpOnly: true,
+     secure: process.env.NODE_ENV === 'production',
+     sameSite: 'lax' as const,
+     path: '/',
+     maxAge: 60 * 60 * 24 * 7  // 7 days
+   };
+
+   # Essential functions:
+   export async function createSession() {
+     const token = await new SignJWT({})
+       .setProtectedHeader({ alg: 'HS256' })
+       .setIssuedAt()
+       .setExpirationTime('7d')
+       .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+
+     const response = NextResponse.json({ success: true });
+     response.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS);
+     return response;
+   }
+
+   export async function validateCredentials(password: string) {
+     const fileContent = await fs.readFile('/etc/darkflows/admin_credentials.json', 'utf-8');
+     const { hashedPassword } = JSON.parse(fileContent);
+     return await bcrypt.compare(password, hashedPassword);
+   }
+   ```
+
+2. Middleware (middleware.ts):
+   ```typescript
+   # Minimum configuration:
+   const publicPaths = [
+     '/login',
+     '/api/login',
+     '/api/auth/check-setup',
+     '/_next',
+     '/favicon.ico'
+   ];
+
+   export async function middleware(request: NextRequest) {
+     const { pathname } = request.nextUrl;
+
+     if (publicPaths.some(path => pathname.startsWith(path))) {
+       return NextResponse.next();
+     }
+
+     const token = request.cookies.get('session');
+     if (!token) {
+       return pathname.startsWith('/api/')
+         ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+         : NextResponse.redirect(new URL('/login', request.url));
+     }
+
+     try {
+       await jwtVerify(
+         token.value,
+         new TextEncoder().encode(process.env.SESSION_SECRET),
+         { algorithms: ['HS256'] }
+       );
+       return NextResponse.next();
+     } catch {
+       return pathname.startsWith('/api/')
+         ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+         : NextResponse.redirect(new URL('/login', request.url));
+     }
+   }
+   ```
+
+3. Login Route (app/api/login/route.ts):
+   ```typescript
+   export async function POST(request: NextRequest) {
+     try {
+       const { password } = await request.json();
+       if (!password) {
+         return NextResponse.json(
+           { error: 'Password is required' },
+           { status: 400 }
+         );
+       }
+
+       const success = await validateCredentials(password);
+       if (success) {
+         return await createSession();
+       }
+
+       return NextResponse.json(
+         { error: 'Invalid credentials' },
+         { status: 401 }
+       );
+     } catch (error) {
+       return NextResponse.json(
+         { error: 'Login failed' },
+         { status: 500 }
+       );
+     }
+   }
+   ```
+
+4. Login Page (app/login/page.tsx):
+   ```typescript
+   'use client';
+
+   export default function LoginPage() {
+     const [error, setError] = useState('');
+     const [isLoading, setIsLoading] = useState(false);
+     const router = useRouter();
+
+     async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+       e.preventDefault();
+       setIsLoading(true);
+       setError('');
+
+       const formData = new FormData(e.currentTarget);
+       const password = formData.get('password') as string;
+
+       try {
+         const response = await fetch('/api/login', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ password }),
+           credentials: 'include'
+         });
+
+         if (response.ok) {
+           router.push('/');
+           router.refresh();
+         } else {
+           const data = await response.json();
+           throw new Error(data.error || 'Login failed');
+         }
+       } catch (error) {
+         setError(error instanceof Error ? error.message : 'Login failed');
+       } finally {
+         setIsLoading(false);
+       }
+     }
+
+     return (
+       <form onSubmit={handleSubmit}>
+         {error && <div className="error">{error}</div>}
+         <input type="password" name="password" required />
+         <button type="submit" disabled={isLoading}>
+           {isLoading ? 'Logging in...' : 'Login'}
+         </button>
+       </form>
+     );
+   }
+   ```
+
+5. Next.js Configuration (next.config.js):
+   ```javascript
+   /** @type {import('next').NextConfig} */
+   const nextConfig = {
+     experimental: {
+       serverActions: true
+     },
+     headers: async () => [{
+       source: '/api/:path*',
+       headers: [
+         {
+           key: 'Cache-Control',
+           value: 'no-store, no-cache, must-revalidate'
+         },
+         {
+           key: 'Access-Control-Allow-Credentials',
+           value: 'true'
+         }
+       ]
+     }]
+   };
+
+   module.exports = nextConfig;
+   ```
+
+6. First-time Setup (app/api/auth/check-setup/route.ts):
+   ```typescript
+   import { NextResponse } from 'next/server';
+   import fs from 'fs/promises';
+
+   const CREDENTIALS_FILE = '/etc/darkflows/admin_credentials.json';
+
+   export async function GET() {
+     try {
+       await fs.access(CREDENTIALS_FILE);
+       return NextResponse.json({ isFirstTime: false });
+     } catch {
+       return NextResponse.json({ isFirstTime: true });
+     }
+   }
+   ```
+
+7. Logout Implementation (app/api/logout/route.ts):
+   ```typescript
+   import { NextResponse } from 'next/server';
+   import { cookies } from 'next/headers';
+
+   export async function POST() {
+     const response = NextResponse.json({ success: true });
+     
+     // Clear cookie in multiple ways for reliability
+     const cookieStore = await cookies();
+     await cookieStore.delete('session');
+     
+     response.cookies.set('session', '', {
+       expires: new Date(0),
+       path: '/'
+     });
+
+     return response;
+   }
+   ```
+
+8. Basic Test Script (test-auth.sh):
+   ```bash
+   #!/bin/bash
+   
+   # Colors for output
+   GREEN='\033[0;32m'
+   RED='\033[0;31m'
+   NC='\033[0m'
+   
+   # Clean environment
+   rm -f /etc/darkflows/admin_credentials.json
+   rm -f cookies.txt
+   
+   echo -e "\n${GREEN}Testing first-time setup...${NC}"
+   SETUP_CHECK=$(curl -s http://localhost:4080/api/auth/check-setup)
+   if echo "$SETUP_CHECK" | grep -q "isFirstTime\":true"; then
+     echo "✓ First-time setup detected"
+   else
+     echo "✗ First-time setup detection failed"
+     exit 1
+   fi
+   
+   echo -e "\n${GREEN}Testing login...${NC}"
+   LOGIN_RESPONSE=$(curl -s -X POST http://localhost:4080/api/login \
+     -H "Content-Type: application/json" \
+     -d '{"password":"testpass123"}' \
+     -c cookies.txt)
+   
+   if echo "$LOGIN_RESPONSE" | grep -q "success\":true"; then
+     echo "✓ Login successful"
+   else
+     echo "✗ Login failed"
+     exit 1
+   fi
+   
+   echo -e "\n${GREEN}Testing protected route...${NC}"
+   STATUS_RESPONSE=$(curl -s http://localhost:4080/api/status \
+     -b cookies.txt)
+   
+   if [ $? -eq 0 ]; then
+     echo "✓ Protected route accessible"
+   else
+     echo "✗ Protected route failed"
+     exit 1
+   fi
+   ```
+
+8. NEXT STEPS
+-----------
+After basic implementation:
+1. Add logging (Part 5, Section 20)
+2. Implement monitoring (Part 5, Section 20.3)
+3. Set up maintenance procedures (Part 5, Section 21)
+4. Add security enhancements (Part 7, Section 27)
+
+For detailed implementation of any component, refer to the corresponding section in the main guide.
+
+9. DEBUGGING AND ERROR HANDLING
+---------------------------
+
+1. Debug Mode Setup:
+   ```bash
+   # Add to start.sh or run directly
+   export DEBUG=true
+   export DEBUG_FILE=/var/log/darkflows/auth-debug.log
+   ```
+
+2. Error Handler (lib/error.ts):
+   ```typescript
+   export class AuthError extends Error {
+     constructor(
+       message: string,
+       public status: number = 500,
+       public code?: string
+     ) {
+       super(message);
+       this.name = 'AuthError';
+     }
+   }
+
+   export function handleAuthError(error: unknown) {
+     if (error instanceof AuthError) {
+       return NextResponse.json(
+         { error: error.message, code: error.code },
+         { status: error.status }
+       );
+     }
+     console.error('Unhandled auth error:', error);
+     return NextResponse.json(
+       { error: 'Internal server error' },
+       { status: 500 }
+     );
+   }
+   ```
+
+3. Debug Tools (lib/debug.ts):
+   ```typescript
+   export function debugAuth(
+     stage: 'request' | 'verify' | 'response',
+     details: Record<string, unknown>
+   ) {
+     const entry = {
+       timestamp: new Date().toISOString(),
+       stage,
+       ...details
+     };
+
+     if (process.env.DEBUG) {
+       console.log('Auth debug:', JSON.stringify(entry, null, 2));
+     }
+   }
+
+   export function inspectCookies(request: NextRequest) {
+     const cookies = request.cookies.getAll();
+     return cookies.map(c => ({
+       name: c.name,
+       value: c.value ? '(present)' : '(empty)',
+       attributes: {
+         path: c.path,
+         expires: c.expires,
+         maxAge: c.maxAge,
+         httpOnly: c.httpOnly,
+         secure: c.secure,
+         sameSite: c.sameSite
+       }
+     }));
+   }
+   ```
+
+4. Quick Debug Commands:
+   ```bash
+   # Check session configuration
+   cat .session-secret
+   ls -la /etc/darkflows/
+   ls -la .session-secret
+
+   # Test cookie handling
+   curl -v -X POST http://localhost:4080/api/login \
+     -H "Content-Type: application/json" \
+     -d '{"password":"testpass123"}' \
+     2>&1 | grep -i "set-cookie"
+
+   # Monitor auth logs
+   tail -f /var/log/darkflows/auth-debug.log
+
+   # Check file permissions
+   sudo ls -la /etc/darkflows/admin_credentials.json
+   ```
+
+5. Common Issues and Solutions:
+
+   a) Cookie Issues:
+   - Check secure flag matches environment (development/production)
+   - Verify domain/path settings
+   - Ensure credentials: 'include' in fetch calls
+   - Check response headers for Set-Cookie
+
+   b) Session Problems:
+   - Verify SESSION_SECRET is consistent
+   - Check JWT token format and expiration
+   - Validate middleware paths
+   - Inspect cookie presence and format
+
+   c) Login Failures:
+   - Enable DEBUG=true for detailed logs
+   - Check credentials file exists and permissions
+   - Verify password hashing
+   - Monitor network responses
+
+   d) Protected Routes:
+   - Check middleware matcher configuration
+   - Verify public paths list
+   - Ensure token verification
+   - Check redirect URLs
+
+6. Integration with Existing Error Handling:
+   ```typescript
+   // In login/route.ts
+   import { handleAuthError, AuthError } from '@/lib/error';
+   import { debugAuth } from '@/lib/debug';
+
+   export async function POST(request: NextRequest) {
+     debugAuth('request', { url: request.url });
+     try {
+       const { password } = await request.json();
+       if (!password) {
+         throw new AuthError('Password required', 400);
+       }
+       // ... rest of login logic
+     } catch (error) {
+       debugAuth('error', { error });
+       return handleAuthError(error);
+     }
+   }
+   ```
+
+For more advanced debugging and monitoring solutions, refer to:
+- Logging Implementation (Part 5, Section 20)
+- Security Auditing (Part 7, Section 22)
+- Emergency Procedures (Part 6, Section 25)
+
+[Rest of the guide remains the same...]
+
+10. DEPLOYMENT CHECKLIST
+---------------------
+
+1. File Structure Verification:
+   ```
+   /app
+   ├── api
+   │   ├── auth
+   │   │   ├── check-setup/route.ts
+   │   │   └── save-credentials/route.ts
+   │   ├── login/route.ts
+   │   └── logout/route.ts
+   ├── lib
+   │   ├── session.ts
+   │   ├── error.ts
+   │   └── debug.ts
+   ├── login
+   │   └── page.tsx
+   └── middleware.ts
+   ```
+
+2. Environment Setup:
+   - [ ] SESSION_SECRET generated and stored
+   - [ ] /etc/darkflows directory created with correct permissions
+   - [ ] Debug mode configured if needed
+   - [ ] Log directories created and writable
+
+3. Security Configuration:
+   - [ ] Cookie options set correctly for environment
+   - [ ] JWT settings configured (expiration, algorithms)
+   - [ ] Protected routes defined in middleware
+   - [ ] Error handling implemented
+
+4. Testing Checklist:
+   - [ ] First-time setup flow works
+   - [ ] Password validation functions
+   - [ ] Login sets cookies correctly
+   - [ ] Protected routes require authentication
+   - [ ] Logout clears session properly
+   - [ ] Error handling returns correct responses
+
+5. Production Readiness:
+   - [ ] Debug logging disabled
+   - [ ] Secure headers configured
+   - [ ] Rate limiting implemented
+   - [ ] Backup procedures documented
+   - [ ] Monitoring set up
+
+6. Documentation:
+   - [ ] API endpoints documented
+   - [ ] Error codes listed
+   - [ ] Recovery procedures written
+   - [ ] Maintenance tasks scheduled
+
+7. Final Verification:
+   ```bash
+   # Run all tests
+   ./test-auth.sh
+   
+   # Check configurations
+   ls -la /etc/darkflows/
+   ls -la .session-secret
+   
+   # Verify logs
+   tail /var/log/darkflows/auth.log
+   
+   # Test production settings
+   NODE_ENV=production npm run build
+   ```
+
+Remember to refer to the main implementation guide for detailed instructions on each component. 

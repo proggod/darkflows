@@ -1,0 +1,200 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION - PART 3
+=============================================
+
+11. FIRST-TIME SETUP IMPLEMENTATION
+--------------------------------
+
+11.1. Check Setup Status (app/api/auth/check-setup/route.ts)
+# import { NextResponse } from 'next/server';
+# import fs from 'fs/promises';
+#
+# const CREDENTIALS_FILE = '/etc/darkflows/admin_credentials.json';
+#
+# export async function GET() {
+#   try {
+#     await fs.access(CREDENTIALS_FILE);
+#     return NextResponse.json({ isFirstTime: false });
+#   } catch {
+#     return NextResponse.json({ isFirstTime: true });
+#   }
+# }
+
+11.2. Save Credentials (app/api/auth/save-credentials/route.ts)
+# import { NextResponse } from 'next/server';
+# import fs from 'fs/promises';
+# import { hashPassword } from '@/lib/session';
+#
+# export async function POST(request: NextRequest) {
+#   try {
+#     const { password } = await request.json();
+#     const hashedPassword = await hashPassword(password);
+#     
+#     await fs.mkdir('/etc/darkflows', { recursive: true });
+#     await fs.writeFile(
+#       '/etc/darkflows/admin_credentials.json',
+#       JSON.stringify({ hashedPassword })
+#     );
+#     
+#     return NextResponse.json({ success: true });
+#   } catch (error) {
+#     return NextResponse.json({ 
+#       error: 'Failed to save credentials'
+#     }, { status: 500 });
+#   }
+# }
+
+11.3. Update System Passwords (app/api/auth/update-system-passwords/route.ts)
+# import { NextResponse } from 'next/server';
+# import { exec } from 'child_process';
+# import { promisify } from 'util';
+#
+# const execAsync = promisify(exec);
+#
+# export async function POST(request: NextRequest) {
+#   try {
+#     const { password } = await request.json();
+#     
+#     // Update Unix password
+#     await execAsync(`echo "darkflows:${password}" | chpasswd`);
+#     
+#     // Update Samba password
+#     await execAsync(
+#       `(echo "${password}"; echo "${password}") | smbpasswd -s -a darkflows`
+#     );
+#     
+#     return NextResponse.json({ success: true });
+#   } catch (error) {
+#     return NextResponse.json({ 
+#       error: 'Failed to update system passwords'
+#     }, { status: 500 });
+#   }
+# }
+
+11.4. Password Validation (lib/session.ts)
+# export async function validateCredentials(password: string) {
+#   try {
+#     const fileContent = await fs.readFile(
+#       '/etc/darkflows/admin_credentials.json',
+#       'utf-8'
+#     );
+#     const { hashedPassword } = JSON.parse(fileContent);
+#     return await bcrypt.compare(password, hashedPassword);
+#   } catch (error) {
+#     return false;
+#   }
+# }
+
+12. FRONTEND SETUP FLOW
+---------------------
+
+12.1. Login Page with Setup Detection
+# 'use client';
+#
+# export default function LoginPage() {
+#   const [isFirstTime, setIsFirstTime] = useState(false);
+#   const [password, setPassword] = useState('');
+#   const [confirmPassword, setConfirmPassword] = useState('');
+#
+#   useEffect(() => {
+#     fetch('/api/auth/check-setup')
+#       .then(res => res.json())
+#       .then(data => setIsFirstTime(data.isFirstTime));
+#   }, []);
+#
+#   async function handleSubmit(e: FormEvent) {
+#     e.preventDefault();
+#     
+#     if (isFirstTime) {
+#       if (password !== confirmPassword) {
+#         setError('Passwords do not match');
+#         return;
+#       }
+#
+#       // Save credentials
+#       await fetch('/api/auth/save-credentials', {
+#         method: 'POST',
+#         headers: { 'Content-Type': 'application/json' },
+#         body: JSON.stringify({ password })
+#       });
+#
+#       // Update system passwords
+#       await fetch('/api/auth/update-system-passwords', {
+#         method: 'POST',
+#         headers: { 'Content-Type': 'application/json' },
+#         body: JSON.stringify({ password })
+#       });
+#     }
+#
+#     // Proceed with login
+#     const loginResponse = await fetch('/api/login', {
+#       method: 'POST',
+#       headers: { 'Content-Type': 'application/json' },
+#       body: JSON.stringify({ password }),
+#       credentials: 'include'
+#     });
+#
+#     if (loginResponse.ok) {
+#       router.push('/');
+#     }
+#   }
+# }
+
+13. SECURITY CONSIDERATIONS FOR FIRST-TIME SETUP
+--------------------------------------------
+
+13.1. File Permissions
+- Set proper ownership of credential file
+- Restrict access permissions
+- Handle directory creation securely
+- Validate file operations
+
+13.2. Password Requirements
+- Minimum length validation
+- Complexity requirements
+- Prevent common passwords
+- Rate limit attempts
+
+13.3. System Integration
+- Sanitize password input
+- Handle special characters
+- Verify system commands
+- Check command output
+
+14. TESTING FIRST-TIME SETUP
+--------------------------
+
+14.1. Test Cases
+- Verify first-time detection
+- Test password validation
+- Check system password updates
+- Validate file permissions
+
+14.2. Error Scenarios
+- Invalid passwords
+- System command failures
+- File access issues
+- Concurrent setup attempts
+
+14.3. Test Script Additions
+# # Test first-time setup detection
+# SETUP_CHECK=$(curl -s http://localhost:4080/api/auth/check-setup)
+# if echo "$SETUP_CHECK" | grep -q "isFirstTime\":true"; then
+#   echo -e "${GREEN}✓ First-time setup detected${NC}"
+# else
+#   echo -e "${RED}✗ First-time setup detection failed${NC}"
+#   exit 1
+# fi
+#
+# # Test credential saving
+# CRED_RESPONSE=$(curl -s -X POST http://localhost:4080/api/auth/save-credentials \
+#   -H "Content-Type: application/json" \
+#   -d '{"password":"testpass123"}')
+#
+# if echo "$CRED_RESPONSE" | grep -q "success\":true"; then
+#   echo -e "${GREEN}✓ Credentials saved${NC}"
+# else
+#   echo -e "${RED}✗ Failed to save credentials${NC}"
+#   exit 1
+# fi
+
+[End of Part 3] 

@@ -1,0 +1,178 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION - PART 7
+=============================================
+
+26. API KEY MANAGEMENT
+-------------------
+
+26.1. API Key Structure
+# interface ApiKey {
+#   key: string;          // The actual key
+#   name: string;         // Key identifier
+#   created: Date;        // Creation timestamp
+#   lastUsed?: Date;      // Last usage timestamp
+#   expiresAt?: Date;     // Optional expiration
+#   permissions: string[]; // Allowed operations
+# }
+
+26.2. Key Generation and Storage
+# export async function generateApiKey(name: string, permissions: string[]) {
+#   const key = `dk_${crypto.randomBytes(32).toString('base64url')}`;
+#   const hashedKey = await bcrypt.hash(key, 10);
+#   
+#   const apiKey: ApiKey = {
+#     key: hashedKey,
+#     name,
+#     created: new Date(),
+#     permissions
+#   };
+#   
+#   await fs.writeFile(
+#     `/etc/darkflows/api_keys/${name}.json`,
+#     JSON.stringify(apiKey)
+#   );
+#   
+#   return key; // Return only once, cannot be retrieved later
+# }
+
+26.3. API Key Middleware
+# export async function apiKeyMiddleware(
+#   request: NextRequest,
+#   requiredPermission: string
+# ) {
+#   const apiKey = request.headers.get('X-API-Key');
+#   if (!apiKey) return false;
+#   
+#   const keyFiles = await fs.readdir('/etc/darkflows/api_keys');
+#   
+#   for (const file of keyFiles) {
+#     const keyData: ApiKey = JSON.parse(
+#       await fs.readFile(`/etc/darkflows/api_keys/${file}`, 'utf-8')
+#     );
+#     
+#     if (await bcrypt.compare(apiKey, keyData.key)) {
+#       if (keyData.expiresAt && new Date(keyData.expiresAt) < new Date()) {
+#         continue;
+#       }
+#       
+#       if (keyData.permissions.includes(requiredPermission)) {
+#         // Update last used timestamp
+#         keyData.lastUsed = new Date();
+#         await fs.writeFile(
+#           `/etc/darkflows/api_keys/${file}`,
+#           JSON.stringify(keyData)
+#         );
+#         return true;
+#       }
+#     }
+#   }
+#   
+#   return false;
+# }
+
+27. ADVANCED SECURITY FEATURES
+--------------------------
+
+27.1. Request Signing
+# export async function signRequest(
+#   method: string,
+#   path: string,
+#   body: string,
+#   timestamp: number
+# ) {
+#   const message = `${method.toUpperCase()}\n${path}\n${body}\n${timestamp}`;
+#   const key = await crypto.subtle.importKey(
+#     'raw',
+#     new TextEncoder().encode(process.env.SESSION_SECRET),
+#     { name: 'HMAC', hash: 'SHA-256' },
+#     false,
+#     ['sign']
+#   );
+#   
+#   const signature = await crypto.subtle.sign(
+#     'HMAC',
+#     key,
+#     new TextEncoder().encode(message)
+#   );
+#   
+#   return Buffer.from(signature).toString('base64');
+# }
+
+27.2. Enhanced Token Security
+# export async function createEnhancedToken(userId: string) {
+#   const fingerprint = crypto.randomBytes(32).toString('base64');
+#   const hashedFingerprint = await bcrypt.hash(fingerprint, 10);
+#   
+#   const token = await new SignJWT({
+#     sub: userId,
+#     jti: crypto.randomUUID(),
+#     fingerprint: hashedFingerprint
+#   })
+#   .setProtectedHeader({ alg: 'HS256' })
+#   .setIssuedAt()
+#   .setExpirationTime('1h')
+#   .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+#   
+#   return { token, fingerprint };
+# }
+
+28. SECURITY BEST PRACTICES
+------------------------
+
+28.1. Password Policy Implementation
+# export function validatePassword(password: string): boolean {
+#   const minLength = 12;
+#   const hasUpperCase = /[A-Z]/.test(password);
+#   const hasLowerCase = /[a-z]/.test(password);
+#   const hasNumbers = /\d/.test(password);
+#   const hasSpecialChar = /[!@#$%^&*]/.test(password);
+#   
+#   return password.length >= minLength &&
+#     hasUpperCase &&
+#     hasLowerCase &&
+#     hasNumbers &&
+#     hasSpecialChar;
+# }
+
+28.2. Secure Headers Configuration
+# export const securityHeaders = {
+#   'Content-Security-Policy': 
+#     "default-src 'self'; " +
+#     "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+#     "style-src 'self' 'unsafe-inline'; " +
+#     "img-src 'self' data: https:; " +
+#     "connect-src 'self'",
+#   'X-Frame-Options': 'DENY',
+#   'X-Content-Type-Options': 'nosniff',
+#   'Referrer-Policy': 'strict-origin-when-cross-origin',
+#   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+#   'X-XSS-Protection': '1; mode=block'
+# };
+
+29. FINAL CHECKLIST
+----------------
+
+29.1. Pre-deployment Security Checks
+- [ ] Session secret properly configured
+- [ ] Cookie settings match environment
+- [ ] File permissions are correct
+- [ ] Logging is properly configured
+- [ ] Rate limiting is enabled
+- [ ] Security headers are set
+- [ ] Error handling is comprehensive
+- [ ] Backup procedures are tested
+- [ ] Recovery procedures are documented
+- [ ] Monitoring is in place
+
+29.2. Regular Maintenance Tasks
+- [ ] Rotate session secrets
+- [ ] Review API key usage
+- [ ] Check log files
+- [ ] Update dependencies
+- [ ] Test backup restoration
+- [ ] Verify file permissions
+- [ ] Monitor failed attempts
+- [ ] Review security policies
+- [ ] Update documentation
+- [ ] Test recovery procedures
+
+[End of Implementation Guide] 

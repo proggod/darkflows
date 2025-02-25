@@ -1,43 +1,62 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
 // Remove runtime declaration as it's not supported in middleware
 // export const runtime = 'nodejs';
 
+// List of paths that don't require authentication
+const publicPaths = [
+  '/login',
+  '/api/login',
+  '/api/health',
+  '/api/auth/check-setup',
+  '/api/auth/save-credentials',
+  '/api/auth/update-system-passwords',
+  '/api/auth/verify-credentials',
+  '/_next',
+  '/favicon.ico'
+];
+
 export async function middleware(request: NextRequest) {
-  const publicPaths = ['/login', '/api/auth/check-setup', '/api/login', '/api/auth/save-credentials'];
-  const isPublicPath = publicPaths.includes(request.nextUrl.pathname);
-  const session = request.cookies.get('session');
+  const { pathname } = request.nextUrl;
 
-  if (!session && !isPublicPath) {
-    const loginUrl = new URL('/login', request.url);
-    return NextResponse.redirect(loginUrl);
+  // Allow public paths
+  if (publicPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
   }
 
-  if (session && isPublicPath) {
-    const homeUrl = new URL('/', request.url);
-    return NextResponse.redirect(homeUrl);
+  const token = request.cookies.get('session');
+
+  if (!token) {
+    // For API routes, return 401
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    // For web routes, redirect to login
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Only apply to /api routes
-  if (request.nextUrl.pathname.startsWith('/api')) {
-    const response = NextResponse.next()
-    
-    // Add cache control headers
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    response.headers.set('Pragma', 'no-cache')
-    response.headers.set('Expires', '0')
-    response.headers.set('Surrogate-Control', 'no-store')
-    
-    return response
+  try {
+    await jwtVerify(
+      token.value,
+      new TextEncoder().encode(process.env.SESSION_SECRET),
+      { algorithms: ['HS256'] }
+    );
+    return NextResponse.next();
+  } catch (error) {
+    console.error('JWT verification failed:', error);
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
+  } finally {
   }
-
-  return NextResponse.next();
 }
 
+// Configure which paths should be processed by the middleware
 export const config = {
   matcher: [
-    '/((?!api/auth|_next/static|_next/image|favicon.ico).*)',
-    '/api/:path*'
-  ],
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ]
 }; 

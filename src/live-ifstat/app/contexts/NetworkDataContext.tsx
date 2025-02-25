@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface IfstatData {
   timestamp: string
@@ -31,6 +32,7 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<NetworkData>({})
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
   const [lastError, setLastError] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const url = '/api/ifstat-stream'
@@ -45,10 +47,7 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
 
     es.onmessage = (e) => {
       try {
-        // Ignore heartbeat messages
-        if (e.type === 'heartbeat') {
-          return
-        }
+        if (e.type === 'heartbeat') return
 
         const newData = JSON.parse(e.data) as IfstatData
 
@@ -57,18 +56,13 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        const device = newData.device
-
         setData(prev => {
-          const deviceData = prev[device] || []
+          const deviceData = prev[newData.device] || []
           const updated = [...deviceData, newData]
           if (updated.length > MAX_DATA_POINTS) {
             updated.shift()
           }
-          return {
-            ...prev,
-            [device]: updated
-          }
+          return { ...prev, [newData.device]: updated }
         })
       } catch (err) {
         const error = err as Error
@@ -78,24 +72,22 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     }
 
     es.onerror = (err) => {
-      // Get more detailed error information
       const errorDetails = {
         readyState: es.readyState,
         timestamp: new Date().toISOString(),
-        type: err.type,
-        // Add any additional error properties that might be available
-        ...(err instanceof ErrorEvent ? {
-          message: err.message,
-          filename: err.filename,
-          lineno: err.lineno,
-          colno: err.colno,
-        } : {})
+        type: err.type
       }
 
-      console.error('Shared SSE error:', errorDetails)
+      console.error('SSE error:', errorDetails)
       setConnectionStatus('error')
+
+      // Handle authentication errors
+      if (err instanceof ErrorEvent && err.message.includes('401')) {
+        console.log('Authentication failed, redirecting to login')
+        router.replace('/login')
+        return
+      }
       
-      // Provide more specific error message based on readyState
       const errorMessage = es.readyState === EventSource.CLOSED 
         ? 'Connection closed unexpectedly'
         : es.readyState === EventSource.CONNECTING 
@@ -104,12 +96,10 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
         
       setLastError(errorMessage)
       
-      // Attempt to reconnect after a delay if connection is closed
       if (es.readyState === EventSource.CLOSED) {
         setTimeout(() => {
           console.log('Attempting to reconnect...')
           es.close()
-          // The browser will automatically attempt to reconnect
         }, 5000)
       }
     }
@@ -118,11 +108,7 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
       console.log('Cleaning up SSE connection')
       es.close()
     }
-  }, [])
-
-  // Debug output whenever data changes
-  useEffect(() => {
-  }, [data])
+  }, [router])
 
   return (
     <NetworkDataContext.Provider value={{ data, connectionStatus, lastError }}>
@@ -136,9 +122,6 @@ export function useNetworkData(device: string) {
   if (!context) {
     throw new Error('useNetworkData must be used within a NetworkDataProvider')
   }
-
-  // Debug output whenever component requests data
-
 
   return {
     data: context.data[device] || [],

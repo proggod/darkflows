@@ -1,0 +1,200 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION - PART 5
+=============================================
+
+19. DEPLOYMENT CONFIGURATION
+-------------------------
+
+19.1. Environment Variables Setup
+# # .env.production
+# NODE_ENV=production
+# PORT=4080
+# # Generate this securely and store it
+# SESSION_SECRET=your-secure-secret-here
+# # Other environment variables...
+
+19.2. Production Server Configuration
+# # next.config.js
+# const nextConfig = {
+#   output: 'standalone',  // For better deployment
+#   experimental: {
+#     serverActions: true
+#   },
+#   // Production headers
+#   headers: async () => [{
+#     source: '/api/:path*',
+#     headers: [
+#       {
+#         key: 'Cache-Control',
+#         value: 'no-store, private, no-cache'
+#       },
+#       {
+#         key: 'Strict-Transport-Security',
+#         value: 'max-age=31536000; includeSubDomains'
+#       }
+#     ]
+#   }]
+# }
+
+19.3. Systemd Service Setup
+# # /etc/systemd/system/darkflows.service
+# [Unit]
+# Description=DarkFlows Router Interface
+# After=network.target
+# 
+# [Service]
+# Type=simple
+# User=darkflows
+# WorkingDirectory=/usr/local/darkflows/src/live-ifstat
+# EnvironmentFile=/usr/local/darkflows/src/live-ifstat/.env.production
+# ExecStart=/usr/local/darkflows/src/live-ifstat/start.sh
+# Restart=always
+# 
+# [Install]
+# WantedBy=multi-user.target
+
+20. MONITORING AND LOGGING
+-----------------------
+
+20.1. Authentication Event Logging
+# export function logAuthEvent(
+#   event: 'login' | 'logout' | 'error',
+#   details: {
+#     success: boolean;
+#     ip?: string;
+#     error?: string;
+#     path?: string;
+#   }
+# ) {
+#   const logEntry = {
+#     timestamp: new Date().toISOString(),
+#     event,
+#     ...details
+#   };
+#
+#   // Log to file
+#   fs.appendFile(
+#     '/var/log/darkflows/auth.log',
+#     JSON.stringify(logEntry) + '\n'
+#   );
+#
+#   // Console log for development
+#   if (process.env.NODE_ENV !== 'production') {
+#     console.log('Auth event:', logEntry);
+#   }
+# }
+
+20.2. Log Rotation Configuration
+# # /etc/logrotate.d/darkflows
+# /var/log/darkflows/auth.log {
+#     daily
+#     rotate 7
+#     compress
+#     delaycompress
+#     missingok
+#     notifempty
+#     create 640 darkflows darkflows
+# }
+
+20.3. Health Check Implementation
+# export async function GET() {
+#   try {
+#     // Check file system access
+#     await fs.access('/etc/darkflows/admin_credentials.json');
+#     
+#     // Check session secret
+#     if (!process.env.SESSION_SECRET) {
+#       throw new Error('SESSION_SECRET not set');
+#     }
+#     
+#     return NextResponse.json({
+#       status: 'healthy',
+#       timestamp: new Date().toISOString()
+#     });
+#   } catch (error) {
+#     return NextResponse.json({
+#       status: 'unhealthy',
+#       error: error instanceof Error ? error.message : 'Unknown error'
+#     }, { status: 500 });
+#   }
+# }
+
+21. MAINTENANCE PROCEDURES
+-----------------------
+
+21.1. Session Secret Rotation
+# #!/bin/bash
+# # rotate-secret.sh
+# 
+# # Generate new secret
+# NEW_SECRET=$(openssl rand -base64 32)
+# 
+# # Backup current secret
+# cp .session-secret .session-secret.bak
+# 
+# # Update secret
+# echo "$NEW_SECRET" > .session-secret
+# 
+# # Restart service to use new secret
+# systemctl restart darkflows.service
+
+21.2. Credential File Backup
+# #!/bin/bash
+# # backup-credentials.sh
+# 
+# BACKUP_DIR="/etc/darkflows/backups"
+# TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+# 
+# # Create backup directory
+# mkdir -p "$BACKUP_DIR"
+# 
+# # Backup credentials file
+# cp /etc/darkflows/admin_credentials.json \
+#    "$BACKUP_DIR/admin_credentials_$TIMESTAMP.json"
+# 
+# # Compress backups older than 7 days
+# find "$BACKUP_DIR" -name "admin_credentials_*.json" \
+#   -mtime +7 -exec gzip {} \;
+# 
+# # Remove backups older than 30 days
+# find "$BACKUP_DIR" -name "admin_credentials_*.json.gz" \
+#   -mtime +30 -delete
+
+22. SECURITY AUDITING
+------------------
+
+22.1. Auth Log Analysis Script
+# #!/bin/bash
+# # analyze-auth-logs.sh
+# 
+# LOG_FILE="/var/log/darkflows/auth.log"
+# 
+# echo "=== Auth Log Analysis ==="
+# echo "Failed login attempts in last hour:"
+# grep "event\":\"login" "$LOG_FILE" | \
+#   grep "success\":false" | \
+#   grep -c "$(date -d '1 hour ago' +'%Y-%m-%dT%H')"
+# 
+# echo "Successful logins today:"
+# grep "event\":\"login" "$LOG_FILE" | \
+#   grep "success\":true" | \
+#   grep -c "$(date +'%Y-%m-%d')"
+
+22.2. Security Checks
+# #!/bin/bash
+# # security-check.sh
+# 
+# # Check file permissions
+# check_permissions() {
+#   local file="$1"
+#   local expected="$2"
+#   local actual=$(stat -c "%a" "$file")
+#   if [ "$actual" != "$expected" ]; then
+#     echo "Warning: $file has permissions $actual (expected $expected)"
+#   fi
+# }
+# 
+# check_permissions "/etc/darkflows/admin_credentials.json" "600"
+# check_permissions "/etc/darkflows" "700"
+# check_permissions ".session-secret" "600"
+
+[End of Part 5] 

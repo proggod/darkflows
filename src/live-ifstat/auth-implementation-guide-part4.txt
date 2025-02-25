@@ -1,0 +1,186 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION - PART 4
+=============================================
+
+15. ADVANCED SESSION MANAGEMENT
+----------------------------
+
+15.1. Session Token Structure
+# const token = await new SignJWT({
+#   // Add claims for additional security
+#   iat: Math.floor(Date.now() / 1000),
+#   exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7),
+#   iss: 'darkflows-router',
+#   sub: 'admin'
+# })
+# .setProtectedHeader({ alg: 'HS256' })
+# .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+
+15.2. Token Verification Enhancement
+# export async function verifySession(token: string) {
+#   try {
+#     const verified = await jwtVerify(
+#       token,
+#       new TextEncoder().encode(process.env.SESSION_SECRET),
+#       {
+#         algorithms: ['HS256'],
+#         issuer: 'darkflows-router',
+#         subject: 'admin',
+#         maxTokenAge: '7d'
+#       }
+#     );
+#     return verified.payload;
+#   } catch (error) {
+#     console.error('Token verification failed:', error);
+#     return null;
+#   }
+# }
+
+15.3. Session Cleanup
+# export async function clearSession(response: NextResponse) {
+#   // Clear cookie in multiple ways for reliability
+#   const cookieStore = await cookies();
+#   
+#   const clearOptions = {
+#     name: COOKIE_NAME,
+#     value: '',
+#     path: '/',
+#     expires: new Date(0),
+#     maxAge: -1,
+#     httpOnly: true,
+#     secure: process.env.NODE_ENV === 'production',
+#     sameSite: 'lax' as const
+#   };
+#
+#   // Clear using cookies API
+#   await cookieStore.set(clearOptions);
+#
+#   // Clear using response cookies
+#   response.cookies.set(COOKIE_NAME, '', clearOptions);
+#
+#   // Set explicit header
+#   response.headers.set(
+#     'Set-Cookie',
+#     `${COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`
+#   );
+# }
+
+16. SECURITY HARDENING
+-------------------
+
+16.1. Rate Limiting
+# import { rateLimit } from '@/lib/rate-limit';
+#
+# export async function POST(request: NextRequest) {
+#   const ip = request.headers.get('x-forwarded-for') || 'unknown';
+#   const rateLimitResult = await rateLimit(ip);
+#
+#   if (!rateLimitResult.success) {
+#     return NextResponse.json(
+#       { error: 'Too many attempts' },
+#       { status: 429 }
+#     );
+#   }
+#   // ... rest of login logic
+# }
+
+16.2. Brute Force Protection
+# const MAX_ATTEMPTS = 5;
+# const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+#
+# async function checkBruteForce(ip: string): Promise<boolean> {
+#   const attempts = await getAttempts(ip);
+#   if (attempts >= MAX_ATTEMPTS) {
+#     const lastAttempt = await getLastAttempt(ip);
+#     if (Date.now() - lastAttempt < LOCKOUT_TIME) {
+#       return false;
+#     }
+#     await resetAttempts(ip);
+#   }
+#   return true;
+# }
+
+16.3. Enhanced Error Logging
+# function logAuthEvent(
+#   type: 'login' | 'logout' | 'error',
+#   details: Record<string, unknown>
+# ) {
+#   const event = {
+#     timestamp: new Date().toISOString(),
+#     type,
+#     ...details
+#   };
+#   console.log('Auth event:', JSON.stringify(event));
+#   // Add additional logging as needed
+# }
+
+17. ADVANCED MIDDLEWARE FEATURES
+-----------------------------
+
+17.1. Path Pattern Matching
+# const protectedPathPatterns = [
+#   // Exact matches
+#   { path: '/api/status', type: 'exact' },
+#   // Prefix matches
+#   { path: '/api/admin', type: 'prefix' },
+#   // Pattern matches
+#   { path: '/api/users/[0-9]+', type: 'pattern' }
+# ];
+#
+# function isProtectedPath(path: string): boolean {
+#   return protectedPathPatterns.some(pattern => {
+#     if (pattern.type === 'exact') return path === pattern.path;
+#     if (pattern.type === 'prefix') return path.startsWith(pattern.path);
+#     if (pattern.type === 'pattern') {
+#       return new RegExp(`^${pattern.path}$`).test(path);
+#     }
+#     return false;
+#   });
+# }
+
+17.2. Response Enhancement
+# export async function middleware(request: NextRequest) {
+#   const response = await handleAuth(request);
+#   
+#   // Add security headers
+#   response.headers.set('X-Frame-Options', 'DENY');
+#   response.headers.set('X-Content-Type-Options', 'nosniff');
+#   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+#   
+#   if (process.env.NODE_ENV === 'production') {
+#     response.headers.set(
+#       'Strict-Transport-Security',
+#       'max-age=31536000; includeSubDomains'
+#     );
+#   }
+#   
+#   return response;
+# }
+
+18. TESTING ENHANCEMENTS
+----------------------
+
+18.1. Session Token Tests
+# # Test token validation
+# TOKEN_TEST=$(curl -s http://localhost:4080/api/status \
+#   -H "Cookie: session=invalid_token" \
+#   -w "\nStatus: %{http_code}")
+#
+# if echo "$TOKEN_TEST" | grep -q "Status: 401"; then
+#   echo -e "${GREEN}✓ Invalid token rejected${NC}"
+# else
+#   echo -e "${RED}✗ Invalid token not properly handled${NC}"
+# fi
+
+18.2. Security Header Tests
+# # Test security headers
+# HEADERS_TEST=$(curl -s -I http://localhost:4080/api/status \
+#   -b cookies.txt)
+#
+# if echo "$HEADERS_TEST" | grep -q "X-Frame-Options: DENY" && \
+#    echo "$HEADERS_TEST" | grep -q "X-Content-Type-Options: nosniff"; then
+#   echo -e "${GREEN}✓ Security headers present${NC}"
+# else
+#   echo -e "${RED}✗ Missing security headers${NC}"
+# fi
+
+[End of Part 4] 

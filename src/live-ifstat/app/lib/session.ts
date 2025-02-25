@@ -4,152 +4,178 @@ import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import 'server-only';
 import fs from 'fs/promises';
-import { execAsync } from './utils/execAsync';
+import { redirect } from 'next/navigation';
+import { cache } from 'react';
+import { NextResponse } from 'next/server';
+import bcrypt from 'bcrypt';
 
-const secretKey = process.env.SESSION_SECRET || 'your-secret-key-min-32-chars-long';
-const encodedKey = new TextEncoder().encode(secretKey);
+const COOKIE_NAME = 'session';
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: 60 * 60 * 24 * 7 // 7 days
+};
 
-async function hashPassword(password: string): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(password + secretKey);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  return btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(hashBuffer))));
-}
-
-export async function validateCredentials(password: string) {
+// Helper function to get session token
+const getSessionToken = cache(async () => {
   try {
-    console.log('=== Starting validateCredentials ===');
-    
-    // Check setup status directly via file system
-    console.log('Checking setup status...');
-    const CREDENTIALS_FILE = '/etc/darkflows/admin_credentials.json';
-    let isFirstTime = false;
-    
-    try {
-      await fs.access(CREDENTIALS_FILE);
-      console.log('Credentials file exists - not first time setup');
-    } catch {
-      console.log('No credentials file - this is first time setup');
-      isFirstTime = true;
+    const cookieStore = await cookies();
+    const token = cookieStore.get(COOKIE_NAME);
+    return token?.value;
+  } catch (error) {
+    console.error('getSessionToken error:', error);
+    return null;
+  } finally {
+  }
+});
+
+// Verify session and return payload or redirect
+export const verifySession = cache(async () => {
+  try {
+    const token = await getSessionToken();
+
+    if (!token) {
+      redirect('/login');
     }
 
-    if (isFirstTime) {
-      console.log('=== Starting first-time setup flow ===');
-      try {
-        // Hash password first
-        console.log('Hashing password...');
-        const hashedPassword = await hashPassword(password);
-        console.log('Password hashed successfully');
-
-        // Save credentials
-        console.log('Saving credentials...');
-        await fs.mkdir('/etc/darkflows', { recursive: true });
-        await fs.writeFile(CREDENTIALS_FILE, JSON.stringify({ hashedPassword }));
-        console.log('Credentials saved successfully');
-
-        // Update system passwords
-        console.log('Updating system passwords...');
-        await execAsync(`echo "darkflows:${password}" | chpasswd`);
-        await execAsync(`(echo "${password}"; echo "${password}") | smbpasswd -s -a darkflows`);
-        console.log('System passwords updated successfully');
-
-        console.log('Creating session...');
-        await createSession();
-        console.log('Session created successfully');
-        return true;
-      } catch (error) {
-        console.error('Error during first-time setup:', error);
-        return false;
-      }
-    } else {
-      // Normal login flow
-      console.log('=== Starting normal login flow ===');
-      try {
-        const content = await fs.readFile(CREDENTIALS_FILE, 'utf-8');
-        const { hashedPassword: storedHash } = JSON.parse(content);
-        
-        console.log('Hashing provided password...');
-        const hashedInput = await hashPassword(password);
-        
-        if (hashedInput === storedHash) {
-          console.log('Password verified, creating session...');
-          await createSession();
-          console.log('Session created successfully');
-          return true;
+    try {
+      const verified = await jwtVerify(
+        token,
+        new TextEncoder().encode(process.env.SESSION_SECRET),
+        {
+          algorithms: ['HS256']
         }
-        
-        console.log('Password verification failed');
-        return false;
-      } catch (error) {
-        console.error('Error during login:', error);
-        return false;
-      }
+      );
+      return verified.payload;
+    } catch (error) {
+      console.error('JWT verification failed:', error);
+      redirect('/login');
     }
   } catch (error) {
-    console.error('Validation error:', error);
+    console.error('verifySession error:', error);
+    redirect('/login');
+  } finally {
+  }
+});
+
+// Check if user is logged in without redirecting
+export async function isLoggedIn() {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(COOKIE_NAME);
+    
+    if (!sessionCookie?.value) return false;
+    
+    await jwtVerify(
+      sessionCookie.value,
+      new TextEncoder().encode(process.env.SESSION_SECRET),
+      {
+        algorithms: ['HS256']
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error('isLoggedIn error:', error);
     return false;
+  } finally {
   }
 }
 
+// Create and set session cookie
 export async function createSession() {
   try {
     const token = await new SignJWT({})
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('24h')
-      .sign(encodedKey);
+      .setExpirationTime('7d')
+      .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
 
+    const response = NextResponse.json({ success: true });
+
+    // Set cookie in both ways to ensure it's set
     const cookieStore = await cookies();
-    
-    const cookieOptions = {
+    await cookieStore.set({
+      name: COOKIE_NAME,
+      value: token,
       httpOnly: true,
-      secure: false,
-      sameSite: 'lax' as const,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24
-    };
-    
-    cookieStore.set('session', token, cookieOptions);
-    
-    const response = new Response(null);
-    const cookieHeader = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24}`;
-    response.headers.set('Set-Cookie', cookieHeader);
+      maxAge: 60 * 60 * 24 * 7
+    });
+
+    response.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS);
+
+    // Also set explicit Set-Cookie header
+    response.headers.set(
+      'Set-Cookie',
+      `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`
+    );
+
 
     return response;
   } catch (error) {
-    throw error;
+    console.error('createSession error:', error);
+    return NextResponse.json({ success: false });
+  } finally {
   }
 }
 
-export async function isLoggedIn() {
+export async function hashPassword(password: string): Promise<string> {
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+  return hashedPassword;
+}
+
+export async function validateCredentials(password: string) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session');
-
-    if (!sessionCookie?.value) {
-      return false;
-    }
-
-    // Just verify the token, we don't need the payload
-    await jwtVerify(sessionCookie.value, encodedKey);
-    return true;
-  } catch {
-    // Don't need the error variable if we're not using it
+    const credentialsFile = '/etc/darkflows/admin_credentials.json';
+    
+    const fileContent = await fs.readFile(credentialsFile, 'utf-8');
+    
+    const { hashedPassword } = JSON.parse(fileContent);
+    
+    const isValid = await bcrypt.compare(password, hashedPassword);
+    
+    return isValid;
+  } catch (error) {
+    console.error('validateCredentials error:', error);
     return false;
+  } finally {
   }
 }
 
-export async function verifySession() {
+// Helper function to clear session cookie
+export async function clearSession(response: NextResponse) {
   try {
+    const clearOptions = {
+      name: COOKIE_NAME,
+      value: '',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: -1,
+      expires: new Date(0)
+    };
+
+    // Clear using cookies API
     const cookieStore = await cookies();
-    const sessionValue = await cookieStore.get('session')?.value;
+    await cookieStore.set(clearOptions);
 
-    if (!sessionValue) {
-      return null;
-    }
+    // Also clear using response
+    response.cookies.set(COOKIE_NAME, '', clearOptions);
 
-    const verified = await jwtVerify(sessionValue, encodedKey);
-    return verified.payload;
-  } catch {
-    return null;
+    // Set explicit Set-Cookie header for immediate expiration
+    response.headers.set(
+      'Set-Cookie',
+      `${COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`
+    );
+
+  } catch (error) {
+    console.error('Failed to clear session:', error);
+  } finally {
   }
 } 

@@ -4,6 +4,10 @@ declare module 'jose' {
     [key: string]: any;
   }
   
+  export interface JWTVerifyOptions {
+    algorithms?: string[];
+  }
+  
   export class SignJWT {
     constructor(payload: JWTPayload);
     setProtectedHeader(header: { alg: string }): this;
@@ -12,5 +16,9 @@ declare module 'jose' {
     sign(key: Uint8Array): Promise<string>;
   }
 
-  export function jwtVerify(token: string, key: Uint8Array): Promise<{ payload: JWTPayload }>;
+  export function jwtVerify(
+    token: string, 
+    key: Uint8Array, 
+    options?: JWTVerifyOptions
+  ): Promise<{ payload: JWTPayload }>;
 } 

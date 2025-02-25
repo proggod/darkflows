@@ -1,0 +1,196 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION - PART 2
+=============================================
+
+7. DETAILED COMPONENT IMPLEMENTATIONS
+----------------------------------
+
+7.1. Session Management (lib/session.ts)
+# import { cookies } from 'next/headers';
+# import { SignJWT, jwtVerify } from 'jose';
+# import bcrypt from 'bcrypt';
+# import { NextResponse } from 'next/server';
+#
+# const COOKIE_NAME = 'session';
+# const COOKIE_OPTIONS = {
+#   httpOnly: true,
+#   secure: process.env.NODE_ENV === 'production',
+#   sameSite: 'lax' as const,
+#   path: '/',
+#   maxAge: 60 * 60 * 24 * 7
+# };
+#
+# export async function createSession() {
+#   const token = await new SignJWT({})
+#     .setProtectedHeader({ alg: 'HS256' })
+#     .setIssuedAt()
+#     .setExpirationTime('7d')
+#     .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+#
+#   const response = NextResponse.json({ success: true });
+#   
+#   // Set cookie in three ways for maximum compatibility
+#   const cookieStore = await cookies();
+#   await cookieStore.set({ name: COOKIE_NAME, value: token, ...COOKIE_OPTIONS });
+#   response.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS);
+#   response.headers.set('Set-Cookie', 
+#     `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${COOKIE_OPTIONS.maxAge}`);
+#
+#   return response;
+# }
+
+7.2. Middleware Implementation (middleware.ts)
+# import { NextResponse } from 'next/server';
+# import type { NextRequest } from 'next/server';
+# import { jwtVerify } from 'jose';
+#
+# const publicPaths = ['/login', '/api/login', '/api/health', /* ... */];
+#
+# export async function middleware(request: NextRequest) {
+#   const { pathname } = request.nextUrl;
+#
+#   if (publicPaths.some(path => pathname.startsWith(path))) {
+#     return NextResponse.next();
+#   }
+#
+#   const token = request.cookies.get('session');
+#   if (!token) {
+#     if (pathname.startsWith('/api/')) {
+#       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+#     }
+#     return NextResponse.redirect(new URL('/login', request.url));
+#   }
+#
+#   try {
+#     await jwtVerify(token.value, 
+#       new TextEncoder().encode(process.env.SESSION_SECRET),
+#       { algorithms: ['HS256'] });
+#     return NextResponse.next();
+#   } catch {
+#     return pathname.startsWith('/api/')
+#       ? NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+#       : NextResponse.redirect(new URL('/login', request.url));
+#   }
+# }
+
+7.3. Login Route Implementation (app/api/login/route.ts)
+# import { NextRequest, NextResponse } from 'next/server';
+# import { validateCredentials, createSession } from '@/lib/session';
+#
+# export async function POST(request: NextRequest) {
+#   try {
+#     const { password } = await request.json();
+#     if (!password) {
+#       return NextResponse.json(
+#         { error: 'Password is required' },
+#         { status: 400 }
+#       );
+#     }
+#
+#     const success = await validateCredentials(password);
+#     if (success) {
+#       const response = await createSession();
+#       return response;
+#     }
+#
+#     return NextResponse.json(
+#       { error: 'Invalid credentials' },
+#       { status: 401 }
+#     );
+#   } catch (error) {
+#     return NextResponse.json(
+#       { error: 'Login failed' },
+#       { status: 500 }
+#     );
+#   }
+# }
+
+7.4. Test Script Implementation (test-auth.sh)
+# #!/bin/bash
+#
+# # Colors for output
+# GREEN='\033[0;32m'
+# RED='\033[0;31m'
+# YELLOW='\033[1;33m'
+# NC='\033[0m'
+#
+# # Generate session secret if not exists
+# if [ ! -f .session-secret ]; then
+#     openssl rand -base64 32 > .session-secret
+# fi
+#
+# # Clean environment
+# rm -f /etc/darkflows/admin_credentials.json
+# pkill -f "next-server"
+#
+# # Start server
+# NODE_ENV=production \
+# NEXT_TELEMETRY_DISABLED=1 \
+# SESSION_SECRET=$(cat .session-secret) \
+# ./start.sh &
+#
+# # Test first-time setup
+# curl -s -X POST http://localhost:4080/api/auth/save-credentials \
+#   -H "Content-Type: application/json" \
+#   -d '{"password":"testpass123"}'
+#
+# # Test login
+# curl -s -X POST http://localhost:4080/api/login \
+#   -H "Content-Type: application/json" \
+#   -d '{"password":"testpass123"}' \
+#   -c cookies.txt
+
+8. COMMON ISSUES AND SOLUTIONS
+---------------------------
+8.1. Cookie Not Setting
+- Check secure flag matches environment
+- Verify domain configuration
+- Ensure all three setting methods are used
+- Check response headers
+
+8.2. Session Verification Failing
+- Verify SESSION_SECRET consistency
+- Check token expiration
+- Validate cookie presence
+- Check JWT algorithm
+
+8.3. Login Not Working
+- Enable credentials in fetch
+- Check cookie settings
+- Verify CORS configuration
+- Check response handling
+
+9. PRODUCTION CONSIDERATIONS
+--------------------------
+9.1. Environment Setup
+- Use secure SESSION_SECRET
+- Enable secure cookies
+- Configure proper domains
+- Set appropriate timeouts
+
+9.2. Security Headers
+- Set CSP headers
+- Configure CORS properly
+- Enable HSTS if needed
+- Set referrer policy
+
+9.3. Error Handling
+- Log security events
+- Handle edge cases
+- Provide user feedback
+- Maintain audit trail
+
+10. MAINTENANCE PROCEDURES
+------------------------
+10.1. Regular Tasks
+- Rotate session secrets
+- Update dependencies
+- Monitor failed attempts
+- Review security logs
+
+10.2. Troubleshooting Steps
+- Check server logs
+- Verify cookie presence
+- Validate token format
+- Test authentication flow
+
+[End of Part 2] 

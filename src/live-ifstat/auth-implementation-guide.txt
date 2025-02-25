@@ -1,0 +1,221 @@
+DARKFLOWS AUTHENTICATION IMPLEMENTATION GUIDE
+===========================================
+
+1. OVERVIEW
+----------
+This guide describes how to implement secure authentication in a Next.js application
+using JWT tokens and HTTP-only cookies. The implementation supports:
+- First-time setup flow
+- Password-based authentication
+- Protected API routes
+- Protected web pages
+- Session management
+- Automatic redirects
+
+2. REQUIRED DEPENDENCIES
+----------------------
+Add to package.json:
+# {
+#   "dependencies": {
+#     "jose": "^4.14.4",     // For JWT handling
+#     "bcrypt": "^5.1.1",    // For password hashing
+#     "next": "^14.0.0",     // Framework
+#   }
+# }
+
+3. FILE STRUCTURE AND PURPOSE
+---------------------------
+/app
+  /api
+    /auth
+      /check-setup/route.ts    # Checks if first-time setup is needed
+        - Verifies existence of credentials file
+        - Returns isFirstTime status
+      
+      /save-credentials/route.ts # Handles initial password setup
+        - Hashes password
+        - Creates credentials file
+        - Stores hashed password
+      
+      /update-system-passwords/route.ts # Updates system passwords
+        - Updates Unix password
+        - Updates Samba password
+        - Handles errors
+    
+    /login/route.ts    # Handles login requests
+      - Validates credentials
+      - Creates JWT session
+      - Sets HTTP-only cookie
+    
+    /logout/route.ts   # Handles logout
+      - Clears session cookie
+      - Returns success response
+    
+    /status/route.ts   # Example protected route
+      - Requires authentication
+      - Returns protected data
+  
+  /lib
+    /session.ts       # Session management
+      - JWT token generation
+      - Cookie management
+      - Session verification
+      - Password hashing
+    
+    /auth.ts         # Auth helpers
+      - Route protection
+      - Auth checking
+      - Error handling
+  
+  /login
+    /page.tsx        # Login page
+      - Login form
+      - Error handling
+      - First-time setup
+  
+  middleware.ts      # Global auth middleware
+    - Route protection
+    - Token verification
+    - Redirect handling
+
+4. DETAILED IMPLEMENTATION STEPS
+-----------------------------
+4.1. Environment Setup
+
+a) Create start.sh:
+# #!/bin/bash
+# # Generate session secret if not exists
+# if [ ! -f .session-secret ]; then
+#     openssl rand -base64 32 > .session-secret
+# fi
+# export SESSION_SECRET=$(cat .session-secret)
+# export NODE_ENV=production
+# export PORT=4080
+# npm run start
+
+b) Configure next.config.js:
+# const nextConfig = {
+#   experimental: { serverActions: true },
+#   reactStrictMode: false,
+#   headers: async () => [{
+#     source: '/api/:path*',
+#     headers: [
+#       { key: 'Cache-Control', 
+#         value: 'no-store, no-cache' },
+#       { key: 'Access-Control-Allow-Credentials',
+#         value: 'true' }
+#     ]
+#   }]
+# }
+
+4.2. Session Management Implementation
+
+a) Cookie Options Configuration:
+# const COOKIE_OPTIONS = {
+#   httpOnly: true,
+#   secure: process.env.NODE_ENV === 'production',
+#   sameSite: 'lax' as const,
+#   path: '/',
+#   maxAge: 60 * 60 * 24 * 7  // 7 days
+# }
+
+b) JWT Token Generation:
+# const token = await new SignJWT({})
+#   .setProtectedHeader({ alg: 'HS256' })
+#   .setIssuedAt()
+#   .setExpirationTime('7d')
+#   .sign(new TextEncoder().encode(process.env.SESSION_SECRET))
+
+c) Cookie Setting (use all three methods for compatibility):
+- Use cookies() API
+- Use response.cookies.set()
+- Set explicit Set-Cookie header
+
+4.3. Middleware Configuration
+
+a) Protected Paths:
+# const publicPaths = [
+#   '/login',
+#   '/api/login',
+#   '/api/health',
+#   '/api/auth/check-setup',
+#   '/api/auth/save-credentials',
+#   '/api/auth/update-system-passwords',
+#   '/_next',
+#   '/favicon.ico'
+# ]
+
+b) Route Protection Logic:
+- Check if path is public
+- Verify token presence
+- Validate JWT token
+- Handle API vs web routes differently
+- Return appropriate response (401 or redirect)
+
+4.4. API Routes Implementation
+
+a) Login Route:
+- Validate credentials
+- Generate JWT token
+- Set cookie
+- Return success response
+
+b) Logout Route:
+- Clear cookie using multiple methods
+- Return success response
+
+c) Protected Routes:
+- Verify authentication
+- Return protected data or error
+
+4.5. Frontend Implementation
+
+a) Login Form:
+- Handle first-time setup
+- Show loading states
+- Display errors
+- Handle redirects
+
+b) Request Configuration:
+- Include credentials in fetch
+- Handle response status
+- Parse error messages
+
+5. SECURITY MEASURES
+------------------
+5.1. Password Storage
+- Use bcrypt for hashing
+- Store in secure location
+- Handle file permissions
+
+5.2. Cookie Security
+- Always use HTTP-only
+- Secure in production
+- Proper expiration
+- SameSite configuration
+
+5.3. JWT Security
+- Short expiration times
+- Secure signing key
+- Algorithm specification
+- Token validation
+
+6. TESTING IMPLEMENTATION
+-----------------------
+6.1. Test Script Structure:
+- Clean environment setup
+- Server startup
+- First-time setup test
+- Login test
+- Protected route test
+- Logout test
+- Cookie verification
+
+6.2. Test Cases:
+- Successful login
+- Invalid credentials
+- Protected route access
+- Cookie clearing
+- Session expiration
+
+[Continued in Part 2...] 
