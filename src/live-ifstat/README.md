@@ -39,9 +39,15 @@ v 0.33
     - Fixed System Monitor to not use SSE
     - Made ISO pull dynamic installer
     - Major security and authentication updates
+    - So much major stuff to add for VLANS
+    - DHCP Vlan Support
+    - DHCP Vlan Custom DNS support
+    - DNS Vlan Support
+    - Traffic shaping VLAN support
+    - Traffic routing VLAN support
+    - Local port mapping vlan support
+
     
-
-
     
 v 0.30
     - Removed test SSH keys from root
