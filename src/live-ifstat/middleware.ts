@@ -24,17 +24,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'no-referrer-when-cross-origin');
   
-  // Only log non-sensitive paths in development
-  if (process.env.NODE_ENV === 'development') {
-    const sensitivePathRegex = /\/(login|auth)/;
-    if (!sensitivePathRegex.test(request.nextUrl.pathname)) {
-      console.log('Middleware processing:', {
-        pathname: request.nextUrl.pathname,
-        isPublicPath: publicPaths.some(path => request.nextUrl.pathname.startsWith(path)),
-        hasSessionCookie: !!request.cookies.get('session')
-      });
-    }
-  }
+
 
   const { pathname } = request.nextUrl;
 

@@ -48,12 +48,20 @@ import { CategoryMenu } from '@/components/CategoryMenu'
 import { ComponentCategory, CATEGORIES } from '@/types/dashboard'
 import { DEFAULT_ITEMS } from '@/constants/dashboard'
 import VLANCard from '@/components/VLANCard'
+import { getNetworkConfig } from './actions/getNetworkConfig'
 
 interface IfstatData {
   timestamp: string
   interface: string
   kbIn: number
   kbOut: number
+}
+
+interface NetworkConfig {
+  PRIMARY_INTERFACE: string;
+  SECONDARY_INTERFACE: string;
+  INTERNAL_INTERFACE: string;
+  _timestamp: string;
 }
 
 const CombinedDashboard = () => {
@@ -372,8 +380,12 @@ const CombinedDashboard = () => {
 
   // Add getNetworkCardData function that was missing
   const getNetworkCardData = (iface: string): IfstatData[] => {
+    console.log(`Looking for network stats for interface: ${iface}`);
+    console.log(`Available interfaces with stats:`, Object.keys(networkStats));
+    
     const stats = networkStats[iface]
     if (!stats || stats.length === 0) {
+      console.log(`No stats found for ${iface}`);
       return [{
         timestamp: new Date().toISOString(),
         interface: iface,
@@ -382,6 +394,7 @@ const CombinedDashboard = () => {
       }]
     }
 
+    console.log(`Found ${stats.length} data points for ${iface}`);
     return stats.map(stat => ({
       timestamp: new Date(stat.timestamp).toISOString(),
       interface: stat.interface,
@@ -571,6 +584,17 @@ const CombinedDashboard = () => {
     localStorage.setItem('selectedCategory', JSON.stringify(currentCategory))
   }, [currentCategory])
 
+  const [debugConfig, setDebugConfig] = useState<NetworkConfig | null>(null);
+
+  const fetchDebugConfig = async () => {
+    console.log("🔍 Manual debug fetch triggered");
+    const result = await getNetworkConfig();
+    console.log("📊 Debug result:", result);
+    if (result?.config) {
+      setDebugConfig(result.config);
+    }
+  };
+
   if (isLoading) {
     return <div className="p-4">Loading dashboard...</div>
   }
@@ -649,6 +673,21 @@ const CombinedDashboard = () => {
           </div>
         </div>
       )}
+
+      <div className="mt-4">
+        <button 
+          onClick={fetchDebugConfig}
+          className="bg-blue-500 text-white p-2 rounded"
+        >
+          Debug Network Config
+        </button>
+        
+        {debugConfig && (
+          <pre className="mt-2 bg-gray-800 text-white p-2 rounded">
+            {JSON.stringify(debugConfig, null, 2)}
+          </pre>
+        )}
+      </div>
     </>
   )
 }

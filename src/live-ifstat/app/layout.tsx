@@ -21,6 +21,12 @@ export const metadata = {
   },
 }
 
+// Force dynamic rendering for all routes
+export const dynamic = 'force-dynamic'
+
+// Add revalidation at the app level
+export const revalidate = 0
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">

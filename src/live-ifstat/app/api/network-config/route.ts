@@ -148,12 +148,38 @@ async function writeConfig(config: NetworkConfig): Promise<void> {
 }
 
 export async function GET(request: NextRequest) {
+  // Pass cache-busting headers to the auth check
   const authResponse = await requireAuth(request);
-  if (authResponse) return authResponse;
-
+  
+  // If auth response exists, add cache headers before returning
+  if (authResponse) {
+    authResponse.headers.set('Cache-Control', 'no-store');
+    return authResponse;
+  }
+  
   try {
+    const url = new URL(request.url);
+    const queryParams = Object.fromEntries(url.searchParams);
+    
+    console.log('=== NETWORK CONFIG REQUEST ===');
+    console.log('URL:', request.url);
+    console.log('Query Params:', queryParams);
+    console.log('Request Headers:', Object.fromEntries(request.headers));
+    
     const config = await parseConfig();
-    return NextResponse.json(config);
+    console.log('Serving fresh network config at:', new Date().toISOString());
+    console.log('Config:', config);
+    
+    return new NextResponse(JSON.stringify(config), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store',
+        'X-Response-Time': new Date().toISOString(),
+      }
+    });
   } catch (error) {
     console.error('Error reading network config:', error);
     return NextResponse.json({ 

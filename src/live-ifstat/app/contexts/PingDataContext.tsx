@@ -50,20 +50,34 @@ export function PingDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const fetchNetworkConfig = async () => {
       try {
-        const response = await fetch('/api/network-config');
-        if (!response.ok) {
+        console.log("🚀 Starting network config fetch");
+        
+        // Use normal URL without cache-busting parameters
+        const url = `/api/network-config`;
+        console.log(`Fetching from: ${url}`);
+        
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log("✅ Network config success:", data);
+          setNetworkConfig(data);
+        } else {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
-        setNetworkConfig(data);
       } catch (error) {
-        console.error('Failed to fetch network config:', error);
+        console.error("❌ Network config fetch failed:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchNetworkConfig();
+    const interval = setInterval(fetchNetworkConfig, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {

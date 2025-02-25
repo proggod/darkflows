@@ -11,20 +11,34 @@ const SETUP_PATHS = [
 ];
 
 export async function requireAuth(request: NextRequest) {
-  // Allow setup-related endpoints without auth
-  const path = request.nextUrl.pathname;
-  if (SETUP_PATHS.includes(path)) {
+  try {
+    // Allow setup-related endpoints without auth
+    const path = request.nextUrl.pathname;
+    if (SETUP_PATHS.includes(path)) {
+      return null;
+    }
+    
+    const session = await verifySession();
+    
+    if (!session) {
+      const response = NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+      
+      // Add these cache control headers
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      
+      return response;
+    }
+    
+    // No response means auth passed, but still need to handle caching
     return null;
+  } catch (error) {
+    console.error('Auth error:', error);
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   }
-  
-  const session = await verifySession();
-  
-  if (!session) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
-  
-  return null;
 } 

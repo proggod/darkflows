@@ -1,7 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
+import { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback } from 'react'
 
 interface IfstatData {
   timestamp: string
@@ -32,17 +31,25 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<NetworkData>({})
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting')
   const [lastError, setLastError] = useState<string | null>(null)
-  const router = useRouter()
+  const [retryCount, setRetryCount] = useState(0)
+  const eventSourceRef = useRef<EventSource | null>(null)
 
-  useEffect(() => {
-    const url = '/api/ifstat-stream'
+
+  // Reconnection strategy with backoff
+  const connectEventSource = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+
     setConnectionStatus('connecting')
-
+    const url = '/api/ifstat-stream'
     const es = new EventSource(url)
+    eventSourceRef.current = es
 
     es.onopen = () => {
       setConnectionStatus('connected')
       setLastError(null)
+      setRetryCount(0) // Reset retry count on successful connection
     }
 
     es.onmessage = (e) => {
@@ -72,43 +79,37 @@ export function NetworkDataProvider({ children }: { children: ReactNode }) {
     }
 
     es.onerror = (err) => {
-      const errorDetails = {
-        readyState: es.readyState,
-        timestamp: new Date().toISOString(),
-        type: err.type
-      }
-
-      console.error('SSE error:', errorDetails)
+      console.error('Network stats SSE error:', err)
       setConnectionStatus('error')
-
-      // Handle authentication errors
-      if (err instanceof ErrorEvent && err.message.includes('401')) {
-        console.log('Authentication failed, redirecting to login')
-        router.replace('/login')
-        return
-      }
+      setLastError('Connection to network stats failed')
       
-      const errorMessage = es.readyState === EventSource.CLOSED 
-        ? 'Connection closed unexpectedly'
-        : es.readyState === EventSource.CONNECTING 
-          ? 'Connection attempt failed'
-          : 'Connection error occurred'
+      // Close current connection
+      es.close()
+      
+      // Implement exponential backoff for reconnection
+      const maxRetryCount = 5
+      if (retryCount < maxRetryCount) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000) // 1s, 2s, 4s, 8s, 16s, 30s max
+        console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})`)
         
-      setLastError(errorMessage)
-      
-      if (es.readyState === EventSource.CLOSED) {
         setTimeout(() => {
-          console.log('Attempting to reconnect...')
-          es.close()
-        }, 5000)
+          setRetryCount(prevCount => prevCount + 1)
+          connectEventSource()
+        }, delay)
       }
     }
+  }, [retryCount])
+
+  useEffect(() => {
+    connectEventSource()
 
     return () => {
-      console.log('Cleaning up SSE connection')
-      es.close()
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
     }
-  }, [router])
+  }, [connectEventSource])
 
   return (
     <NetworkDataContext.Provider value={{ data, connectionStatus, lastError }}>
