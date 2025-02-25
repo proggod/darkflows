@@ -7,6 +7,7 @@ set -e
 
 VLANS_JSON="/etc/darkflows/vlans.json"
 NFTABLES_SCRIPT="/usr/local/darkflows/bin/nftables_vlan_min.sh"
+NFTABLES_SHAPING_SCRIPT="/usr/local/darkflows/bin/nftables_vlan_shaping.sh"
 
 if [ ! -f "$VLANS_JSON" ]; then
   echo "ERROR: Missing $VLANS_JSON"
@@ -28,6 +29,7 @@ fi
 for VLAN_ID in $(jq -r '.[].id' "$VLANS_JSON"); do
   echo "=== Configuring VLAN with ID $VLAN_ID ==="
   "$NFTABLES_SCRIPT" "$VLAN_ID"
+  "$NFTABLES_SHAPING_SCRIPT" "$VLAN_ID"
   echo
 done
 

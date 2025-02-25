@@ -133,7 +133,6 @@ export interface VLANConfig {
   ipRange: IPRange;
   egressBandwidth?: string;
   ingressBandwidth?: string;
-  cakeParams?: string;
   dhcp: DHCPConfig;
   communicationGroup: CommunicationGroup;
   created: Date;

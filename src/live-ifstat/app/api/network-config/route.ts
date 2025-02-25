@@ -158,17 +158,9 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    const url = new URL(request.url);
-    const queryParams = Object.fromEntries(url.searchParams);
     
-    console.log('=== NETWORK CONFIG REQUEST ===');
-    console.log('URL:', request.url);
-    console.log('Query Params:', queryParams);
-    console.log('Request Headers:', Object.fromEntries(request.headers));
     
     const config = await parseConfig();
-    console.log('Serving fresh network config at:', new Date().toISOString());
-    console.log('Config:', config);
     
     return new NextResponse(JSON.stringify(config), {
       headers: {

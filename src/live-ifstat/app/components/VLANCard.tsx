@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, OutlinedInput } from '@mui/material'
 import { VLANConfig, NetworkCard, NetworkDevice, NetworkConfig, NetworkInterfaceConfig } from '@/types/dashboard'
 
@@ -16,6 +16,8 @@ interface VLANDialogProps {
     gatewayIp: string;
     subnetMask: string;
     ipPools: Array<{ start: string; end: string; }>;
+    PRIMARY_EGRESS_BANDWIDTH?: string;
+    PRIMARY_INGRESS_BANDWIDTH?: string;
   }
 }
 
@@ -36,7 +38,74 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
   const [isSaving, setIsSaving] = useState(false)
   const [egressBandwidth, setEgressBandwidth] = useState('')
   const [ingressBandwidth, setIngressBandwidth] = useState('')
-  const [cakeParams, setCakeParams] = useState('')
+  const [dnsServers, setDnsServers] = useState<string[]>([''])
+
+  const resetForm = useCallback(() => {
+    console.log("RESET FORM CALLED, networkSettings:", networkSettings);
+    
+    setId(1)
+    setName('')
+    setNetworkCard({ deviceName: '' })
+    setSubnet('')
+    setGateway('')
+    setIpRange({
+      start: '',
+      end: '',
+      available: 0,
+      used: 0
+    })
+    setErrors({})
+    setDnsServers([''])
+    
+    // Use default bandwidth settings if available
+    if (networkSettings) {
+      console.log("Setting defaults from network settings:", {
+        egressBW: networkSettings.PRIMARY_EGRESS_BANDWIDTH,
+        ingressBW: networkSettings.PRIMARY_INGRESS_BANDWIDTH
+      });
+      
+      // Set default egress bandwidth if available
+      if (networkSettings.PRIMARY_EGRESS_BANDWIDTH) {
+        setEgressBandwidth(networkSettings.PRIMARY_EGRESS_BANDWIDTH)
+      } else {
+        setEgressBandwidth('')
+      }
+      
+      // Set default ingress bandwidth if available
+      if (networkSettings.PRIMARY_INGRESS_BANDWIDTH) {
+        setIngressBandwidth(networkSettings.PRIMARY_INGRESS_BANDWIDTH)
+      } else {
+        setIngressBandwidth('')
+      }
+    } else {
+      console.log("No network settings available, using empty defaults");
+      setEgressBandwidth('')
+      setIngressBandwidth('')
+    }
+  }, [networkSettings])
+
+  const initNewVlanForm = useCallback(() => {
+    console.log("INIT NEW VLAN FORM");
+    resetForm();
+    
+    // Force-set values directly after resetForm
+    if (networkSettings) {
+      console.log("Force setting values from network settings");
+      if (networkSettings.PRIMARY_EGRESS_BANDWIDTH) setEgressBandwidth(networkSettings.PRIMARY_EGRESS_BANDWIDTH);
+      if (networkSettings.PRIMARY_INGRESS_BANDWIDTH) setIngressBandwidth(networkSettings.PRIMARY_INGRESS_BANDWIDTH);
+    }
+  }, [resetForm, networkSettings]);
+
+  useEffect(() => {
+    if (!open) {
+      // When closing, just reset the form
+      resetForm();
+    } else if (!vlan) {
+      // When opening for a new VLAN (not editing)
+      console.log("Dialog opened for new VLAN");
+      initNewVlanForm();
+    }
+  }, [open, vlan, initNewVlanForm, resetForm]);
 
   useEffect(() => {
     if (vlan) {
@@ -49,13 +118,13 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       setGateway(vlan.gateway)
       setIpRange(vlan.ipRange)
       setDhcpEnabled(vlan.dhcp?.enabled ?? true)
+      setDnsServers(vlan.dhcp?.dnsServers?.length ? vlan.dhcp.dnsServers : [gateway])
       setEgressBandwidth(vlan.egressBandwidth || '')
       setIngressBandwidth(vlan.ingressBandwidth || '')
-      setCakeParams(vlan.cakeParams || '')
     } else {
       resetForm()
     }
-  }, [vlan, networkCards])
+  }, [vlan, networkCards, gateway, resetForm])
 
   // Validation functions
   const isValidIp = (ip: string): boolean => {
@@ -357,29 +426,14 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     return Object.keys(newErrors).length === 0
   }
 
-  const resetForm = () => {
-    setId(1)
-    setName('')
-    setNetworkCard({ deviceName: '' })
-    setSubnet('')
-    setGateway('')
-    setIpRange({
-      start: '',
-      end: '',
-      available: 0,
-      used: 0
-    })
-    setErrors({})
-    setEgressBandwidth('')
-    setIngressBandwidth('')
-    setCakeParams('')
-  }
-
   const handleSave = async () => {
     if (!validateForm()) return
 
     setIsSaving(true)
     try {
+      // Filter out empty DNS servers
+      const filteredDnsServers = dnsServers.filter(server => server.trim() !== '')
+      
       await onSave({
         id,
         name,
@@ -389,11 +443,13 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
         ipRange,
         egressBandwidth,
         ingressBandwidth,
-        cakeParams,
         dhcp: {
           enabled: dhcpEnabled,
           leaseTime: 86400,
-          dnsServers: dhcpEnabled ? [gateway] : [],
+          // Use custom DNS servers if provided, otherwise default to gateway
+          dnsServers: dhcpEnabled ? 
+            (filteredDnsServers.length > 0 ? filteredDnsServers : [gateway]) : 
+            [],
           defaultGateway: dhcpEnabled ? gateway : '',
           reservations: []
         },
@@ -411,12 +467,12 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     }
   }
 
-  // Reset form when dialog closes
+  // Update useEffect dependency array
   useEffect(() => {
     if (!open) {
       resetForm()
     }
-  }, [open])
+  }, [open, resetForm])
 
   // Update subnet handler to auto-fill
   const handleSubnetChange = (newSubnet: string) => {
@@ -612,13 +668,24 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                 <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
                   Egress BW
                 </label>
-                <input
-                  type="text"
-                  value={egressBandwidth}
-                  onChange={(e) => setEgressBandwidth(e.target.value)}
-                  placeholder="e.g. 50mbit"
-                  className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
+                <div className="flex items-center w-[120px]">
+                  <input
+                    type="text"
+                    value={egressBandwidth}
+                    onChange={(e) => setEgressBandwidth(e.target.value)}
+                    placeholder="Leave blank for unlimited"
+                    className="flex-1 px-1.5 py-1 text-[10px] rounded-l bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  />
+                  {egressBandwidth && (
+                    <button
+                      type="button"
+                      onClick={() => setEgressBandwidth('')}
+                      className="px-1 py-1 text-[10px] bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r hover:bg-gray-300 dark:hover:bg-gray-500"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -627,28 +694,24 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                 <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
                   Ingress BW
                 </label>
-                <input
-                  type="text"
-                  value={ingressBandwidth}
-                  onChange={(e) => setIngressBandwidth(e.target.value)}
-                  placeholder="e.g. 200mbit"
-                  className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col">
-              <div className="flex items-center">
-                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
-                  CAKE Params
-                </label>
-                <input
-                  type="text"
-                  value={cakeParams}
-                  onChange={(e) => setCakeParams(e.target.value)}
-                  placeholder="CAKE parameters"
-                  className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
+                <div className="flex items-center w-[120px]">
+                  <input
+                    type="text"
+                    value={ingressBandwidth}
+                    onChange={(e) => setIngressBandwidth(e.target.value)}
+                    placeholder="Leave blank for unlimited"
+                    className="flex-1 px-1.5 py-1 text-[10px] rounded-l bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  />
+                  {ingressBandwidth && (
+                    <button
+                      type="button"
+                      onClick={() => setIngressBandwidth('')}
+                      className="px-1 py-1 text-[10px] bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r hover:bg-gray-300 dark:hover:bg-gray-500"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -714,6 +777,50 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                 Enable DHCP
               </label>
             </div>
+
+            {dhcpEnabled && (
+              <div className="mt-2">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                  DNS Servers
+                </label>
+                {dnsServers.map((server, index) => (
+                  <div key={index} className="flex items-center mb-1 space-x-1">
+                    <input
+                      type="text"
+                      value={server}
+                      onChange={(e) => {
+                        const newServers = [...dnsServers];
+                        newServers[index] = e.target.value;
+                        setDnsServers(newServers);
+                      }}
+                      placeholder={index === 0 ? "Primary DNS (default: gateway)" : "Secondary DNS"}
+                      className="flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    />
+                    {index === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setDnsServers([...dnsServers, ''])}
+                        className="px-1 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-[10px]"
+                      >
+                        +
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newServers = [...dnsServers];
+                          newServers.splice(index, 1);
+                          setDnsServers(newServers);
+                        }}
+                        className="px-1 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-[10px]"
+                      >
+                        -
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
@@ -750,6 +857,13 @@ export default function VLANCard() {
   const [error, setError] = useState<string>('')
   const [showAddVlan, setShowAddVlan] = useState(false)
   const [editingVlan, setEditingVlan] = useState<VLANConfig | undefined>()
+  const [networkSettings, setNetworkSettings] = useState<{
+    gatewayIp: string;
+    subnetMask: string;
+    ipPools: Array<{ start: string; end: string; }>;
+    PRIMARY_EGRESS_BANDWIDTH?: string;
+    PRIMARY_INGRESS_BANDWIDTH?: string;
+  }>()
 
   const loadData = async () => {
     try {
@@ -760,6 +874,13 @@ export default function VLANCard() {
       if (!vlansResponse.ok) throw new Error('Failed to load VLANs')
       const vlansData = await vlansResponse.json()
       setVlans(vlansData)
+
+      // Load network settings to get default CAKE params
+      const networkSettingsResponse = await fetch('/api/network-settings')
+      if (networkSettingsResponse.ok) {
+        const settingsData = await networkSettingsResponse.json()
+        setNetworkSettings(settingsData)
+      }
 
       // Load network interfaces
       const devicesResponse = await fetch('/api/devices', {
@@ -851,7 +972,10 @@ export default function VLANCard() {
 
         <div className="flex justify-end mb-2">
           <button
-            onClick={() => setShowAddVlan(true)}
+            onClick={() => {
+              console.log("Add VLAN button clicked, networkSettings:", networkSettings);
+              setShowAddVlan(true);
+            }}
             className="btn btn-blue"
           >
             Add VLAN
@@ -917,7 +1041,8 @@ export default function VLANCard() {
         vlan={editingVlan}
         networkCards={networkCards}
         networkConfig={networkConfig}
-        vlans={[]}
+        vlans={vlans}
+        networkSettings={networkSettings}
       />
     </div>
   )
