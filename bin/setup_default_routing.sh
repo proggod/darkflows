@@ -11,6 +11,7 @@ cd /usr/local/darkflows/bin
 /usr/local/darkflows/bin/update_local_forwards.sh
 /usr/local/darkflows/bin/update_secondary_routes.sh
 #/usr/local/darkflows/bin/update_dyndns.sh
+/usr/local/darkflows/bin/setup_vlans.sh
 
 
 
@@ -27,6 +28,7 @@ cd /usr/local/darkflows/bin
 /usr/bin/screen -dmS cake_stats /usr/local/darkflows/bin/cake_stats.sh
 /usr/bin/screen -dmS ping_monitor /usr/bin/python3 /usr/local/darkflows/bin/run_ping.py
 /usr/bin/screen -dmS bandwidth_monitor /usr/bin/python3 /usr/local/darkflows/bin/monitor_bandwidth.py
+/usr/bin/screen -dmS unbound /usr/bin/python3 /usr/local/darkflows/bin/run_unbound.py
 
 
 # Check if docker is installed
