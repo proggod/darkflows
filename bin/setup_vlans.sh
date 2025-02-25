@@ -6,7 +6,7 @@
 set -e
 
 VLANS_JSON="/etc/darkflows/vlans.json"
-NFTABLES_SCRIPT="/usr/local/darkflows/bin/nftables_vlan_ifb.sh"
+NFTABLES_SCRIPT="/usr/local/darkflows/bin/nftables_vlan_min.sh"
 
 if [ ! -f "$VLANS_JSON" ]; then
   echo "ERROR: Missing $VLANS_JSON"

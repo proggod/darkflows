@@ -150,8 +150,8 @@ def update_interfaces():
 
 def update_kea_dhcp_config():
     """Update Kea DHCP configuration with VLAN subnets."""
-    vlans = read_vlans_json()
-    darkflows_map = parse_darkflows_config()
+    with open(VLANS_JSON, 'r') as f:
+        vlans = json.load(f)
 
     with open(KEA_CONFIG_PATH, 'r') as f:
         kea_config = json.load(f)
@@ -198,17 +198,6 @@ def update_kea_dhcp_config():
         pool_start = f"{'.'.join(network_prefix)}.10"
         pool_end   = f"{'.'.join(network_prefix)}.240"
         
-        # Get DNS servers from VLAN configuration
-        dns_servers = []
-        if 'dhcp' in vlan and 'dnsServers' in vlan['dhcp'] and vlan['dhcp']['dnsServers']:
-            dns_servers = vlan['dhcp']['dnsServers']
-        else:
-            # Default to the gateway IP if no DNS servers specified
-            dns_servers = [gateway]
-        
-        # Format DNS servers for Kea (comma-separated list)
-        dns_servers_str = ','.join(dns_servers)
-        
         subnet_config = {
             "id": vlan_id,
             "subnet": network,
@@ -224,7 +213,7 @@ def update_kea_dhcp_config():
                 },
                 {
                     "name": "domain-name-servers",
-                    "data": dns_servers_str
+                    "data": "192.168.1.1"
                 }
             ]
         }
@@ -240,72 +229,12 @@ def update_kea_dhcp_config():
     # Final updated subnets
     kea_config['Dhcp4']['subnet4'] = new_subnets
 
-    # Update the interfaces-config section
-    update_kea_interfaces(kea_config, vlans, darkflows_map)
-
     # Write out the updated config
     with open(KEA_CONFIG_PATH, 'w') as f:
         json.dump(kea_config, f, indent=2)
 
     # Optionally restart KEA
     # os.system('systemctl restart kea-dhcp4-server')
-
-def update_kea_interfaces(kea_config, vlans, darkflows_map):
-    """
-    Update the interfaces list in Kea's interfaces-config section.
-    Adds both the base LAN interfaces and VLAN interfaces that should be there.
-    Removes any interfaces that shouldn't be in the list.
-    """
-    # Ensure we have an interfaces-config section
-    if 'interfaces-config' not in kea_config['Dhcp4']:
-        kea_config['Dhcp4']['interfaces-config'] = {
-            "interfaces": [],
-            "dhcp-socket-type": "raw",
-            "service-sockets-max-retries": 200000,
-            "service-sockets-retry-wait-time": 5000
-        }
-    elif 'interfaces' not in kea_config['Dhcp4']['interfaces-config']:
-        kea_config['Dhcp4']['interfaces-config']['interfaces'] = []
-
-    # Get base interfaces and VLAN interfaces
-    base_interfaces = set()
-    vlan_interfaces = set()
-
-    # Map label -> darkflows config key
-    label_map = {
-        "internal": "INTERNAL_INTERFACE",
-        "primary": "PRIMARY_INTERFACE",
-        "secondary": "SECONDARY_INTERFACE",
-        # Add more if needed
-    }
-
-    # Collect all interfaces from vlans
-    for vlan in vlans:
-        label = vlan['networkCard'].get('label', '').lower()
-        vlan_id = vlan['id']
-        
-        if label in label_map:
-            config_key = label_map[label]
-            device_name = darkflows_map.get(config_key, "lan0")  # fallback
-        else:
-            # Fallback to deviceName if label not recognized
-            device_name = vlan['networkCard'].get('deviceName', 'lan0')
-        
-        base_interfaces.add(device_name)
-        vlan_interfaces.add(f"{device_name}.{vlan_id}")
-    
-    # Only include base interfaces that are actually used in VLANs
-    # We don't automatically add all interfaces from darkflows_map anymore
-    
-    # Fallback to lan0 if no interfaces found
-    if not base_interfaces:
-        base_interfaces.add('lan0')
-    
-    # Combine all interfaces that should be in the list
-    all_interfaces = sorted(list(base_interfaces) + sorted(list(vlan_interfaces)))
-    
-    # Set the updated interfaces list
-    kea_config['Dhcp4']['interfaces-config']['interfaces'] = all_interfaces
 
 def main():
     try:
@@ -318,4 +247,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
