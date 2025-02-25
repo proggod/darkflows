@@ -1,5 +1,5 @@
 #!/bin/bash
-
+cd //usr/local/darkflows/src/live-ifstat
 # Generate a secure random string for SESSION_SECRET if not exists
 if [ ! -f .session-secret ]; then
     openssl rand -base64 32 > .session-secret

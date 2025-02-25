@@ -10,13 +10,6 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 
 const COOKIE_NAME = 'session';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-  maxAge: 60 * 60 * 24 * 7 // 7 days
-};
 
 const getSessionSecret = () => {
   const secret = process.env.SESSION_SECRET;
