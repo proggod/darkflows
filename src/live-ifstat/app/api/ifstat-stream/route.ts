@@ -25,6 +25,16 @@ async function getNetworkStats(device: string) {
   }
 }
 
+function shouldIncludeInterface(interfaceName: string): boolean {
+  // Filter out unwanted interface types
+  return !(
+    interfaceName.startsWith('br-') ||      // Bridge interfaces
+    interfaceName.startsWith('docker') ||   // Docker interfaces
+    interfaceName.startsWith('veth') ||     // Virtual ethernet
+    interfaceName.includes('tailscale')     // Tailscale VPN
+  );
+}
+
 export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
   let intervalId: NodeJS.Timeout | null = null;
@@ -41,7 +51,7 @@ export async function GET(request: NextRequest) {
     if (filteredDevices.length === 0) {
       return new Response('No valid network devices found', { status: 404 });
     }
-    devices.push(...filteredDevices);
+    devices.push(...filteredDevices.filter(shouldIncludeInterface));
   } catch (err) {
     console.error('Error getting network devices:', err);
     return new Response('Failed to get network devices', { status: 500 });
@@ -194,6 +204,7 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'  // This is critical for Nginx
     }
   });
 }

@@ -20,7 +20,16 @@ const nextConfig = {
         { key: 'Expires', value: '0' },
         { key: 'Surrogate-Control', value: 'no-store' },
       ]
-    }
+    },
+    {
+      source: '/api/:path*',
+      headers: [
+        {
+          key: 'X-Accel-Buffering',
+          value: 'no',
+        },
+      ],
+    },
   ],
   typescript: {
     ignoreBuildErrors: true,

@@ -24,7 +24,12 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'no-referrer-when-cross-origin');
   
-
+  // Check if this is a route that needs the streaming header
+  if (request.nextUrl.pathname.startsWith('/api/') && 
+      (request.nextUrl.pathname.includes('stream') || 
+       request.nextUrl.pathname.includes('events'))) {
+    response.headers.set('X-Accel-Buffering', 'no');
+  }
 
   const { pathname } = request.nextUrl;
 
