@@ -46,8 +46,8 @@ v 0.33
     - Traffic shaping VLAN support
     - Traffic routing VLAN support
     - Local port mapping vlan support
-
-    
+    - Added NGINX removed LightHttpd reliance
+    - Generate SSL cert, proxy through NGINX for SSL    
     
 v 0.30
     - Removed test SSH keys from root
