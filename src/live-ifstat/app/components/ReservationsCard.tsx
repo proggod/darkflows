@@ -49,21 +49,40 @@ export default function ReservationsCard() {
   const [editingHostname, setEditingHostname] = useState<string | null>(null)
   const { triggerRefresh, registerRefreshCallback } = useRefresh()
   const [isCheckingIp, setIsCheckingIp] = useState<boolean>(false)
+  const [fetchAttempts, setFetchAttempts] = useState<number>(0)
 
   useEffect(() => {
-    fetchReservations()
-    return registerRefreshCallback(fetchReservations)
-  }, [registerRefreshCallback])
+    
+    fetchReservations();
+    return registerRefreshCallback(fetchReservations);
+  }, [registerRefreshCallback]);
 
 
   const fetchReservations = async () => {
     try {
-      const response = await fetch('/api/reservations')
-      const data = await response.json()
-      setReservations(data)
+      const currentAttempt = fetchAttempts + 1;
+      setFetchAttempts(currentAttempt);
+      
+      
+      const response = await fetch('/api/reservations');
+
+      if (!response.ok) {
+        setError(`Failed to load reservations: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data)) {
+        setReservations(data);
+      } else {
+        console.error(`[ReservationsCard] Expected array but got:`, data);
+        setError('Received invalid data format from server');
+      }
     } catch (error) {
-      console.error('Error fetching reservations:', error)
-      setError('Failed to load reservations')
+      console.error('[ReservationsCard] Error fetching reservations:', error);
+      setError(`Failed to load reservations: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -79,21 +98,22 @@ export default function ReservationsCard() {
           })
         })
 
+        
         if (response.ok) {
           await fetchReservations()
           triggerRefresh()
         } else {
-          setError('Failed to delete reservation')
+          setError(`Failed to delete reservation: ${response.status} ${response.statusText}`)
         }
       } catch (error) {
-        console.error('Error deleting reservation:', error)
-        setError('Error deleting reservation')
+        setError(`Error deleting reservation: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
   }
 
   const handleAdd = async () => {
     try {
+      
       // Basic validation
       if (!newReservation['ip-address'] || !newReservation['hw-address']) {
         setError('IP Address and MAC Address are required')
@@ -114,28 +134,30 @@ export default function ReservationsCard() {
         return
       }
 
+      
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newReservation)
       })
 
+      
       if (response.ok) {
         setOpenDialog(false)
         setNewReservation({ 'ip-address': '', 'hw-address': '', hostname: '' })
         await fetchReservations()
         triggerRefresh()
       } else {
-        setError('Failed to add reservation')
+        setError(`Failed to add reservation: ${response.status} ${response.statusText}`)
       }
     } catch (error) {
-      console.error('Error adding reservation:', error)
-      setError('Error adding reservation')
+      setError(`Error adding reservation: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   const handleEdit = async () => {
     try {
+      
       // Basic validation
       if (!newReservation['ip-address'] || !newReservation['hw-address']) {
         setError('IP Address and MAC Address are required')
@@ -177,6 +199,7 @@ export default function ReservationsCard() {
         return;
       }
 
+      
       const response = await fetch('/api/reservations', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -186,6 +209,7 @@ export default function ReservationsCard() {
         })
       });
 
+      
       if (response.ok) {
         setError('');
         setOpenDialog(false);
@@ -196,7 +220,6 @@ export default function ReservationsCard() {
         toast.success('Reservation updated successfully');
       } else {
         const errorData = await response.json();
-        console.error('Failed to update reservation:', errorData);
         if (errorData.error === 'Reservation not found') {
           setError('Cannot find original reservation. Please try adding as new instead.');
         } else {
@@ -208,7 +231,6 @@ export default function ReservationsCard() {
         }
       }
     } catch (error) {
-      console.error('Error updating reservation:', error);
       setError(error instanceof Error ? error.message : 'Error updating reservation');
     }
   };
@@ -283,9 +305,10 @@ export default function ReservationsCard() {
           })
         });
 
+        
         if (!dnsResponse.ok) {
           const errorText = await dnsResponse.text();
-          console.error('Failed to update hostname:', errorText);
+          console.error(`[ReservationsCard] Failed to update hostname: ${errorText}`);
           setError('Failed to update hostname');
           return;
         }
@@ -301,8 +324,7 @@ export default function ReservationsCard() {
           return newState;
         });
       } catch (error) {
-        console.error('Error updating hostname:', error);
-        setError('Failed to update hostname');
+        setError(`Failed to update hostname: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setSavingHostnames(prev => ({ ...prev, [reservation['ip-address']]: false }));
       }
@@ -312,7 +334,12 @@ export default function ReservationsCard() {
   return (
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DHCP Reservations</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          DHCP Reservations 
+          <span className="text-xs ml-1 text-gray-500">
+            ({process.env.NODE_ENV === 'production' ? 'prod' : 'dev'})
+          </span>
+        </h3>
         <div className="flex gap-2">
           <RefreshIcon 
             onClick={fetchReservations}
@@ -396,6 +423,25 @@ export default function ReservationsCard() {
             </tr>
           </thead>
           <tbody>
+            {reservations.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-1 py-2 text-center text-xs text-gray-500 dark:text-gray-400">
+                  {fetchAttempts > 0 ? (
+                    <div className="flex flex-col items-center">
+                      <p className="mb-2">No reservations found</p>
+                      <button
+                        onClick={() => {
+                          setOpenDialog(true);
+                        }}
+                        className="px-2 py-1 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700"
+                      >
+                        Add your first reservation
+                      </button>
+                    </div>
+                  ) : 'Loading reservations...'}
+                </td>
+              </tr>
+            )}
             {reservations.map((reservation, index) => (
               <tr 
                 key={reservation['ip-address']} 

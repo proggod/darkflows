@@ -380,12 +380,9 @@ const CombinedDashboard = () => {
 
   // Add getNetworkCardData function that was missing
   const getNetworkCardData = (iface: string): IfstatData[] => {
-    console.log(`Looking for network stats for interface: ${iface}`);
-    console.log(`Available interfaces with stats:`, Object.keys(networkStats));
     
     const stats = networkStats[iface]
     if (!stats || stats.length === 0) {
-      console.log(`No stats found for ${iface}`);
       return [{
         timestamp: new Date().toISOString(),
         interface: iface,
@@ -394,7 +391,6 @@ const CombinedDashboard = () => {
       }]
     }
 
-    console.log(`Found ${stats.length} data points for ${iface}`);
     return stats.map(stat => ({
       timestamp: new Date(stat.timestamp).toISOString(),
       interface: stat.interface,

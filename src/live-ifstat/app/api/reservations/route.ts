@@ -7,9 +7,6 @@ import { syncAllSystems } from '@/lib/sync';
 import { requireAuth } from '../../lib/auth';
 import mysql from 'mysql2/promise';
 
-// At the top of the file, after imports
-process.stdout.write('=== Reservations API module loaded ===\n');
-
 const execAsync = promisify(exec);
 const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py';
 
@@ -18,79 +15,104 @@ const getDbConnection = async () => {
     const config = await readConfig();
     const dbConfig = config.Dhcp4['lease-database'];
     
-    return mysql.createConnection({
+    const connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
       user: dbConfig.user,
       password: dbConfig.password,
       database: dbConfig.name
     });
-  } catch {
-    console.error('Error connecting to database');
-    throw new Error('Failed to connect to database');
+    
+    return connection;
+  } catch (error) {
+    console.error('Error connecting to database:', error);
+    throw new Error(`Failed to connect to database: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
 
 async function syncDNSEntry(ip: string, hostname: string, shouldDelete = false) {
-  const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}] DNS Sync:`;
-
   try {
-    const cmd = shouldDelete 
-      ? `python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`
-      : `python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`;
-    
-    process.stdout.write(`${prefix} Executing command: ${cmd}\n`);
-    
-    const { stdout, stderr } = shouldDelete
-      ? await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`)
-      : await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`);
-
-    if (stdout) process.stdout.write(`${prefix} Output: ${stdout}\n`);
-    if (stderr) process.stderr.write(`${prefix} Error: ${stderr}\n`);
-    
-    process.stdout.write(`${prefix} Command executed successfully\n`);
+    if (shouldDelete) {
+      await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`);
+    } else {
+      await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`);
+    }
   } catch (error) {
-    process.stderr.write(`${prefix} Failed: ${error}\n`);
+    console.error(`DNS Sync Error: ${error}`);
   }
 }
 
 export async function GET(request: NextRequest) {
   const authResponse = await requireAuth(request);
-  if (authResponse) return authResponse;
+  if (authResponse) {
+    return authResponse;
+  }
 
   let connection;
   try {
     connection = await getDbConnection();
     
-    // Query the hosts table
-    const [rows] = await connection.execute<mysql.RowDataPacket[]>(`
+    // Get the correct identifier type for MAC addresses
+    let macIdentifierType = 1; // Default value as fallback
+    try {
+      const [hwAddressType] = await connection.execute<mysql.RowDataPacket[]>(
+        "SELECT type FROM host_identifier_type WHERE name = 'hw-address' OR name = 'hw_address' LIMIT 1"
+      );
+      
+      if (hwAddressType.length > 0) {
+        macIdentifierType = hwAddressType[0].type;
+      }
+    } catch {
+      // Use default macIdentifierType if query fails
+    }
+    
+    // Query the hosts table with the correct identifier type
+    const query = `
       SELECT 
         INET_NTOA(ipv4_address) as 'ip-address',
         LOWER(HEX(dhcp_identifier)) as 'hw-address-hex',
         hostname
       FROM hosts
-      WHERE dhcp_identifier_type = 1
-    `);
+      WHERE dhcp_identifier_type = ?
+    `;
+    
+    const [rows] = await connection.execute<mysql.RowDataPacket[]>(query, [macIdentifierType]);
     
     // Format MAC addresses with colons
-    const reservations = rows.map(row => ({
-      'ip-address': row['ip-address'],
-      'hw-address': (row['hw-address-hex'].match(/.{1,2}/g) || []).join(':').toLowerCase(),
-      hostname: row.hostname || ''
-    }));
+    const reservations = rows.map(row => {
+      const formattedMac = (row['hw-address-hex'].match(/.{1,2}/g) || []).join(':').toLowerCase();
+      return {
+        'ip-address': row['ip-address'],
+        'hw-address': formattedMac,
+        hostname: row.hostname || ''
+      };
+    });
     
-    return NextResponse.json(reservations);
+    const response = NextResponse.json(reservations);
+    
+    // Add no-cache headers explicitly
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Error reading reservations from database:', error);
-    return NextResponse.json({ error: 'Failed to read reservations' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to read reservations',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   } finally {
-    if (connection) await connection.end();
+    if (connection) {
+      await connection.end();
+    }
   }
 }
 
 export async function POST(request: NextRequest) {
   const authResponse = await requireAuth(request);
-  if (authResponse) return authResponse;
+  if (authResponse) {
+    return authResponse;
+  }
 
   let connection;
   try {
@@ -102,16 +124,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'IP address is not in any configured subnet' }, { status: 400 });
     }
     
+    connection = await getDbConnection();
+    
+    // Get correct identifier type for MAC addresses
+    let macIdentifierType = 1; // Default value as fallback
+    try {
+      const [hwAddressType] = await connection.execute<mysql.RowDataPacket[]>(
+        "SELECT type FROM host_identifier_type WHERE name = 'hw-address' OR name = 'hw_address' LIMIT 1"
+      );
+      
+      if (hwAddressType.length > 0) {
+        macIdentifierType = hwAddressType[0].type;
+      }
+    } catch {
+      // Use default macIdentifierType if query fails
+    }
+    
     // Convert MAC to binary format for database
     const macHex = reservation['hw-address'].replace(/:/g, '');
     const ipNumber = ipToNumber(reservation['ip-address']);
     
-    connection = await getDbConnection();
-    
     // Check if reservation already exists
     const [existing] = await connection.execute<mysql.RowDataPacket[]>(
-      'SELECT * FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = 1',
-      [macHex]
+      'SELECT * FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ?',
+      [macHex, macIdentifierType]
     );
     
     if (existing.length > 0) {
@@ -120,8 +156,8 @@ export async function POST(request: NextRequest) {
     
     // Insert the new reservation
     await connection.execute(
-      'INSERT INTO hosts (dhcp_identifier, dhcp_identifier_type, dhcp4_subnet_id, ipv4_address, hostname) VALUES (UNHEX(?), 1, ?, ?, ?)',
-      [macHex, subnetId, ipNumber, reservation.hostname || null]
+      'INSERT INTO hosts (dhcp_identifier, dhcp_identifier_type, dhcp4_subnet_id, ipv4_address, hostname) VALUES (UNHEX(?), ?, ?, ?, ?)',
+      [macHex, macIdentifierType, subnetId, ipNumber, reservation.hostname || null]
     );
     
     // Add DNS entry if hostname is provided
@@ -136,13 +172,17 @@ export async function POST(request: NextRequest) {
     console.error('Error creating reservation:', error);
     return NextResponse.json({ error: 'Failed to create reservation' }, { status: 500 });
   } finally {
-    if (connection) await connection.end();
+    if (connection) {
+      await connection.end();
+    }
   }
 }
 
 export async function DELETE(request: NextRequest) {
   const authResponse = await requireAuth(request);
-  if (authResponse) return authResponse;
+  if (authResponse) {
+    return authResponse;
+  }
 
   let connection;
   try {
@@ -154,10 +194,24 @@ export async function DELETE(request: NextRequest) {
     
     connection = await getDbConnection();
     
+    // Get correct identifier type for MAC addresses
+    let macIdentifierType = 1; // Default value as fallback
+    try {
+      const [hwAddressType] = await connection.execute<mysql.RowDataPacket[]>(
+        "SELECT type FROM host_identifier_type WHERE name = 'hw-address' OR name = 'hw_address' LIMIT 1"
+      );
+      
+      if (hwAddressType.length > 0) {
+        macIdentifierType = hwAddressType[0].type;
+      }
+    } catch {
+      // Use default macIdentifierType if query fails
+    }
+    
     // Get hostname before deleting for DNS cleanup
     const [rows] = await connection.execute<mysql.RowDataPacket[]>(
-      'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = 1 AND ipv4_address = ?',
-      [macHex, ipNumber]
+      'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ? AND ipv4_address = ?',
+      [macHex, macIdentifierType, ipNumber]
     );
     
     const hostname = rows[0]?.hostname;
@@ -169,8 +223,8 @@ export async function DELETE(request: NextRequest) {
     
     // Delete the reservation
     await connection.execute(
-      'DELETE FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = 1 AND ipv4_address = ?',
-      [macHex, ipNumber]
+      'DELETE FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ? AND ipv4_address = ?',
+      [macHex, macIdentifierType, ipNumber]
     );
     
     await syncAllSystems();
@@ -180,13 +234,17 @@ export async function DELETE(request: NextRequest) {
     console.error('Error deleting reservation:', error);
     return NextResponse.json({ error: 'Failed to delete reservation' }, { status: 500 });
   } finally {
-    if (connection) await connection.end();
+    if (connection) {
+      await connection.end();
+    }
   }
 }
 
 export async function PUT(request: NextRequest) {
   const authResponse = await requireAuth(request);
-  if (authResponse) return authResponse;
+  if (authResponse) {
+    return authResponse;
+  }
 
   let connection;
   try {
@@ -204,10 +262,24 @@ export async function PUT(request: NextRequest) {
     
     connection = await getDbConnection();
     
+    // Get correct identifier type for MAC addresses
+    let macIdentifierType = 1; // Default value as fallback
+    try {
+      const [hwAddressType] = await connection.execute<mysql.RowDataPacket[]>(
+        "SELECT type FROM host_identifier_type WHERE name = 'hw-address' OR name = 'hw_address' LIMIT 1"
+      );
+      
+      if (hwAddressType.length > 0) {
+        macIdentifierType = hwAddressType[0].type;
+      }
+    } catch {
+      // Use default macIdentifierType if query fails
+    }
+    
     // Get existing reservation
     const [rows] = await connection.execute<mysql.RowDataPacket[]>(
-      'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = 1',
-      [macHex]
+      'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ?',
+      [macHex, macIdentifierType]
     );
     
     if (rows.length === 0) {
@@ -227,8 +299,8 @@ export async function PUT(request: NextRequest) {
     
     // Update the reservation
     await connection.execute(
-      'UPDATE hosts SET ipv4_address = ?, hostname = ?, dhcp4_subnet_id = ? WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = 1',
-      [newIpNumber, reservation.hostname || null, subnetId, macHex]
+      'UPDATE hosts SET ipv4_address = ?, hostname = ?, dhcp4_subnet_id = ? WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ?',
+      [newIpNumber, reservation.hostname || null, subnetId, macHex, macIdentifierType]
     );
     
     await syncAllSystems();
@@ -238,7 +310,9 @@ export async function PUT(request: NextRequest) {
     console.error('Error updating reservation:', error);
     return NextResponse.json({ error: 'Failed to update reservation' }, { status: 500 });
   } finally {
-    if (connection) await connection.end();
+    if (connection) {
+      await connection.end();
+    }
   }
 }
 

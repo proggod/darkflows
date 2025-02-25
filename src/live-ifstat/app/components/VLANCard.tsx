@@ -41,7 +41,6 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
   const [dnsServers, setDnsServers] = useState<string[]>([''])
 
   const resetForm = useCallback(() => {
-    console.log("RESET FORM CALLED, networkSettings:", networkSettings);
     
     setId(1)
     setName('')
@@ -59,10 +58,6 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     
     // Use default bandwidth settings if available
     if (networkSettings) {
-      console.log("Setting defaults from network settings:", {
-        egressBW: networkSettings.PRIMARY_EGRESS_BANDWIDTH,
-        ingressBW: networkSettings.PRIMARY_INGRESS_BANDWIDTH
-      });
       
       // Set default egress bandwidth if available
       if (networkSettings.PRIMARY_EGRESS_BANDWIDTH) {

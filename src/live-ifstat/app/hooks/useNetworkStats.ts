@@ -27,7 +27,6 @@ export function useNetworkStats() {
 
     eventSource.onmessage = (event) => {
       const stats = JSON.parse(event.data) as RawNetworkStats
-      console.log('Received stats data:', stats)
       setNetworkStats(prevStats => {
         const newStats = { ...prevStats }
         const iface = stats.device
