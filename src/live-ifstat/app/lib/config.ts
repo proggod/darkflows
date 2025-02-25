@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import { exec } from 'child_process';
+import { Config } from '@/types/config';
 
 const KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf';
 
@@ -17,7 +18,7 @@ interface KeaConfig {
   };
 }
 
-export async function readConfig(): Promise<KeaConfig> {
+export async function readConfig(): Promise<Config> {
   try {
     const content = await fs.readFile(KEA_CONFIG_PATH, 'utf-8');
     // Remove any trailing commas before parsing
@@ -25,7 +26,7 @@ export async function readConfig(): Promise<KeaConfig> {
       .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas before } or ]
       .replace(/,(\s*})/g, '}')       // Remove trailing commas before }
       .replace(/,(\s*\])/g, ']');     // Remove trailing commas before ]
-    return JSON.parse(cleanContent);
+    return JSON.parse(cleanContent) as Config;
   } catch (error) {
     console.error('Error parsing Kea config:', error);
     throw error;

@@ -1,8 +1,9 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { readConfig, writeConfig } from '@/lib/config'
+import { readConfig } from '@/lib/config'
 import { syncAllSystems } from '@/lib/sync'
+import mysql from 'mysql2/promise'
 
 const execAsync = promisify(exec)
 const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py'
@@ -30,6 +31,22 @@ function parseListOutput(output: string): DnsEntry[] {
   }
 }
 
+const getDbConnection = async () => {
+  try {
+    const config = await readConfig()
+    const dbConfig = config.Dhcp4['lease-database']
+    
+    return mysql.createConnection({
+      socketPath: '/var/run/mysqld/mysqld.sock',
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.name
+    })
+  } catch (error) {
+    console.error('Error connecting to database:', error)
+    throw new Error('Failed to connect to database')
+  }
+}
 
 // GET handler to list all DNS entries
 export async function GET() {
@@ -149,35 +166,38 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: addStderr }, { status: 500 })
     }
     
-    // If we have a MAC address, update the DHCP reservation too
+    // If we have a MAC address, update the DHCP reservation in the database
     if (mac) {
       try {
-        const config = await readConfig();
-        const reservations = config.Dhcp4.subnet4[0].reservations;
+        // Convert MAC to binary format for database
+        const macHex = mac.replace(/:/g, '');
+        const ipNumber = ip.split('.').reduce((acc: number, octet: string) => (acc << 8) + parseInt(octet, 10), 0);
         
-        // Find and update the matching reservation
-        const reservation = reservations.find(r => 
-          r['ip-address'] === ip && r['hw-address'] === mac
-        );
+        const connection = await getDbConnection();
         
-        if (reservation) {
-          reservation.hostname = newHostname;
-          await writeConfig(config);
+        try {
+          await connection.execute(
+            'UPDATE hosts SET hostname = ? WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = 1 AND ipv4_address = ?',
+            [newHostname, macHex, ipNumber]
+          );
+        } finally {
+          await connection.end();
         }
       } catch (error) {
-        console.error('Error updating DHCP reservation:', error)
+        console.error('Error updating hostname in database:', error);
+        return NextResponse.json({ error: 'Failed to update hostname in database' }, { status: 500 });
       }
     }
     
     try {
       await syncAllSystems();
     } catch (error) {
-      console.error('Error syncing systems:', error)
+      console.error('Error syncing systems:', error);
     }
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating hostname:', error);
-    return NextResponse.json({ error: 'Failed to update hostname' }, { status: 500 });
+    console.error('Error in DNS hosts update:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 
