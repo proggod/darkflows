@@ -4,6 +4,11 @@ const nextConfig = {
   experimental: {
     serverActions: true
   },
+  logging: {
+    fetches: {
+      fullUrl: false
+    }
+  },
   // Disable strict mode for now while debugging auth
   reactStrictMode: false,
   headers: async () => {

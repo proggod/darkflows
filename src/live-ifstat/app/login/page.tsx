@@ -76,7 +76,9 @@ export default function LoginPage() {
       console.log('Attempting login...');
       const response = await fetch('/api/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ password }),
         credentials: 'include'
       });
@@ -89,21 +91,17 @@ export default function LoginPage() {
         data
       });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
-
       if (data.success) {
         console.log('Login successful, redirecting...');
         router.push('/');
         router.refresh();
       } else {
         console.log('Login failed:', data);
-        setError('Invalid credentials');
+        setError(data.error || 'Invalid credentials');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(error instanceof Error ? error.message : 'Login failed');
+      setError('Login failed');
     } finally {
       setIsLoading(false);
       console.log('=== Login Form Submission END ===');

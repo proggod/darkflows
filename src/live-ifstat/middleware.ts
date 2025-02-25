@@ -9,7 +9,6 @@ import { jwtVerify } from 'jose';
 const publicPaths = [
   '/login',
   '/api/login',
-  '/api/health',
   '/api/auth/check-setup',
   '/api/auth/save-credentials',
   '/api/auth/update-system-passwords',
@@ -19,11 +18,29 @@ const publicPaths = [
 ];
 
 export async function middleware(request: NextRequest) {
+  const response = NextResponse.next();
+
+  // Add security headers
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'no-referrer-when-cross-origin');
+  
+  // Only log non-sensitive paths in development
+  if (process.env.NODE_ENV === 'development') {
+    const sensitivePathRegex = /\/(login|auth)/;
+    if (!sensitivePathRegex.test(request.nextUrl.pathname)) {
+      console.log('Middleware processing:', {
+        pathname: request.nextUrl.pathname,
+        isPublicPath: publicPaths.some(path => request.nextUrl.pathname.startsWith(path)),
+        hasSessionCookie: !!request.cookies.get('session')
+      });
+    }
+  }
+
   const { pathname } = request.nextUrl;
 
   // Allow public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
-    return NextResponse.next();
+    return response;
   }
 
   const token = request.cookies.get('session');
@@ -40,10 +57,10 @@ export async function middleware(request: NextRequest) {
   try {
     await jwtVerify(
       token.value,
-      new TextEncoder().encode(process.env.SESSION_SECRET),
+      new TextEncoder().encode(process.env.SESSION_SECRET || 'development-secret'),
       { algorithms: ['HS256'] }
     );
-    return NextResponse.next();
+    return response;
   } catch (error) {
     console.error('JWT verification failed:', error);
     if (pathname.startsWith('/api/')) {

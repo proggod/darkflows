@@ -3,8 +3,19 @@ import { readFile, writeFile } from 'fs/promises'
 import { VLANConfig } from '@/types/dashboard'
 import { requireAuth } from '@/lib/auth'
 import { NextRequest } from 'next/server'
+import { exec } from 'child_process'
+import { promisify } from 'util'
 
+const execAsync = promisify(exec)
 const VLANS_FILE = '/etc/darkflows/vlans.json'
+const UPDATE_SCRIPT = '/usr/local/darkflows/bin/update_vlans.py'
+
+// Helper to validate bandwidth format
+const isValidBandwidth = (bandwidth: string): boolean => {
+  if (!bandwidth) return true // Optional field
+  const regex = /^\d+(\.\d+)?(kbit|mbit|gbit|tbit)$/i
+  return regex.test(bandwidth)
+}
 
 // Helper to read VLAN configurations
 async function readVLANs(): Promise<VLANConfig[]> {
@@ -20,6 +31,7 @@ async function readVLANs(): Promise<VLANConfig[]> {
 // Helper to write VLAN configurations
 async function writeVLANs(vlans: VLANConfig[]): Promise<void> {
   await writeFile(VLANS_FILE, JSON.stringify(vlans, null, 2))
+  await execAsync(UPDATE_SCRIPT)
 }
 
 export async function GET(request: NextRequest) {
@@ -46,6 +58,14 @@ export async function POST(request: NextRequest) {
     // Validate VLAN ID uniqueness
     if (vlans.some(v => v.id === newVlan.id)) {
       return NextResponse.json({ error: 'VLAN ID already exists' }, { status: 400 })
+    }
+
+    // Validate bandwidth formats if provided
+    if (newVlan.egressBandwidth && !isValidBandwidth(newVlan.egressBandwidth)) {
+      return NextResponse.json({ error: 'Invalid egress bandwidth format' }, { status: 400 })
+    }
+    if (newVlan.ingressBandwidth && !isValidBandwidth(newVlan.ingressBandwidth)) {
+      return NextResponse.json({ error: 'Invalid ingress bandwidth format' }, { status: 400 })
     }
 
     // Add timestamps

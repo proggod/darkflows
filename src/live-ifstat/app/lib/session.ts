@@ -18,6 +18,14 @@ const COOKIE_OPTIONS = {
   maxAge: 60 * 60 * 24 * 7 // 7 days
 };
 
+const getSessionSecret = () => {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET is not set in production');
+  }
+  return secret || 'development-secret';
+};
+
 // Helper function to get session token
 const getSessionToken = cache(async () => {
   try {
@@ -43,7 +51,7 @@ export const verifySession = cache(async () => {
     try {
       const verified = await jwtVerify(
         token,
-        new TextEncoder().encode(process.env.SESSION_SECRET),
+        new TextEncoder().encode(getSessionSecret()),
         {
           algorithms: ['HS256']
         }
@@ -70,7 +78,7 @@ export async function isLoggedIn() {
     
     await jwtVerify(
       sessionCookie.value,
-      new TextEncoder().encode(process.env.SESSION_SECRET),
+      new TextEncoder().encode(getSessionSecret()),
       {
         algorithms: ['HS256']
       }
@@ -90,36 +98,29 @@ export async function createSession() {
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
-      .sign(new TextEncoder().encode(process.env.SESSION_SECRET));
+      .sign(new TextEncoder().encode(getSessionSecret()));
 
     const response = NextResponse.json({ success: true });
-
-    // Set cookie in both ways to ensure it's set
-    const cookieStore = await cookies();
-    await cookieStore.set({
-      name: COOKIE_NAME,
-      value: token,
+    
+    // Set cookie in multiple ways to ensure it works in development
+    response.cookies.set('session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7
+      maxAge: 60 * 60 * 24 * 7 // 7 days
     });
-
-    response.cookies.set(COOKIE_NAME, token, COOKIE_OPTIONS);
 
     // Also set explicit Set-Cookie header
     response.headers.set(
       'Set-Cookie',
-      `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`
+      `session=${token}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; ' : ''}SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`
     );
-
 
     return response;
   } catch (error) {
     console.error('createSession error:', error);
-    return NextResponse.json({ success: false });
-  } finally {
+    return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
   }
 }
 
@@ -131,19 +132,21 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function validateCredentials(password: string) {
   try {
+    if (process.env.NODE_ENV === 'development' && password === 'development') {
+      return true;
+    }
+
     const credentialsFile = '/etc/darkflows/admin_credentials.json';
-    
     const fileContent = await fs.readFile(credentialsFile, 'utf-8');
-    
     const { hashedPassword } = JSON.parse(fileContent);
-    
-    const isValid = await bcrypt.compare(password, hashedPassword);
-    
-    return isValid;
+    return await bcrypt.compare(password, hashedPassword);
   } catch (error) {
     console.error('validateCredentials error:', error);
+    if (process.env.NODE_ENV === 'development') {
+      // Allow login in development if credential file doesn't exist
+      return password === 'development';
+    }
     return false;
-  } finally {
   }
 }
 

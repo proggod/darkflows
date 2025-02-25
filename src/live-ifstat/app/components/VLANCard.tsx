@@ -34,6 +34,9 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [dhcpEnabled, setDhcpEnabled] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [egressBandwidth, setEgressBandwidth] = useState('')
+  const [ingressBandwidth, setIngressBandwidth] = useState('')
+  const [cakeParams, setCakeParams] = useState('')
 
   useEffect(() => {
     if (vlan) {
@@ -46,6 +49,9 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       setGateway(vlan.gateway)
       setIpRange(vlan.ipRange)
       setDhcpEnabled(vlan.dhcp?.enabled ?? true)
+      setEgressBandwidth(vlan.egressBandwidth || '')
+      setIngressBandwidth(vlan.ingressBandwidth || '')
+      setCakeParams(vlan.cakeParams || '')
     } else {
       resetForm()
     }
@@ -364,6 +370,9 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       used: 0
     })
     setErrors({})
+    setEgressBandwidth('')
+    setIngressBandwidth('')
+    setCakeParams('')
   }
 
   const handleSave = async () => {
@@ -378,6 +387,9 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
         subnet,
         gateway,
         ipRange,
+        egressBandwidth,
+        ingressBandwidth,
+        cakeParams,
         dhcp: {
           enabled: dhcpEnabled,
           leaseTime: 86400,
@@ -593,6 +605,51 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
               {errors.subnet && (
                 <span className="text-[9px] text-red-500 mt-0.5">{errors.subnet}</span>
               )}
+            </div>
+
+            <div className="flex flex-col">
+              <div className="flex items-center">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
+                  Egress BW
+                </label>
+                <input
+                  type="text"
+                  value={egressBandwidth}
+                  onChange={(e) => setEgressBandwidth(e.target.value)}
+                  placeholder="e.g. 50mbit"
+                  className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <div className="flex items-center">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
+                  Ingress BW
+                </label>
+                <input
+                  type="text"
+                  value={ingressBandwidth}
+                  onChange={(e) => setIngressBandwidth(e.target.value)}
+                  placeholder="e.g. 200mbit"
+                  className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col">
+              <div className="flex items-center">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">
+                  CAKE Params
+                </label>
+                <input
+                  type="text"
+                  value={cakeParams}
+                  onChange={(e) => setCakeParams(e.target.value)}
+                  placeholder="CAKE parameters"
+                  className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+              </div>
             </div>
           </div>
 

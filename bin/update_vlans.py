@@ -9,6 +9,29 @@ from pathlib import Path
 INTERFACES_FILE = '/etc/network/interfaces'
 VLANS_JSON = '/etc/darkflows/vlans.json'
 KEA_CONFIG_PATH = '/etc/kea/kea-dhcp4.conf'
+DARKFLOWS_CONFIG = '/etc/darkflows/d_network.cfg'
+
+def parse_darkflows_config():
+    """
+    Parse /etc/darkflows/d_network.cfg to retrieve the interface variables.
+    For example: PRIMARY_INTERFACE=lan1, INTERNAL_INTERFACE=lan0, etc.
+    """
+    config_map = {}
+    if not os.path.exists(DARKFLOWS_CONFIG):
+        return config_map
+
+    with open(DARKFLOWS_CONFIG, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # Example line: PRIMARY_INTERFACE="lan1"
+            if '=' in line:
+                key, val = line.split('=', 1)
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")  # remove quotes
+                config_map[key] = val
+    return config_map
 
 def read_vlans_json():
     """Read and parse the VLANS configuration file."""
@@ -29,7 +52,7 @@ def read_interfaces_file():
         sys.exit(1)
 
 def write_interfaces_file(content):
-    """Write the updated network interfaces file."""
+    """Write the updated network interfaces file, creating a backup."""
     try:
         # Create backup
         Path(INTERFACES_FILE).rename(f"{INTERFACES_FILE}.bak")
@@ -46,54 +69,90 @@ def write_interfaces_file(content):
             pass
         sys.exit(1)
 
-def generate_vlan_config(vlan):
-    """Generate interface configuration for a VLAN."""
-    device_name = vlan['networkCard']['deviceName']  # This will be "2"
+def generate_vlan_config(vlan, darkflows_map):
+    """
+    Generate interface configuration for a VLAN.
+    We'll look up the real base interface name from label (e.g. "Internal" => lan0).
+    Then we add egress/ingress/cakeParams as comments or optional 'up' commands.
+    """
+    label = vlan['networkCard'].get('label', '').lower()  # e.g. "internal"
+    
+    # Map label -> darkflows config key
+    label_map = {
+        "internal":  "INTERNAL_INTERFACE",
+        "primary":   "PRIMARY_INTERFACE",
+        "secondary": "SECONDARY_INTERFACE",
+        # Add more if needed
+    }
+    if label in label_map:
+        config_key = label_map[label]
+        device_name = darkflows_map.get(config_key, "lan0")  # fallback
+    else:
+        # Fallback to deviceName if label not recognized
+        device_name = vlan['networkCard'].get('deviceName', 'lan0')
+
     vlan_id = vlan['id']
     gateway = vlan['gateway']
-    netmask = vlan['subnet'].split('/')[1]
+    netmask_bits = vlan['subnet'].split('/')[1]
     
     # Convert CIDR to netmask
-    netmask_bits = int(netmask)
-    netmask = '.'.join([str((0xffffffff << (32 - netmask_bits) >> i) & 0xff)
-                        for i in [24, 16, 8, 0]])
-    
+    netmask_bits = int(netmask_bits)
+    netmask = '.'.join([
+        str((0xffffffff << (32 - netmask_bits) >> i) & 0xff)
+        for i in [24, 16, 8, 0]
+    ])
+
+    # Pull shaping fields from JSON (optional)
+    egress_bw = vlan.get("egressBandwidth", "N/A")
+    ingress_bw = vlan.get("ingressBandwidth", "N/A")
+    cake_params = vlan.get("cakeParams", "")
+
+    # If you want these as comment lines only:
     return f"""
 auto {device_name}.{vlan_id}
 iface {device_name}.{vlan_id} inet static
     vlan-raw-device {device_name}
     address {gateway}
-    netmask {netmask}"""
+    netmask {netmask}
+
+    # Traffic Shaping (read from JSON):
+    #   Egress:  {egress_bw}
+    #   Ingress: {ingress_bw}
+    #   CAKE:    {cake_params}
+
+    # If you want to run 'tc' commands automatically on 'ifup', you could do:
+    # post-up /usr/local/bin/configure_cake.sh {device_name}.{vlan_id} {egress_bw} {ingress_bw} "{cake_params}"
+    # pre-down /usr/local/bin/cleanup_cake.sh {device_name}.{vlan_id}
+"""
 
 def update_interfaces():
     """Update the interfaces file with VLAN configurations."""
-    # Read configurations
+    darkflows_map = parse_darkflows_config()
+
     vlans = read_vlans_json()
     interfaces_content = read_interfaces_file()
     
-    # Remove existing VLAN configurations
-    # Match any interface definition that includes 'vlan-raw-device'
+    # Remove existing VLAN configs that match 'vlan-raw-device ... address ... netmask'
     cleaned_content = re.sub(
-        r'\nauto [^\n]+\niface [^\n]+\n\s+vlan-raw-device[^\n]+\n\s+address[^\n]+\n\s+netmask[^\n]+',
+        r'\nauto [^\n]+\niface [^\n]+\n\s+vlan-raw-device[^\n]+\n\s+address[^\n]+\n\s+netmask[^\n]+(\n\s+.*?)*',
         '',
         interfaces_content
     )
+
+    # Generate new VLAN stanzas
+    vlan_configs = [generate_vlan_config(vlan, darkflows_map) for vlan in vlans]
     
-    # Generate new VLAN configurations
-    vlan_configs = [generate_vlan_config(vlan) for vlan in vlans]
-    
-    # Combine original content (without VLANs) and new VLAN configurations
+    # Combine original content (minus old VLANs) + new VLAN stanzas
     new_content = cleaned_content.rstrip() + '\n' + '\n'.join(vlan_configs) + '\n'
     
-    # Write updated content
+    # Write updated file
     write_interfaces_file(new_content)
 
 def update_kea_dhcp_config():
-    # Read the current VLANS configuration
+    """Update Kea DHCP configuration with VLAN subnets."""
     with open(VLANS_JSON, 'r') as f:
         vlans = json.load(f)
 
-    # Read the current KEA config
     with open(KEA_CONFIG_PATH, 'r') as f:
         kea_config = json.load(f)
 
@@ -101,21 +160,21 @@ def update_kea_dhcp_config():
     primary_subnet = None
     new_subnets = []
 
-    # First, find and preserve the primary subnet
+    # Find & preserve the primary subnet
     for subnet in kea_config['Dhcp4']['subnet4']:
         if subnet['subnet'] == '192.168.0.0/23':
             primary_subnet = subnet
             new_subnets.append(subnet)
             break
 
-    # Create a map of existing VLAN subnets by network address
+    # Existing VLAN subnets
     existing_vlans = {
         subnet['subnet']: subnet
         for subnet in kea_config['Dhcp4']['subnet4']
         if subnet['subnet'] != '192.168.0.0/23'
     }
 
-    # Add subnet configurations for each VLAN
+    # Add or update subnets for each VLAN
     for vlan in vlans:
         vlan_id = vlan['id']
         gateway = vlan.get('gateway')
@@ -125,26 +184,26 @@ def update_kea_dhcp_config():
             print(f"Warning: Missing gateway or subnet for VLAN {vlan_id}", file=sys.stderr)
             continue
 
-        # Clean up subnet mask - extract just the mask part (e.g. "24" from "192.168.20.1/24")
+        # Extract numeric mask from e.g. "192.168.20.1/24"
         if '/' in subnet_mask:
             subnet_mask = subnet_mask.split('/')[-1]
 
         # Construct network address from gateway and subnet
         network_parts = gateway.split('.')
         network_parts[-1] = '0'  # Replace last octet with 0
-        
-        # Format the network with cleaned subnet mask
         network = f"{'.'.join(network_parts)}/{subnet_mask}"
-        
-        # Extract the network prefix for pool configuration
+
+        # example: 192.168.20.0/24 => 192.168.20.10 - 192.168.20.240
         network_prefix = network_parts[0:3]
+        pool_start = f"{'.'.join(network_prefix)}.10"
+        pool_end   = f"{'.'.join(network_prefix)}.240"
         
         subnet_config = {
-            "id": vlan_id,  # Use the original VLAN ID directly
+            "id": vlan_id,
             "subnet": network,
             "pools": [
                 {
-                    "pool": f"{'.'.join(network_prefix)}.10-{'.'.join(network_prefix)}.240"
+                    "pool": f"{pool_start}-{pool_end}"
                 }
             ],
             "option-data": [
@@ -159,7 +218,7 @@ def update_kea_dhcp_config():
             ]
         }
 
-        # If this VLAN already exists in Kea config, preserve its reservations
+        # Preserve reservations if this subnet already existed
         if network in existing_vlans:
             existing_subnet = existing_vlans[network]
             if 'reservations' in existing_subnet:
@@ -167,15 +226,15 @@ def update_kea_dhcp_config():
 
         new_subnets.append(subnet_config)
 
-    # Update the config with new subnets
+    # Final updated subnets
     kea_config['Dhcp4']['subnet4'] = new_subnets
 
-    # Write the updated configuration
+    # Write out the updated config
     with open(KEA_CONFIG_PATH, 'w') as f:
         json.dump(kea_config, f, indent=2)
 
-    # Restart KEA DHCP service to apply changes
-    #  os.system('systemctl restart kea-dhcp4-server')
+    # Optionally restart KEA
+    # os.system('systemctl restart kea-dhcp4-server')
 
 def main():
     try:
@@ -188,3 +247,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
