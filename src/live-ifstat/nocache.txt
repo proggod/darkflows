@@ -1,0 +1,53 @@
+Next.js Caching Prevention Methods
+===============================
+
+1. Using unstable_noStore
+------------------------
+```typescript
+'use client'
+import { unstable_noStore as noStore } from 'next/cache'
+
+export default function YourComponent() {
+  // Call it at the start of your component
+  noStore()
+  
+  // Rest of your component code...
+}
+```
+
+2. Using dynamic flag
+--------------------
+```typescript
+// Add this at the top of your component file
+export const dynamic = 'force-dynamic'
+
+export default function YourComponent() {
+  // Your component code...
+}
+```
+
+3. Using route segment config
+---------------------------
+```typescript
+// Add this at the top of your page file
+export const revalidate = 0
+
+export default function YourPage() {
+  // Your page code...
+}
+```
+
+Best Practices:
+--------------
+1. Use unstable_noStore() for immediate effect
+2. Consider dynamic flag for more stable behavior
+3. Use revalidate = 0 for page-level control
+4. Combine methods if needed for stubborn caching issues
+
+Note: Choose the method that best fits your use case:
+- unstable_noStore: Newest method, might change in future versions
+- dynamic flag: More stable, affects the whole component
+- revalidate: Best for page-level control
+
+Remember: These methods should only be used when you specifically need to prevent caching.
+Excessive use can impact performance. 

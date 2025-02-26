@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, OutlinedInput } from '@mui/material'
 import { VLANConfig, NetworkCard, NetworkDevice, NetworkConfig, NetworkInterfaceConfig } from '@/types/dashboard'
 
@@ -39,6 +39,14 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
   const [egressBandwidth, setEgressBandwidth] = useState('')
   const [ingressBandwidth, setIngressBandwidth] = useState('')
   const [dnsServers, setDnsServers] = useState<string[]>([''])
+  
+  // Add ref to stabilize networkSettings
+  const networkSettingsRef = useRef(networkSettings)
+  
+  // Update ref when networkSettings changes
+  useEffect(() => {
+    networkSettingsRef.current = networkSettings
+  }, [networkSettings])
 
   const resetForm = useCallback(() => {
     
@@ -56,19 +64,21 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     setErrors({})
     setDnsServers([''])
     
+    // Use ref instead of direct dependency
+    const settings = networkSettingsRef.current
+    
     // Use default bandwidth settings if available
-    if (networkSettings) {
-      
+    if (settings) {
       // Set default egress bandwidth if available
-      if (networkSettings.PRIMARY_EGRESS_BANDWIDTH) {
-        setEgressBandwidth(networkSettings.PRIMARY_EGRESS_BANDWIDTH)
+      if (settings.PRIMARY_EGRESS_BANDWIDTH) {
+        setEgressBandwidth(settings.PRIMARY_EGRESS_BANDWIDTH)
       } else {
         setEgressBandwidth('')
       }
       
       // Set default ingress bandwidth if available
-      if (networkSettings.PRIMARY_INGRESS_BANDWIDTH) {
-        setIngressBandwidth(networkSettings.PRIMARY_INGRESS_BANDWIDTH)
+      if (settings.PRIMARY_INGRESS_BANDWIDTH) {
+        setIngressBandwidth(settings.PRIMARY_INGRESS_BANDWIDTH)
       } else {
         setIngressBandwidth('')
       }
@@ -77,19 +87,20 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       setEgressBandwidth('')
       setIngressBandwidth('')
     }
-  }, [networkSettings])
+  }, []) // Remove networkSettings dependency
 
   const initNewVlanForm = useCallback(() => {
     console.log("INIT NEW VLAN FORM");
     resetForm();
     
     // Force-set values directly after resetForm
-    if (networkSettings) {
+    const settings = networkSettingsRef.current;
+    if (settings) {
       console.log("Force setting values from network settings");
-      if (networkSettings.PRIMARY_EGRESS_BANDWIDTH) setEgressBandwidth(networkSettings.PRIMARY_EGRESS_BANDWIDTH);
-      if (networkSettings.PRIMARY_INGRESS_BANDWIDTH) setIngressBandwidth(networkSettings.PRIMARY_INGRESS_BANDWIDTH);
+      if (settings.PRIMARY_EGRESS_BANDWIDTH) setEgressBandwidth(settings.PRIMARY_EGRESS_BANDWIDTH);
+      if (settings.PRIMARY_INGRESS_BANDWIDTH) setIngressBandwidth(settings.PRIMARY_INGRESS_BANDWIDTH);
     }
-  }, [resetForm, networkSettings]);
+  }, [resetForm]); // Remove networkSettings dependency
 
   useEffect(() => {
     if (!open) {
@@ -102,6 +113,7 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     }
   }, [open, vlan, initNewVlanForm, resetForm]);
 
+  // This useEffect handles initializing form values when editing an existing VLAN
   useEffect(() => {
     if (vlan) {
       setId(vlan.id)
@@ -461,13 +473,6 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       setIsSaving(false)
     }
   }
-
-  // Update useEffect dependency array
-  useEffect(() => {
-    if (!open) {
-      resetForm()
-    }
-  }, [open, resetForm])
 
   // Update subnet handler to auto-fill
   const handleSubnetChange = (newSubnet: string) => {
