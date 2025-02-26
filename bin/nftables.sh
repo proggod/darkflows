@@ -130,12 +130,12 @@ nft add rule inet filter input iif lo accept
 nft add rule inet filter input ct state established,related accept
 
 # Allow SSH on port 12222
-nft add rule inet filter input iif $PRIMARY_INTERFACE tcp dport 12222 ct state new,established accept
-if [ -n "$SECONDARY_INTERFACE" ]; then
-    nft add rule inet filter input iif $SECONDARY_INTERFACE tcp dport 12222 ct state new,established accept
-    nft add rule inet filter output oif $SECONDARY_INTERFACE tcp sport 12222 ct state established accept
-fi
-nft add rule inet filter output oif $PRIMARY_INTERFACE tcp sport 12222 ct state established accept
+#nft add rule inet filter input iif $PRIMARY_INTERFACE tcp dport 12222 ct state new,established accept
+#if [ -n "$SECONDARY_INTERFACE" ]; then
+#    nft add rule inet filter input iif $SECONDARY_INTERFACE tcp dport 12222 ct state new,established accept
+#    nft add rule inet filter output oif $SECONDARY_INTERFACE tcp sport 12222 ct state established accept
+#fi
+#nft add rule inet filter output oif $PRIMARY_INTERFACE tcp sport 12222 ct state established accept
 
 # NAT prerouting chain setup
 nft add chain ip nat prerouting { type nat hook prerouting priority 100 \; }

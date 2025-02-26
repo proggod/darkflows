@@ -1,0 +1,224 @@
+table ip filter { # handle 1
+	chain DOCKER { # handle 3
+		iifname != "br-e0d30fccd802" oifname "br-e0d30fccd802" ip daddr 172.23.0.2 tcp dport 443 counter packets 1 bytes 60 accept # handle 47
+		iifname != "br-3188e3df9f30" oifname "br-3188e3df9f30" ip daddr 172.19.0.2 tcp dport 853 counter packets 0 bytes 0 accept # handle 48
+		iifname != "br-3188e3df9f30" oifname "br-3188e3df9f30" ip daddr 172.19.0.2 tcp dport 443 counter packets 1 bytes 44 accept # handle 49
+		iifname != "br-e0d30fccd802" oifname "br-e0d30fccd802" ip daddr 172.23.0.2 tcp dport 80 counter packets 1 bytes 40 accept # handle 50
+		iifname != "br-3188e3df9f30" oifname "br-3188e3df9f30" ip daddr 172.19.0.2 udp dport 443 counter packets 0 bytes 0 accept # handle 51
+		iifname != "br-e0d30fccd802" oifname "br-e0d30fccd802" ip daddr 172.23.0.2 tcp dport 22 counter packets 2 bytes 104 accept # handle 52
+		iifname != "br-3188e3df9f30" oifname "br-3188e3df9f30" ip daddr 172.19.0.2 tcp dport 80 counter packets 0 bytes 0 accept # handle 53
+		iifname != "br-3188e3df9f30" oifname "br-3188e3df9f30" ip daddr 172.19.0.2 tcp dport 53 counter packets 0 bytes 0 accept # handle 54
+		iifname != "br-3188e3df9f30" oifname "br-3188e3df9f30" ip daddr 172.19.0.2 udp dport 53 counter packets 0 bytes 0 accept # handle 55
+	}
+
+	chain DOCKER-ISOLATION-STAGE-1 { # handle 4
+		iifname "docker0" oifname != "docker0" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2 # handle 42
+		iifname "br-e0d30fccd802" oifname != "br-e0d30fccd802" counter packets 36 bytes 1956 jump DOCKER-ISOLATION-STAGE-2 # handle 35
+		iifname "br-3188e3df9f30" oifname != "br-3188e3df9f30" counter packets 16 bytes 976 jump DOCKER-ISOLATION-STAGE-2 # handle 28
+		iifname "br-1f08a5bb9dad" oifname != "br-1f08a5bb9dad" counter packets 0 bytes 0 jump DOCKER-ISOLATION-STAGE-2 # handle 21
+		counter packets 1217606 bytes 1476914522 return # handle 6
+	}
+
+	chain DOCKER-ISOLATION-STAGE-2 { # handle 5
+		oifname "docker0" counter packets 0 bytes 0 drop # handle 43
+		oifname "br-e0d30fccd802" counter packets 0 bytes 0 drop # handle 36
+		oifname "br-3188e3df9f30" counter packets 0 bytes 0 drop # handle 29
+		oifname "br-1f08a5bb9dad" counter packets 0 bytes 0 drop # handle 22
+		counter packets 52 bytes 2932 return # handle 7
+	}
+
+	chain FORWARD { # handle 8
+		type filter hook forward priority filter; policy accept;
+		counter packets 1183844 bytes 1433206441 jump ts-forward # handle 60
+		counter packets 1212719 bytes 1470638639 jump DOCKER-USER # handle 46
+		counter packets 1213027 bytes 1471055908 jump DOCKER-ISOLATION-STAGE-1 # handle 41
+		oifname "docker0" ct state related,established counter packets 0 bytes 0 accept # handle 40
+		oifname "docker0" counter packets 0 bytes 0 jump DOCKER # handle 39
+		iifname "docker0" oifname != "docker0" counter packets 0 bytes 0 accept # handle 38
+		iifname "docker0" oifname "docker0" counter packets 0 bytes 0 accept # handle 37
+		oifname "br-e0d30fccd802" ct state related,established counter packets 17 bytes 932 accept # handle 33
+		oifname "br-e0d30fccd802" counter packets 4 bytes 204 jump DOCKER # handle 32
+		iifname "br-e0d30fccd802" oifname != "br-e0d30fccd802" counter packets 36 bytes 1956 accept # handle 31
+		iifname "br-e0d30fccd802" oifname "br-e0d30fccd802" counter packets 0 bytes 0 accept # handle 30
+		oifname "br-3188e3df9f30" ct state related,established counter packets 0 bytes 0 accept # handle 26
+		oifname "br-3188e3df9f30" counter packets 1 bytes 44 jump DOCKER # handle 25
+		iifname "br-3188e3df9f30" oifname != "br-3188e3df9f30" counter packets 16 bytes 976 accept # handle 24
+		iifname "br-3188e3df9f30" oifname "br-3188e3df9f30" counter packets 0 bytes 0 accept # handle 23
+		oifname "br-1f08a5bb9dad" ct state related,established counter packets 0 bytes 0 accept # handle 19
+		oifname "br-1f08a5bb9dad" counter packets 0 bytes 0 jump DOCKER # handle 18
+		iifname "br-1f08a5bb9dad" oifname != "br-1f08a5bb9dad" counter packets 0 bytes 0 accept # handle 17
+		iifname "br-1f08a5bb9dad" oifname "br-1f08a5bb9dad" counter packets 0 bytes 0 accept # handle 16
+	}
+
+	chain DOCKER-USER { # handle 44
+		counter packets 1212719 bytes 1470638639 return # handle 45
+	}
+
+	chain ts-input { # handle 56
+		iifname "lo" ip saddr 100.72.54.72 counter packets 0 bytes 0 accept # handle 69
+		iifname != "tailscale0" ip saddr 100.115.92.0/23 counter packets 0 bytes 0 return # handle 61
+		iifname != "tailscale0" ip saddr 100.64.0.0/10 counter packets 0 bytes 0 drop # handle 62
+		iifname "tailscale0" counter packets 107 bytes 6844 accept # handle 63
+		udp dport 41641 counter packets 75 bytes 4500 accept # handle 68
+	}
+
+	chain ts-forward { # handle 57
+		iifname "tailscale0" counter packets 0 bytes 0 meta mark set mark and 0xff00ffff xor 0x40000 # handle 64
+		meta mark & 0x00ff0000 == 0x00040000 counter packets 0 bytes 0 accept # handle 65
+		oifname "tailscale0" ip saddr 100.64.0.0/10 counter packets 0 bytes 0 drop # handle 66
+		oifname "tailscale0" counter packets 0 bytes 0 accept # handle 67
+	}
+
+	chain INPUT { # handle 58
+		type filter hook input priority filter; policy accept;
+		counter packets 72930 bytes 20640742 jump ts-input # handle 59
+	}
+}
+table ip nat { # handle 2
+	chain postrouting { # handle 2
+		type nat hook postrouting priority srcnat; policy accept;
+		oif "lan1" masquerade # handle 5
+		oif "lan2" masquerade # handle 6
+		ip daddr 172.23.0.2 tcp dport 22 snat to 192.168.1.1 # handle 48
+		ip daddr 172.23.0.2 tcp dport 22 snat to 47.132.224.175 # handle 50
+		ip daddr 172.23.0.2 tcp dport 22 snat to 192.168.12.50 # handle 52
+		ip daddr 172.23.0.2 tcp dport 443 snat to 192.168.1.1 # handle 54
+		ip daddr 172.23.0.2 tcp dport 443 snat to 47.132.224.175 # handle 56
+		ip daddr 172.23.0.2 tcp dport 443 snat to 192.168.12.50 # handle 58
+		ip daddr 172.23.0.2 tcp dport 80 snat to 192.168.1.1 # handle 60
+		ip daddr 172.23.0.2 tcp dport 80 snat to 47.132.224.175 # handle 62
+		ip daddr 172.23.0.2 tcp dport 80 snat to 192.168.12.50 # handle 64
+	}
+
+	chain prerouting { # handle 7
+		type nat hook prerouting priority 100; policy accept;
+		iif "lan1" tcp dport 1022 dnat to 172.23.0.2:22 # handle 49
+		iif "lan2" tcp dport 1022 dnat to 172.23.0.2:22 # handle 51
+		iif "lan0" tcp dport 1443 dnat to 172.23.0.2:443 # handle 53
+		iif "lan1" tcp dport 1443 dnat to 172.23.0.2:443 # handle 55
+		iif "lan2" tcp dport 1443 dnat to 172.23.0.2:443 # handle 57
+		iif "lan0" tcp dport 1080 dnat to 172.23.0.2:80 # handle 59
+		iif "lan1" tcp dport 1080 dnat to 172.23.0.2:80 # handle 61
+		iif "lan2" tcp dport 1080 dnat to 172.23.0.2:80 # handle 63
+		iif != "lo" tcp dport 5080 dnat to 127.0.0.1:5080 # handle 70
+	}
+
+	chain DOCKER { # handle 8
+		iifname "docker0" counter packets 0 bytes 0 return # handle 23
+		iifname "br-e0d30fccd802" counter packets 0 bytes 0 return # handle 21
+		iifname "br-3188e3df9f30" counter packets 0 bytes 0 return # handle 19
+		iifname "br-1f08a5bb9dad" counter packets 0 bytes 0 return # handle 17
+		iifname != "br-3188e3df9f30" tcp dport 10853 counter packets 0 bytes 0 dnat to 172.19.0.2:853 # handle 24
+		iifname != "br-e0d30fccd802" tcp dport 1443 counter packets 1 bytes 60 dnat to 172.23.0.2:443 # handle 25
+		iifname != "br-3188e3df9f30" tcp dport 10443 counter packets 1 bytes 44 dnat to 172.19.0.2:443 # handle 28
+		iifname != "br-e0d30fccd802" tcp dport 1080 counter packets 1 bytes 40 dnat to 172.23.0.2:80 # handle 29
+		iifname != "br-3188e3df9f30" udp dport 10443 counter packets 0 bytes 0 dnat to 172.19.0.2:443 # handle 32
+		iifname != "br-e0d30fccd802" tcp dport 1022 counter packets 2 bytes 104 dnat to 172.23.0.2:22 # handle 33
+		iifname != "br-3188e3df9f30" tcp dport 10080 counter packets 0 bytes 0 dnat to 172.19.0.2:80 # handle 36
+		iifname != "br-3188e3df9f30" tcp dport 10053 counter packets 0 bytes 0 dnat to 172.19.0.2:53 # handle 38
+		iifname != "br-3188e3df9f30" udp dport 10053 counter packets 0 bytes 0 dnat to 172.19.0.2:53 # handle 40
+	}
+
+	chain POSTROUTING { # handle 9
+		type nat hook postrouting priority srcnat; policy accept;
+		counter packets 13401 bytes 1505166 jump ts-postrouting # handle 43
+		oifname != "docker0" ip saddr 172.17.0.0/16 counter packets 0 bytes 0 masquerade # handle 22
+		oifname != "br-e0d30fccd802" ip saddr 172.23.0.0/16 counter packets 0 bytes 0 masquerade # handle 20
+		oifname != "br-3188e3df9f30" ip saddr 172.19.0.0/16 counter packets 0 bytes 0 masquerade # handle 18
+		oifname != "br-1f08a5bb9dad" ip saddr 172.22.0.0/16 counter packets 0 bytes 0 masquerade # handle 16
+		ip saddr 172.23.0.2 ip daddr 172.23.0.2 tcp dport 443 counter packets 0 bytes 0 masquerade # handle 26
+		ip saddr 172.19.0.2 ip daddr 172.19.0.2 tcp dport 853 counter packets 0 bytes 0 masquerade # handle 27
+		ip saddr 172.19.0.2 ip daddr 172.19.0.2 tcp dport 443 counter packets 0 bytes 0 masquerade # handle 30
+		ip saddr 172.23.0.2 ip daddr 172.23.0.2 tcp dport 80 counter packets 0 bytes 0 masquerade # handle 31
+		ip saddr 172.19.0.2 ip daddr 172.19.0.2 udp dport 443 counter packets 0 bytes 0 masquerade # handle 34
+		ip saddr 172.23.0.2 ip daddr 172.23.0.2 tcp dport 22 counter packets 0 bytes 0 masquerade # handle 35
+		ip saddr 172.19.0.2 ip daddr 172.19.0.2 tcp dport 80 counter packets 0 bytes 0 masquerade # handle 37
+		ip saddr 172.19.0.2 ip daddr 172.19.0.2 tcp dport 53 counter packets 0 bytes 0 masquerade # handle 39
+		ip saddr 172.19.0.2 ip daddr 172.19.0.2 udp dport 53 counter packets 0 bytes 0 masquerade # handle 41
+	}
+
+	chain PREROUTING { # handle 12
+		type nat hook prerouting priority dstnat; policy accept;
+		fib daddr type local counter packets 4769 bytes 355296 jump DOCKER # handle 13
+	}
+
+	chain OUTPUT { # handle 14
+		type nat hook output priority -100; policy accept;
+		ip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump DOCKER # handle 15
+	}
+
+	chain ts-postrouting { # handle 42
+		meta mark & 0x00ff0000 == 0x00040000 counter packets 0 bytes 0 masquerade # handle 44
+	}
+}
+table ip6 filter { # handle 3
+	chain ts-input { # handle 3
+		iifname "tailscale0" counter packets 0 bytes 0 accept # handle 9
+		udp dport 41641 counter packets 0 bytes 0 accept # handle 13
+	}
+
+	chain ts-forward { # handle 4
+		iifname "tailscale0" counter packets 0 bytes 0 meta mark set mark and 0xff00ffff xor 0x40000 # handle 10
+		meta mark & 0x00ff0000 == 0x00040000 counter packets 0 bytes 0 accept # handle 11
+		oifname "tailscale0" counter packets 0 bytes 0 accept # handle 12
+	}
+
+	chain INPUT { # handle 5
+		type filter hook input priority filter; policy accept;
+		counter packets 0 bytes 0 jump ts-input # handle 6
+	}
+
+	chain FORWARD { # handle 7
+		type filter hook forward priority filter; policy accept;
+		counter packets 0 bytes 0 jump ts-forward # handle 8
+	}
+}
+table ip6 nat { # handle 4
+	chain ts-postrouting { # handle 2
+		meta mark & 0x00ff0000 == 0x00040000 counter packets 0 bytes 0  # handle 5
+	}
+
+	chain POSTROUTING { # handle 3
+		type nat hook postrouting priority srcnat; policy accept;
+		counter packets 0 bytes 0 jump ts-postrouting # handle 4
+	}
+}
+table inet filter { # handle 5
+	chain input { # handle 1
+		type filter hook input priority filter; policy drop;
+		iif "lan0.10" accept # handle 16
+		iif "lan0" accept # handle 4
+		ip protocol icmp accept # handle 12
+		iif "lo" accept # handle 13
+		ct state established,related accept # handle 14
+		iif "tailscale0" accept # handle 15
+		iif "lan0.10" tcp dport 12222 ct state established,new accept # handle 21
+	}
+
+	chain forward { # handle 2
+		type filter hook forward priority filter; policy drop;
+		iif "lan0" oif "lan1" accept # handle 5
+		iif "lan1" oif "lan0" ct state established,related accept # handle 8
+		iif "lan0" oif "lan2" accept # handle 9
+		iif "lan2" oif "lan0" ct state established,related accept # handle 10
+		iif "lan0.10" oif "lan1" accept # handle 17
+		iif "lan1" oif "lan0.10" ct state established,related accept # handle 18
+		iif "lan0.10" oif "lan2" accept # handle 19
+		iif "lan2" oif "lan0.10" ct state established,related accept # handle 20
+		iif "lan0" ip daddr 172.23.0.2 tcp dport 22 accept # handle 23
+		iif "lan1" ip daddr 172.23.0.2 tcp dport 22 accept # handle 25
+		iif "lan2" ip daddr 172.23.0.2 tcp dport 22 accept # handle 27
+		iif "lan0" ip daddr 172.23.0.2 tcp dport 443 accept # handle 29
+		iif "lan1" ip daddr 172.23.0.2 tcp dport 443 accept # handle 31
+		iif "lan2" ip daddr 172.23.0.2 tcp dport 443 accept # handle 33
+		iif "lan0" ip daddr 172.23.0.2 tcp dport 80 accept # handle 35
+		iif "lan1" ip daddr 172.23.0.2 tcp dport 80 accept # handle 37
+		iif "lan2" ip daddr 172.23.0.2 tcp dport 80 accept # handle 39
+	}
+
+	chain output { # handle 3
+		type filter hook output priority filter; policy accept;
+		ip protocol icmp accept # handle 11
+		oif "lan0.10" tcp sport 12222 ct state established accept # handle 22
+	}
+}
