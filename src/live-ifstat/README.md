@@ -48,6 +48,7 @@ v 0.33
     - Local port mapping vlan support
     - Added NGINX removed LightHttpd reliance
     - Generate SSL cert, proxy through NGINX for SSL    
+    - Modified local and external forward scripts to make them work better
     
 v 0.30
     - Removed test SSH keys from root

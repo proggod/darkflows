@@ -7,7 +7,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Detect Ethernet and USB interfaces (ignore wireless, virtual, etc.)
-INTERFACES=($(ls /sys/class/net | grep -E '^(enp|enx|eth|usb)' | grep -vE '^(lo|wlp|virbr|veth|tun|tap)'))
+INTERFACES=($(ls /sys/class/net | grep -E '^(ens|enp|enx|eth|usb)' | grep -vE '^(lo|wlp|virbr|veth|tun|tap)'))
 if [ ${#INTERFACES[@]} -eq 0 ]; then
   echo "No Ethernet or USB interfaces found!"
   exit 1

@@ -1,6 +1,8 @@
 k#!/bin/bash
 
 # Remove immutable attribute from resolv.conf
+tailscale down
+systemctl stop tailscaled
 chattr -i /etc/resolv.conf
 
 # Create the new resolv.conf content
@@ -12,6 +14,8 @@ EOF
 
 # Set immutable attribute back on resolv.conf
 chattr +i /etc/resolv.conf
+systemctl start tailscaled
+tailscale up
 
 echo "resolv.conf has been updated successfully."
 

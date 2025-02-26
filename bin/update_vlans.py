@@ -115,14 +115,6 @@ iface {device_name}.{vlan_id} inet static
     address {gateway}
     netmask {netmask}
 
-    # Traffic Shaping (read from JSON):
-    #   Egress:  {egress_bw}
-    #   Ingress: {ingress_bw}
-    #   CAKE:    {cake_params}
-
-    # If you want to run 'tc' commands automatically on 'ifup', you could do:
-    # post-up /usr/local/bin/configure_cake.sh {device_name}.{vlan_id} {egress_bw} {ingress_bw} "{cake_params}"
-    # pre-down /usr/local/bin/cleanup_cake.sh {device_name}.{vlan_id}
 """
 
 def update_interfaces():
