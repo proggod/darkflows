@@ -26,9 +26,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 
 ## Changelog
 v 0.33
-    - Switched to Unbound for DNS
-    - Added Custom DNS Lists
-    - Added DNS Client Blocklist
+- Switched to Unbound for DNS
+- Added Custom DNS Lists
+- Added DNS Client Blocklist
     - Added DNS Client Whitelist
     - Added DNS Hosts
     - Added DNS Resolver Status
