@@ -213,6 +213,17 @@ export default function ReservationsCard() {
         return
       }
 
+      // Before adding, check if the IP address is already in use by a device
+      setIsCheckingIp(true)
+      const isAlive = await pingIp(newReservation['ip-address'])
+      setIsCheckingIp(false)
+
+      if (isAlive) {
+        if (!confirm('Warning: A device is already responding at this IP address. Do you still want to create this reservation?')) {
+          return
+        }
+      }
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 
@@ -229,7 +240,8 @@ export default function ReservationsCard() {
         await fetchReservations()
         triggerRefresh()
       } else {
-        setError(`Failed to add reservation: ${response.status} ${response.statusText}`)
+        const errorData = await response.json()
+        setError(errorData.error || `Failed to add reservation: ${response.status} ${response.statusText}`)
       }
     } catch (error) {
       setError(`Error adding reservation: ${
@@ -413,6 +425,35 @@ export default function ReservationsCard() {
     }
   }
 
+  // Add sorting logic to sort the reservations based on the current sortField and sortDirection
+  const sortedReservations = [...reservations].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortField) {
+      case 'ip-address':
+        // Split IP into octets and compare numerically
+        const aOctets = a['ip-address'].split('.').map(Number);
+        const bOctets = b['ip-address'].split('.').map(Number);
+        for (let i = 0; i < 4; i++) {
+          if (aOctets[i] !== bOctets[i]) {
+            comparison = aOctets[i] - bOctets[i];
+            break;
+          }
+        }
+        break;
+      case 'hw-address':
+        comparison = a['hw-address'].localeCompare(b['hw-address']);
+        break;
+      case 'name':
+        const nameA = a.hostname || 'N/A';
+        const nameB = b.hostname || 'N/A';
+        comparison = nameA.localeCompare(nameB);
+        break;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
   return (
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
@@ -533,7 +574,7 @@ export default function ReservationsCard() {
                 </td>
               </tr>
             )}
-            {reservations.map((reservation, index) => (
+            {sortedReservations.map((reservation, index) => (
               <tr
                 key={reservation['ip-address']}
                 className={`card-hover ${index % 2 === 0 ? '' : 'card-alternate'} ${index === reservations.length - 1 ? 'last-row' : ''}`}

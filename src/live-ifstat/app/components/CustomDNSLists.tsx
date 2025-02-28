@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
-import LaunchIcon from '@mui/icons-material/Launch'
 
 type ListType = 'whitelist' | 'blacklist'
 
@@ -178,13 +177,7 @@ export default function CustomDNSLists() {
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between mb-2 px-1">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Custom Blocklists</h3>
-          <button
-            onClick={() => window.open(`${window.location.protocol}//${window.location.hostname}/admin`, '_blank')}
-            className="btn btn-blue flex items-center gap-1"
-          >
-            <LaunchIcon className="!w-3 !h-3" />
-            Pi-hole Admin
-          </button>
+
         </div>
         
         <div className="flex-1 overflow-auto">

@@ -111,6 +111,7 @@ export async function lookupHostnames(ips: string[]): Promise<Map<string, HostIn
     });
 
     try {
+      // Get lease data for IPs we're looking for
       const placeholders = ips.map(() => '?').join(',');
       const query = `
         SELECT 
@@ -122,17 +123,17 @@ export async function lookupHostnames(ips: string[]): Promise<Map<string, HostIn
       `;
 
       const [leases] = await connection.execute<mysql.RowDataPacket[]>(query, ips);
+      
+      // Get all reservations
       const reservations = config.Dhcp4.subnet4[0]?.reservations || [];
-      const reservationMap = new Map(
-        reservations.map(r => [r['ip-address'], r])
-      );
 
       for (const lease of leases) {
         const ip = lease.ip;
         const mac = lease.hwaddr.match(/../g)?.join(':').toLowerCase();
         let hostname = lease.hostname || undefined;
 
-        const reservation = reservationMap.get(ip);
+        // Check if this IP has a reservation
+        const reservation = reservations.find(r => r['ip-address'] === ip);
         if (reservation) {
           hostname = reservation.hostname || hostname;
         }
@@ -155,6 +156,39 @@ export async function lookupHostnames(ips: string[]): Promise<Map<string, HostIn
             source: 'lease',
             isReserved: !!reservation
           });
+        } else if (mac) {
+          // If we have a MAC but no hostname, still add it
+          results.set(ip, {
+            name: ip,
+            mac,
+            source: 'lease',
+            isReserved: !!reservation
+          });
+        }
+      }
+
+      // For any IPs that are not in results yet, use default values
+      for (const ip of ips) {
+        if (!results.has(ip)) {
+          // Try to find the IP in reservations
+          const reservation = reservations.find(r => r['ip-address'] === ip);
+          if (reservation) {
+            const mac = reservation['hw-address'].toLowerCase();
+            results.set(ip, {
+              name: reservation.hostname || ip,
+              mac,
+              source: 'reservation',
+              isReserved: true
+            });
+          } else {
+            // No lease or reservation found
+            results.set(ip, {
+              name: ip,
+              mac: 'N/A',
+              source: 'mac',
+              isReserved: false
+            });
+          }
         }
       }
     } finally {

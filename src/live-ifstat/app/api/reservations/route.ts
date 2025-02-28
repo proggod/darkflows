@@ -181,22 +181,27 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const authResponse = await requireAuth(request);
   if (authResponse) {
+    console.error('DELETE reservation - Authentication failed');
     return authResponse;
   }
 
   let connection;
   try {
     const { ip, mac } = await request.json();
+    console.log('DELETE reservation - Request received:', { ip, mac });
     
     // Convert MAC to binary format for database
     const macHex = mac.replace(/:/g, '');
     const ipNumber = ipToNumber(ip);
+    console.log('DELETE reservation - Converted values:', { macHex, ipNumber });
     
     connection = await getDbConnection();
+    console.log('DELETE reservation - Database connection established');
     
     // Get correct identifier type for MAC addresses
     let macIdentifierType = 1; // Default value as fallback
     try {
+      console.log('DELETE reservation - Fetching MAC identifier type');
       const [hwAddressType] = await connection.execute<mysql.RowDataPacket[]>(
         "SELECT type FROM host_identifier_type WHERE name = 'hw-address' OR name = 'hw_address' LIMIT 1"
       );
@@ -204,38 +209,132 @@ export async function DELETE(request: NextRequest) {
       if (hwAddressType.length > 0) {
         macIdentifierType = hwAddressType[0].type;
       }
-    } catch {
+      console.log('DELETE reservation - MAC identifier type:', macIdentifierType);
+    } catch (err) {
+      console.error('DELETE reservation - Error fetching MAC identifier type:', err);
       // Use default macIdentifierType if query fails
     }
     
+    // DEBUG: Find all existing reservations
+    try {
+      console.log('DELETE reservation - DEBUG: Fetching all existing reservations');
+      const [allReservations] = await connection.execute<mysql.RowDataPacket[]>(
+        'SELECT INET_NTOA(ipv4_address) as ip, LOWER(HEX(dhcp_identifier)) as mac, dhcp_identifier_type FROM hosts'
+      );
+      console.log('DELETE reservation - DEBUG: All reservations:', JSON.stringify(allReservations, null, 2));
+      
+      // Try a query with just the MAC
+      const [macOnlyRows] = await connection.execute<mysql.RowDataPacket[]>(
+        'SELECT INET_NTOA(ipv4_address) as ip, LOWER(HEX(dhcp_identifier)) as mac, dhcp_identifier_type FROM hosts WHERE dhcp_identifier = UNHEX(?)',
+        [macHex]
+      );
+      console.log('DELETE reservation - DEBUG: Reservations matching MAC only:', JSON.stringify(macOnlyRows, null, 2));
+    } catch (err) {
+      console.error('DELETE reservation - DEBUG: Error fetching all reservations:', err);
+    }
+    
     // Get hostname before deleting for DNS cleanup
+    console.log('DELETE reservation - Fetching existing reservation');
     const [rows] = await connection.execute<mysql.RowDataPacket[]>(
       'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ? AND ipv4_address = ?',
       [macHex, macIdentifierType, ipNumber]
     );
     
-    const hostname = rows[0]?.hostname;
+    // Try alternative query using INET_ATON for IP
+    console.log('DELETE reservation - Trying alternative query with INET_ATON');
+    const [rowsAlt] = await connection.execute<mysql.RowDataPacket[]>(
+      'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ? AND ipv4_address = INET_ATON(?)',
+      [macHex, macIdentifierType, ip]
+    );
+    
+    console.log('DELETE reservation - Alternative query result:', {
+      rowsAltLength: rowsAlt.length,
+      rowsAlt: JSON.stringify(rowsAlt)
+    });
+    
+    console.log('DELETE reservation - Existing reservation rows:', rows.length);
+    const hostname = rows[0]?.hostname || rowsAlt[0]?.hostname;
+    console.log('DELETE reservation - Hostname from existing reservation:', hostname);
     
     // Remove DNS entry if hostname exists
     if (hostname) {
+      console.log('DELETE reservation - Removing DNS entry for hostname:', hostname);
       await syncDNSEntry(ip, hostname, true);
     }
     
     // Delete the reservation
-    await connection.execute(
+    console.log('DELETE reservation - Executing DELETE query with params:', { macHex, macIdentifierType, ipNumber });
+    let deleteResult: mysql.ResultSetHeader;
+    
+    // First try with original method
+    const [deleteResultOriginal] = await connection.execute(
       'DELETE FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ? AND ipv4_address = ?',
       [macHex, macIdentifierType, ipNumber]
-    );
+    ) as [mysql.ResultSetHeader, mysql.FieldPacket[]];
     
-    await syncAllSystems();
+    console.log('DELETE reservation - Original delete result:', {
+      affectedRows: deleteResultOriginal.affectedRows,
+      warningStatus: deleteResultOriginal.warningStatus
+    });
+    
+    // If original method didn't work, try with INET_ATON
+    if (deleteResultOriginal.affectedRows === 0) {
+      console.log('DELETE reservation - Trying alternative DELETE with INET_ATON');
+      const [deleteResultAlt] = await connection.execute(
+        'DELETE FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ? AND ipv4_address = INET_ATON(?)',
+        [macHex, macIdentifierType, ip]
+      ) as [mysql.ResultSetHeader, mysql.FieldPacket[]];
+      
+      console.log('DELETE reservation - Alternative delete result:', {
+        affectedRows: deleteResultAlt.affectedRows,
+        warningStatus: deleteResultAlt.warningStatus
+      });
+      
+      deleteResult = deleteResultAlt;
+    } else {
+      deleteResult = deleteResultOriginal;
+    }
+    
+    if (deleteResult.affectedRows === 0) {
+      console.error('DELETE reservation - No rows were deleted, reservation might not exist');
+      return NextResponse.json({ 
+        error: 'Reservation not found or could not be deleted',
+        details: { ip, mac, macHex, ipNumber, macIdentifierType }
+      }, { status: 404 });
+    }
+    
+    try {
+      console.log('DELETE reservation - Syncing all systems');
+      await syncAllSystems();
+      console.log('DELETE reservation - Successfully completed');
+    } catch (error) {
+      console.error('DELETE reservation - Error in syncAllSystems (continuing anyway):', error);
+      // We'll consider the operation successful even if syncAllSystems fails
+      // since the database record was successfully deleted
+    }
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting reservation:', error);
-    return NextResponse.json({ error: 'Failed to delete reservation' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : null;
+    console.error('DELETE reservation - Error deleting reservation:', { 
+      error, 
+      message: errorMessage,
+      stack: errorStack 
+    });
+    
+    return NextResponse.json({ 
+      error: 'Failed to delete reservation',
+      details: errorMessage
+    }, { status: 500 });
   } finally {
     if (connection) {
-      await connection.end();
+      try {
+        await connection.end();
+        console.log('DELETE reservation - Database connection closed');
+      } catch (err) {
+        console.error('DELETE reservation - Error closing database connection:', err);
+      }
     }
   }
 }
@@ -318,7 +417,25 @@ export async function PUT(request: NextRequest) {
 
 // Helper function to convert IP to number
 function ipToNumber(ip: string): number {
-  return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0);
+  // First method - traditional bit shifting (can result in negative numbers due to 32-bit signed integers)
+  const traditionalMethod = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0);
+  
+  // Alternative method using separate calculation
+  const parts = ip.split('.');
+  const unsignedValue = ((parseInt(parts[0], 10) * 16777216) + 
+                         (parseInt(parts[1], 10) * 65536) + 
+                         (parseInt(parts[2], 10) * 256) + 
+                          parseInt(parts[3], 10)) >>> 0;  // Ensure unsigned 32-bit integer
+  
+  console.log(`IP conversion debug - ${ip}:`, {
+    traditionalMethod,
+    unsignedValue,
+    hexTraditional: `0x${traditionalMethod.toString(16)}`,
+    hexUnsigned: `0x${unsignedValue.toString(16)}`
+  });
+  
+  // Return the unsigned value, which is the correct representation for IP addresses
+  return unsignedValue;
 }
 
 // Helper function to determine subnet ID based on IP address

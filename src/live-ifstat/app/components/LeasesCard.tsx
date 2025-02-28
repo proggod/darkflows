@@ -94,6 +94,8 @@ export default function LeasesCard() {
   const handleRemoveReservation = async (lease: Lease) => {
     try {
       setProcessingClients(prev => ({ ...prev, [lease.ip_address]: true }));
+      console.log('Removing reservation for:', { ip: lease.ip_address, mac: lease.mac_address });
+      
       const response = await fetch('/api/reservations', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -101,17 +103,58 @@ export default function LeasesCard() {
           ip: lease.ip_address,
           mac: lease.mac_address
         })
-      })
+      });
 
       if (response.ok) {
-        await fetchLeases()
-        triggerRefresh()
+        await fetchLeases();
+        triggerRefresh();
       } else {
-        setError('Failed to remove reservation')
+        // Handle different error status codes
+        let errorMessage = `Failed to remove reservation: ${response.status} ${response.statusText}`;
+        
+        // Try to parse JSON error response
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorDetails = errorData.error;
+            if (errorData.details) {
+              errorDetails += ` - ${typeof errorData.details === 'string' ? errorData.details : JSON.stringify(errorData.details)}`;
+            }
+          }
+        } catch {
+          // If not JSON, try to get text
+          try {
+            errorDetails = await response.text();
+          } catch {
+            // If text also fails, continue without details
+          }
+        }
+        
+        // Special handling for 404 Not Found
+        if (response.status === 404) {
+          console.log('Reservation not found, may have been already deleted');
+          // Refresh leases list anyway, as the reservation might have been removed by another user
+          await fetchLeases();
+          triggerRefresh();
+          return; // Exit without showing error
+        }
+        
+        if (errorDetails) {
+          errorMessage += ` - ${errorDetails}`;
+        }
+        
+        console.error('Failed to remove reservation:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorDetails
+        });
+        setError(errorMessage);
       }
     } catch (error) {
-      console.error('Error removing reservation:', error)
-      setError('Error removing reservation')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error removing reservation:', { error, errorMessage });
+      setError(`Error removing reservation: ${errorMessage}`);
     } finally {
       setProcessingClients(prev => ({ ...prev, [lease.ip_address]: false }));
     }

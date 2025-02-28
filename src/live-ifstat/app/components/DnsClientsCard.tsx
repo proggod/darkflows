@@ -13,6 +13,11 @@ interface DnsClient {
   status: 'static' | 'reserved' | 'dynamic';
 }
 
+interface ReservationData {
+  'ip-address': string;
+  'hw-address': string;
+}
+
 type SortField = 'ip' | 'name' | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -32,28 +37,42 @@ export function DnsClientsCard() {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/dns-clients', {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      setError(null);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      // Fetch both DNS clients and reservations in parallel, like LeasesCard does
+      const [clientsData, reservationsData] = await Promise.all([
+        fetch('/api/dns-clients', {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        }).then(res => {
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          return res.json();
+        }),
+        fetch('/api/reservations').then(res => res.json())
+      ]);
 
-      if (Array.isArray(data)) {
-        const formattedClients = data.map((client: DnsClient) => ({
-          ip: client.ip,
-          name: client.name || client.ip,
-          mac: client.mac !== 'N/A' ? client.mac : undefined,
-          lastSeen: client.lastSeen,
-          isReserved: client.isReserved,
-          status: client.status as 'static' | 'reserved' | 'dynamic'
-        }));
+      if (Array.isArray(clientsData)) {
+        // Mark clients as reserved if they match a reservation by IP or MAC
+        const formattedClients = clientsData.map((client: DnsClient) => {
+          // Check if this client has a matching reservation
+          const isReserved = reservationsData.some((r: ReservationData) => 
+            r['ip-address'] === client.ip || 
+            (client.mac && client.mac !== 'N/A' && r['hw-address'].toLowerCase() === client.mac.toLowerCase())
+          );
+          
+          return {
+            ip: client.ip,
+            name: client.name || client.ip,
+            mac: client.mac !== 'N/A' ? client.mac : undefined,
+            lastSeen: client.lastSeen,
+            isReserved: isReserved,
+            status: isReserved ? 'reserved' as const : (client.status === 'static' ? 'static' as const : 'dynamic' as const)
+          };
+        });
 
         setClients(formattedClients);
         setEditedNames({});
@@ -226,6 +245,8 @@ export function DnsClientsCard() {
 
     try {
       setProcessingClients(prev => ({ ...prev, [client.ip]: true }));
+      console.log('Removing reservation for:', { ip: client.ip, mac: client.mac });
+      
       const response = await fetch('/api/reservations', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -239,11 +260,52 @@ export function DnsClientsCard() {
         fetchClients();
         triggerRefresh();
       } else {
-        setError('Failed to remove reservation');
+        // Handle different error status codes
+        let errorMessage = `Failed to remove reservation: ${response.status} ${response.statusText}`;
+        
+        // Try to parse JSON error response
+        let errorDetails = '';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorDetails = errorData.error;
+            if (errorData.details) {
+              errorDetails += ` - ${typeof errorData.details === 'string' ? errorData.details : JSON.stringify(errorData.details)}`;
+            }
+          }
+        } catch {
+          // If not JSON, try to get text
+          try {
+            errorDetails = await response.text();
+          } catch {
+            // If text also fails, continue without details
+          }
+        }
+        
+        // Special handling for 404 Not Found
+        if (response.status === 404) {
+          console.log('Reservation not found, may have been already deleted');
+          // Refresh clients list anyway
+          fetchClients();
+          triggerRefresh();
+          return; // Exit without showing error
+        }
+        
+        if (errorDetails) {
+          errorMessage += ` - ${errorDetails}`;
+        }
+        
+        console.error('Failed to remove reservation:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorDetails
+        });
+        setError(errorMessage);
       }
     } catch (error) {
-      console.error('Error removing reservation:', error);
-      setError('Error removing reservation');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error removing reservation:', { error, errorMessage });
+      setError(`Error removing reservation: ${errorMessage}`);
     } finally {
       setProcessingClients(prev => ({ ...prev, [client.ip]: false }));
     }
