@@ -2,7 +2,7 @@
 
 ## Features
 - Uses kea for DHCP
-- Uses Pihole for DNS
+- Uses unbound for DNS w/ custom web frontend and wrapper
 - Full Web UI
 - Many scripts to do everything from port forwarding to client management
 - configs exist in /etc/darkflows
@@ -20,7 +20,72 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 /usr/local/darkflows/bin/reboot_server.sh
 ``` 
 
+### Reset Cards
+    - Modify /api/version/route.ts to change the version number
+    
+
 ## Changelog
+v 0.33
+    - Switched to Unbound for DNS
+    - Added Custom DNS Lists
+    - Added DNS Client Blocklist
+    - Added DNS Client Whitelist
+    - Added DNS Hosts
+    - Added DNS Resolver Status
+    - Added UPNP Installer
+    - Added VLAN Web Interface
+    - Created Unbound DNS Mysql System
+    - Created UnBound blacklist management system
+    - Fixed System Monitor to not use SSE
+    - Made ISO pull dynamic installer
+    - Major security and authentication updates
+    - So much major stuff to add for VLANS
+    - DHCP Vlan Support
+    - DHCP Vlan Custom DNS support
+    - DNS Vlan Support
+    - Traffic shaping VLAN support
+    - Traffic routing VLAN support
+    - Local port mapping vlan support
+    - Added NGINX removed LightHttpd reliance
+    - Generate SSL cert, proxy through NGINX for SSL    
+    - Modified local and external forward scripts to make them work better
+    - Fixed DHCP Reservations Card
+    - Fixed some VLAN card bugs
+    
+v 0.30
+    - Removed test SSH keys from root
+
+v 0.29
+    - Fixed edit reservation so you could change IP address
+    - Update script fixed
+    
+v 0.28
+    - Fixed route to secondary interface bug
+
+v 0.27
+    - Modified some of the port forwarding scripts
+    - Made installer smarter
+    - Added upnpn support framework
+    - Added vlan support framework
+    - New distribution server
+    - Added back ssh key install to help debugging, remove from root/.ssh/authorized_keys if you don't want it
+
+v 0.26
+    - Fixed kea install bug
+    - Fixed network stats card bug
+
+
+v 0.25
+    - Set update to rebuild webserver on update
+    - Removed creator ssh key transfer
+
+v 0.24
+    - Changed logic on network stats card so we don't get duplicate network stats cards
+
+v 0.23
+    - Made kea config configurator not rely on a device name in config
+    - Added script to rename network devices to prevent device nameshifting
+
 v 0.22
     - Changed default component order, made it so i can order network stats…
     - Added install verifications, added internet verification before running install

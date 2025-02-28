@@ -1,4 +1,4 @@
-k#!/bin/bash
+#!/bin/bash
 
 # Remove immutable attribute from resolv.conf
 tailscale down

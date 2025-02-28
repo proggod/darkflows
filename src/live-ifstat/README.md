@@ -2,7 +2,7 @@
 
 ## Features
 - Uses kea for DHCP
-- Uses Pihole for DNS
+- Uses unbound for DNS w/ custom web frontend and wrapper
 - Full Web UI
 - Many scripts to do everything from port forwarding to client management
 - configs exist in /etc/darkflows
@@ -49,6 +49,8 @@ v 0.33
     - Added NGINX removed LightHttpd reliance
     - Generate SSL cert, proxy through NGINX for SSL    
     - Modified local and external forward scripts to make them work better
+    - Fixed DHCP Reservations Card
+    - Fixed some VLAN card bugs
     
 v 0.30
     - Removed test SSH keys from root

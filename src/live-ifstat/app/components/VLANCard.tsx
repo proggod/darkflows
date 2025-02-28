@@ -106,12 +106,12 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     if (!open) {
       // When closing, just reset the form
       resetForm();
-    } else if (!vlan) {
-      // When opening for a new VLAN (not editing)
+    } else if (!vlan && !subnet && !name) {
+      // Only initialize if it's a new VLAN and form is empty
       console.log("Dialog opened for new VLAN");
       initNewVlanForm();
     }
-  }, [open, vlan, initNewVlanForm, resetForm]);
+  }, [open, vlan, initNewVlanForm, resetForm, subnet, name]);
 
   // This useEffect handles initializing form values when editing an existing VLAN
   useEffect(() => {
@@ -128,24 +128,37 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       setDnsServers(vlan.dhcp?.dnsServers?.length ? vlan.dhcp.dnsServers : [gateway])
       setEgressBandwidth(vlan.egressBandwidth || '')
       setIngressBandwidth(vlan.ingressBandwidth || '')
-    } else {
-      resetForm()
     }
-  }, [vlan, networkCards, gateway, resetForm])
+  }, [vlan, networkCards, gateway])  // Remove resetForm from dependencies
 
   // Validation functions
   const isValidIp = (ip: string): boolean => {
+    console.log('Validating IP:', ip);
     const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/
-    if (!ipRegex.test(ip)) return false
-    return ip.split('.').every(num => parseInt(num) >= 0 && parseInt(num) <= 255)
+    if (!ipRegex.test(ip)) {
+      console.log('IP does not match format');
+      return false;
+    }
+    const isValid = ip.split('.').every(num => parseInt(num) >= 0 && parseInt(num) <= 255);
+    console.log('IP validation result:', isValid);
+    return isValid;
   }
 
   const isValidSubnet = (subnet: string): boolean => {
+    console.log('Validating subnet:', subnet);
     const [ip, mask] = subnet.split('/')
-    if (!ip || !mask) return false
-    if (!isValidIp(ip)) return false
+    if (!ip || !mask) {
+      console.log('Missing IP or mask');
+      return false;
+    }
+    if (!isValidIp(ip)) {
+      console.log('Invalid IP');
+      return false;
+    }
     const maskNum = parseInt(mask)
-    return maskNum >= 0 && maskNum <= 32
+    const isValid = maskNum >= 0 && maskNum <= 32;
+    console.log('Mask validation result:', isValid);
+    return isValid;
   }
 
   const isIpInSubnet = (ip: string, subnet: string): boolean => {
@@ -200,8 +213,12 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
 
   // Add this helper function to calculate IP range from gateway and subnet
   const calculateIpRange = (gateway: string, subnet: string) => {
+    console.log('Calculating IP range for:', { gateway, subnet });
     const [networkIp, mask] = subnet.split('/')
-    if (!networkIp || !mask) return null
+    if (!networkIp || !mask) {
+      console.log('Invalid subnet format');
+      return null
+    }
     
     const maskNum = parseInt(mask)
     const ipParts = networkIp.split('.').map(num => parseInt(num))
@@ -209,7 +226,7 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     
     const maskBits = 0xffffffff << (32 - maskNum)
     const networkNum = ipNum & maskBits
-    const broadcastNum = networkNum | (~maskBits)
+    const broadcastNum = networkNum | (~maskBits >>> 0) // Use unsigned right shift
     
     // Convert to octets
     const networkOctets = [
@@ -225,13 +242,16 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       (broadcastNum >> 8) & 0xff,
       broadcastNum & 0xff
     ]
-    
-    return {
+
+    const result = {
       start: `${networkOctets[0]}.${networkOctets[1]}.${networkOctets[2]}.${networkOctets[3] + 2}`,
       end: `${broadcastOctets[0]}.${broadcastOctets[1]}.${broadcastOctets[2]}.${broadcastOctets[3] - 1}`,
       available: broadcastNum - networkNum - 2,
       used: 0
     }
+    
+    console.log('Calculated range result:', result);
+    return result
   }
 
   // Update validateForm function
@@ -474,28 +494,44 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
     }
   }
 
-  // Update subnet handler to auto-fill
+  // Split the subnet handler into two functions
   const handleSubnetChange = (newSubnet: string) => {
     setSubnet(newSubnet)
+  }
+
+  const handleSubnetBlur = () => {
+    console.log('Subnet blur - current subnet:', subnet);
     
-    // Only proceed if we have a valid subnet format
-    if (isValidSubnet(newSubnet)) {
+    // Only calculate if we have a valid subnet
+    if (isValidSubnet(subnet)) {
+      console.log('Subnet is valid');
+      const [ip] = subnet.split('/')
       // Calculate default gateway - use first usable IP in subnet
-      const [networkIp] = newSubnet.split('/')
-      const ipParts = networkIp.split('.')
+      const ipParts = ip.split('.')
       ipParts[3] = '1' // Set last octet to 1 for gateway
       const defaultGateway = ipParts.join('.')
+      console.log('Calculated gateway:', defaultGateway);
       
       // Set gateway if it's not already set
       if (!gateway) {
         setGateway(defaultGateway)
+        // Set primary DNS to gateway
+        setDnsServers([defaultGateway])
       }
       
       // Calculate default IP range
-      const range = calculateIpRange(defaultGateway, newSubnet)
+      const range = calculateIpRange(defaultGateway, subnet)
+      console.log('Calculated range:', range);
       if (range) {
-        setIpRange(range)
+        setIpRange({
+          start: range.start,
+          end: range.end,
+          available: range.available,
+          used: 0
+        })
       }
+    } else {
+      console.log('Subnet is not valid:', subnet);
     }
   }
 
@@ -528,13 +564,11 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                   VLAN ID
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   value={id}
                   onChange={(e) => handleIdChange(e.target.value)}
                   disabled={!!vlan}
                   placeholder="1-4094"
-                  min="1"
-                  max="4094"
                   className="w-[120px] px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>
@@ -654,6 +688,7 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
                   type="text"
                   value={subnet}
                   onChange={(e) => handleSubnetChange(e.target.value)}
+                  onBlur={handleSubnetBlur}
                   placeholder="192.168.1.0/24"
                   className="flex-1 px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
@@ -865,6 +900,9 @@ export default function VLANCard() {
     PRIMARY_INGRESS_BANDWIDTH?: string;
   }>()
 
+  // Add a ref to track if this is the initial mount
+  const isInitialMount = useRef(true)
+
   const loadData = async () => {
     try {
       setError('')
@@ -910,10 +948,21 @@ export default function VLANCard() {
   }
 
   useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 30000)
-    return () => clearInterval(interval)
-  }, [])
+    // Load data only on initial mount
+    if (isInitialMount.current) {
+      loadData()
+      isInitialMount.current = false
+      return
+    }
+
+    // Set up refresh timer only when dialog is closed
+    if (!showAddVlan) {
+      const interval = setInterval(loadData, 30000)
+      return () => clearInterval(interval)
+    }
+
+    return undefined
+  }, [showAddVlan])
 
   const handleSaveVlan = async (vlan: VLANConfig) => {
     try {
