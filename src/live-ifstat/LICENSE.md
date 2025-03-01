@@ -1,4 +1,4 @@
-# **OpenSource License**  
+# **DarkFlows Open Source License**  
 _Last Updated: [2025]_  
 
 ## **1. Definitions**  
@@ -79,8 +79,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ---
 
 ## **8. Governing Law & Dispute Resolution**  
-- This License shall be governed by and construed under the laws of **[YOUR JURISDICTION]**.  
-- Any legal disputes arising from this License shall be resolved **exclusively in the courts** of **[YOUR JURISDICTION]**.  
+- This License shall be governed by and construed under the laws of **[Maryland, USA]**.  
+- Any legal disputes arising from this License shall be resolved **exclusively in the courts** of **[Maryland, USA]**.  
 
 ---
 
@@ -92,14 +92,6 @@ For inquiries about commercial licensing or special permissions, contact:
 
 ---
 
-## **Summary of Key Points**  
-✅ **Allows personal and commercial use but prevents commercial redistribution**  
-✅ **No financial gain from redistributing forks**  
-✅ **Forking is allowed, but only under the same license**  
-✅ **No military applications**  
-✅ **You retain full ownership**  
-
----
 
 By using this Software, you agree to these terms. If you disagree, you must not use, copy, or distribute the Software.
 
