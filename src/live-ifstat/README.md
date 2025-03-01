@@ -21,7 +21,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 ``` 
 
 ### Reset Cards
-    - Modify /api/version/route.ts to change the version number
+- Modify /api/version/route.ts to change the version number
     
 
 ## Changelog
