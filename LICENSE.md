@@ -1,4 +1,4 @@
-# **Commercial Use Restricted License (CURL) v1.1**  
+# **OpenSource License**  
 _Last Updated: [2025]_  
 
 ## **1. Definitions**  
