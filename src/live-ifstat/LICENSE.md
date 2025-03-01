@@ -1,5 +1,5 @@
 # **Non-Commercial Public License (NCPL) v1.0**  
-_Last Updated: [YEAR]_  
+_Last Updated: [2025]_  
 
 ## **1. Definitions**  
 For the purpose of this License, the following terms apply:  
