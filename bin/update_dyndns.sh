@@ -27,10 +27,10 @@ update_dns() {
 }
 
 # Run the update function in a loop with a 1-minute sleep interval
-while true; do
-    update_dns
-    sleep 60
-done
+#while true; do
+#    update_dns
+#    sleep 60
+#done
 
 
 

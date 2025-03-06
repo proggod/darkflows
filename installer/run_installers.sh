@@ -38,7 +38,7 @@ echo "" > /var/log/installer.log
 /usr/local/darkflows/installer/create_kea_user.sh 2>&1 | tee -a $output_target
 /usr/local/darkflows/installer/setup_services.sh 2>&1 | tee -a $output_target
 /usr/local/darkflows/installer/install_docker.sh 2>&1 | tee -a $output_target
-/usr/local/darkflows/installer/setup_block_scheduler.sh 2>&1 | tee -a $output_target
+/usr/bin/python3 /usr/local/darkflows/installer/setup_crontab.py 2>&1 | tee -a $output_target
 /usr/local/darkflows/installer/update_ssh_key_location.sh 2>&1 | tee -a $output_target
 /usr/local/darkflows/installer/install_nginx.sh 2>&1 | tee -a $output_target
 echo "************ Detecting network... ************" | tee -a $output_target

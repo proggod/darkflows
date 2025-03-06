@@ -193,25 +193,6 @@ if [ $docker_error -gt 0 ]; then
 fi
 echo
 
-# 10. Check Block Scheduler (setup_block_scheduler.sh)
-echo "=== Checking Block Scheduler ==="
-scheduler_error=0
-if [ -f "/usr/local/darkflows/bin/block_scheduler.py" ]; then
-    print_status "OK" "Block scheduler script exists"
-    if crontab -l 2>/dev/null | grep -q "block_scheduler.py"; then
-        print_status "OK" "Block scheduler cron job is configured"
-    else
-        print_status "FAIL" "Block scheduler cron job is missing"
-        ((scheduler_error++))
-    fi
-else
-    print_status "FAIL" "Block scheduler script is missing"
-    ((scheduler_error++))
-fi
-if [ $scheduler_error -gt 0 ]; then
-    run_installer "setup_block_scheduler.sh" "block scheduler configuration"
-fi
-echo
 
 # 11. Check SSH Configuration (update_ssh_key_location.sh)
 echo "=== Checking SSH Configuration ==="

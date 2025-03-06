@@ -25,10 +25,8 @@ const getSessionToken = cache(async () => {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME);
     return token?.value;
-  } catch (error) {
-    console.error('getSessionToken error:', error);
+  } catch {
     return null;
-  } finally {
   }
 });
 
@@ -50,14 +48,11 @@ export const verifySession = cache(async () => {
         }
       );
       return verified.payload;
-    } catch (error) {
-      console.error('JWT verification failed:', error);
+    } catch {
       redirect('/login');
     }
-  } catch (error) {
-    console.error('verifySession error:', error);
+  } catch {
     redirect('/login');
-  } finally {
   }
 });
 
@@ -67,7 +62,9 @@ export async function isLoggedIn() {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(COOKIE_NAME);
     
-    if (!sessionCookie?.value) return false;
+    if (!sessionCookie?.value) {
+      return false;
+    }
     
     await jwtVerify(
       sessionCookie.value,
@@ -77,17 +74,19 @@ export async function isLoggedIn() {
       }
     );
     return true;
-  } catch (error) {
-    console.error('isLoggedIn error:', error);
+  } catch  {
     return false;
-  } finally {
   }
 }
 
 // Create and set session cookie
 export async function createSession() {
   try {
-    const token = await new SignJWT({})
+    const token = await new SignJWT({
+      id: 'admin',
+      role: 'admin',
+      approved: true
+    })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
@@ -95,24 +94,16 @@ export async function createSession() {
 
     const response = NextResponse.json({ success: true });
     
-    // Set cookie in multiple ways to ensure it works in development
     response.cookies.set('session', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
-    // Also set explicit Set-Cookie header
-    response.headers.set(
-      'Set-Cookie',
-      `session=${token}; Path=/; HttpOnly; ${process.env.NODE_ENV === 'production' ? 'Secure; ' : ''}SameSite=Lax; Max-Age=${60 * 60 * 24 * 7}`
-    );
+    response.headers.set('Set-Cookie', `session=${token}; Path=/; HttpOnly; Max-Age=${60 * 60 * 24 * 7}`);
 
     return response;
-  } catch (error) {
-    console.error('createSession error:', error);
+  } catch {
     return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
   }
 }
@@ -125,20 +116,11 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function validateCredentials(password: string) {
   try {
-    if (process.env.NODE_ENV === 'development' && password === 'development') {
-      return true;
-    }
-
     const credentialsFile = '/etc/darkflows/admin_credentials.json';
     const fileContent = await fs.readFile(credentialsFile, 'utf-8');
     const { hashedPassword } = JSON.parse(fileContent);
     return await bcrypt.compare(password, hashedPassword);
-  } catch (error) {
-    console.error('validateCredentials error:', error);
-    if (process.env.NODE_ENV === 'development') {
-      // Allow login in development if credential file doesn't exist
-      return password === 'development';
-    }
+  } catch {
     return false;
   }
 }
@@ -169,9 +151,7 @@ export async function clearSession(response: NextResponse) {
       'Set-Cookie',
       `${COOKIE_NAME}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax`
     );
-
-  } catch (error) {
-    console.error('Failed to clear session:', error);
-  } finally {
+  } catch {
+    // Silently fail
   }
 } 

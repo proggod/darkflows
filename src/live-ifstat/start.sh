@@ -14,7 +14,8 @@ if [[ "$*" == *"--dev"* ]]; then
   export NODE_ENV=development
   export NEXT_TELEMETRY_DISABLED=1
   echo "Starting in development mode..."
-  npm run dev
+  # Bind to 192.168.1.1 in development
+  npm run dev -- -H 192.168.1.1
 else
   export NODE_ENV=production
   export PORT=4080

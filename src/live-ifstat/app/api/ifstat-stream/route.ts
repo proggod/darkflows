@@ -28,7 +28,6 @@ async function getNetworkStats(device: string) {
 function shouldIncludeInterface(interfaceName: string): boolean {
   // Filter out unwanted interface types
   return !(
-    interfaceName.startsWith('br-') ||      // Bridge interfaces
     interfaceName.startsWith('docker') ||   // Docker interfaces
     interfaceName.startsWith('veth') ||     // Virtual ethernet
     interfaceName.includes('tailscale')     // Tailscale VPN

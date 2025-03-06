@@ -99,6 +99,11 @@ export async function lookupHostname(ip: string): Promise<HostInfo> {
 export async function lookupHostnames(ips: string[]): Promise<Map<string, HostInfo>> {
   const results = new Map<string, HostInfo>();
   
+  // Return empty map if no IPs to look up
+  if (!ips || ips.length === 0) {
+    return results;
+  }
+  
   try {
     const configContent = await fs.readFile(KEA_CONFIG_PATH, 'utf-8');
     const config: KeaConfig = JSON.parse(configContent);

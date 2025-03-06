@@ -30,13 +30,21 @@ export async function GET(
 
     const { searchParams } = new URL(request.url)
     const timeRange = searchParams.get('timeRange') || '1440'
+    const limit = searchParams.get('limit') || '1000'
     
-    // Validate time range
+    // Validate parameters
     if (!timeRange.match(/^[0-9]+$/)) {
       return NextResponse.json({ error: 'Invalid time range' }, { status: 400 })
     }
+    if (!limit.match(/^[0-9]+$/)) {
+      return NextResponse.json({ error: 'Invalid limit' }, { status: 400 })
+    }
 
-    const { stdout } = await execAsync(`journalctl -u ${name}.service --since "${timeRange} minute ago"`)
+    // Use tail to limit output and set maxBuffer to handle large outputs
+    const { stdout } = await execAsync(
+      `journalctl -u ${name}.service --since "${timeRange} minute ago" | tail -n ${limit}`,
+      { maxBuffer: 5 * 1024 * 1024 } // 5MB buffer
+    )
     
     return NextResponse.json({ logs: stdout })
   } catch (error) {

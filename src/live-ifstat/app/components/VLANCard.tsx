@@ -376,14 +376,13 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
         console.log(`\nChecking interface ${iface.name}:`, {
           interfaceRange: iface.ipRange,
           vlanRange: ipRange,
-          isDocker: iface.name.startsWith('br-'),
+          isDocker: iface.name.startsWith('docker'),
           isDockerNetwork: iface.name.startsWith('docker'),
           isTailscale: iface.name === 'tailscale0'
         });
 
-        // Skip docker and bridge interfaces
-        if (iface.name.startsWith('br-') || 
-            iface.name.startsWith('docker') || 
+        // Skip docker and tailscale interfaces
+        if (iface.name.startsWith('docker') || 
             iface.name === 'tailscale0') {
           console.log('Skipping virtual interface');
           continue;

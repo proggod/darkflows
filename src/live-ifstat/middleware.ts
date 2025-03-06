@@ -17,6 +17,14 @@ const publicPaths = [
   '/favicon.ico'
 ];
 
+const getSessionSecret = () => {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET is not set in production');
+  }
+  return secret || 'development-secret';
+};
+
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
@@ -52,17 +60,15 @@ export async function middleware(request: NextRequest) {
   try {
     await jwtVerify(
       token.value,
-      new TextEncoder().encode(process.env.SESSION_SECRET || 'development-secret'),
+      new TextEncoder().encode(getSessionSecret()),
       { algorithms: ['HS256'] }
     );
     return response;
   } catch (error) {
-    console.error('JWT verification failed:', error);
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.redirect(new URL('/login', request.url));
-  } finally {
   }
 }
 

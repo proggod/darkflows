@@ -1,20 +1,11 @@
 #!/bin/sh
 
-#boot/grub/grub.cfg  for efi isolinux.cfg for bios
-#  mkdir -p /nvme_array/darkflows_iso/iso
-#  cd /nvme_array/darkflows_iso
-#  wget https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.8.0-amd64-netinst.iso
-#  mount -o loop debian-12.8.0-amd64-netinst.iso iso
-#  mkdir custom_iso
-#  cp -rT iso custom_iso
 /usr/local/darkflows/installer/create_package.sh
 mkdir /usr/local/darkflows_iso/custom_iso/darkflows
-cd /usr/local/darkflows_iso/custom_iso/darkflows
-#scp -P 12222 root@192.168.1.1:/usr/local/installer_packages/darkflows_scripts.tgz .
-#scp -P 12222 root@192.168.1.1:/usr/local/installer_packages/darkflows_configs.tgz .
-#wget https://darkflows.com/downloads/darkflows-current.tgz
-cd ..
+cd /usr/local/darkflows_iso/custom_iso
+cp preseed.cfg /usr/local/darkflows/installer/
+
 xorriso -as mkisofs -o ../darkflows.iso     -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin     -c isolinux/boot.cat     -b isolinux/isolinux.bin     -no-emul-boot -boot-load-size 4 -boot-info-table     -eltorito-alt-boot     -e boot/grub/efi.img     -no-emul-boot     -isohybrid-gpt-basdat     -volid "DARKFLOWS_INSTALL" .
 scp -P 12222 ../darkflows.iso ny:/var/www/darkflows.com/downloads
-#/usr/bin/cp  ../darkflows-installer.iso /nvme_array/proxmox/template/iso/
+scp ../darkflows.iso 192.168.1.110:/nvme_array/proxmox/template/iso
 

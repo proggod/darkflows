@@ -15,57 +15,39 @@ export default function LoginPage() {
     fetch('/api/auth/check-setup')
       .then(res => res.json())
       .then(data => setIsFirstTime(data.isFirstTime))
-      .catch(error => {
-        console.error('Failed to check setup status:', error);
-      });
+      .catch(() => {});
   }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    console.log('=== Login Form Submission START ===');
 
     const formData = new FormData(e.currentTarget);
     const password = formData.get('password') as string;
 
     try {
       if (isFirstTime) {
-        console.log('First time setup flow...');
-        // Validation checks
         if (password !== confirmPassword) {
-          console.log('Password mismatch');
           setError('Passwords do not match');
           setIsLoading(false);
           return;
         }
         
-        console.log('Saving credentials...');
         const setupResponse = await fetch('/api/auth/save-credentials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password })
         });
 
-        console.log('Save credentials response:', {
-          ok: setupResponse.ok,
-          status: setupResponse.status
-        });
-
         if (!setupResponse.ok) {
           throw new Error('Failed to save credentials');
         }
 
-        console.log('Updating system passwords...');
         const systemResponse = await fetch('/api/auth/update-system-passwords', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password })
-        });
-
-        console.log('System passwords update response:', {
-          ok: systemResponse.ok,
-          status: systemResponse.status
         });
 
         if (!systemResponse.ok) {
@@ -73,7 +55,6 @@ export default function LoginPage() {
         }
       }
 
-      console.log('Attempting login...');
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
@@ -84,27 +65,17 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
-      console.log('Login response:', {
-        ok: response.ok,
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-        data
-      });
 
       if (data.success) {
-        console.log('Login successful, redirecting...');
-        router.push('/');
-        router.refresh();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        router.replace('/');
       } else {
-        console.log('Login failed:', data);
         setError(data.error || 'Invalid credentials');
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch {
       setError('Login failed');
     } finally {
       setIsLoading(false);
-      console.log('=== Login Form Submission END ===');
     }
   }
 
@@ -127,6 +98,7 @@ export default function LoginPage() {
             className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             required
             minLength={isFirstTime ? 8 : undefined}
+            autoComplete="current-password"
           />
         </div>
 
@@ -141,6 +113,7 @@ export default function LoginPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required
+              autoComplete="new-password"
             />
           </div>
         )}
