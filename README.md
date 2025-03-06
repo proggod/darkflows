@@ -25,12 +25,12 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
-##v0.36
+### v0.36
 - Fixed weather component so it stores choice and works for non-US
 - Fixed delete ssh key
 - Added CloudFlare dynamic dns settings to web admin
 
-##v0.35
+### v0.35
 - Set docker to host networking only
 - Made ISO install more interactive
 - Using default directories for unbound, kea and darkflow
@@ -43,14 +43,14 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed component overflow for services
 
 
-##v0.34
+### v0.34
 - removed pihole button
 - fixed delete reservation route
 - fixed add reservation
 - fixed dns clients referencing leases updated for new db driven kea + unbound
 - Fixed sort on reservationscard
 
-##v0.33
+### v0.33
 - Switched to Unbound for DNS
 - Added Custom DNS Lists
 - Added DNS Client Blocklist
@@ -77,17 +77,17 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed DHCP Reservations Card
 - Fixed some VLAN card bugs
     
-##v0.30
+### v0.30
 - Removed test SSH keys from root
 
-##v0.29
+### v0.29
 - Fixed edit reservation so you could change IP address
 - Update script fixed
 
-##v0.28
+### v0.28
 - Fixed route to secondary interface bug
 
-##v0.27
+### v0.27
 - Modified some of the port forwarding scripts
 - Made installer smarter
 - Added upnpn support framework
@@ -95,22 +95,22 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - New distribution server
 - Added back ssh key install to help debugging, remove from root/.ssh/authorized_keys if you don't want it
 
-##v0.26
+### v0.26
 - Fixed kea install bug
 - Fixed network stats card bug
 
-##v0.25
+### v0.25
 - Set update to rebuild webserver on update
 - Removed creator ssh key transfer
 
-##v0.24
+### v0.24
 - Changed logic on network stats card so we don't get duplicate network stats cards
 
-##v0.23
+### v0.23
 - Made kea config configurator not rely on a device name in config
 - Added script to rename network devices to prevent device nameshifting
 
-##v0.22
+### v0.22
 - Changed default component order, made it so i can order network stats…
 - Added install verifications, added internet verification before running install
 - make dark mode permenenant, removed switch mode button
@@ -118,14 +118,14 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - install with command, "su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install.sh | bash"
 - visit web after at "http://192.168.58.1"
 
-##v0.21
+### v0.21
 - Completely Changed Authentication to other System to hopefully be more reliable
 
-##v0.20
+### v0.20
 - Fixed issue creating account
 - Excluded default login file
 
-##v0.19
+### v0.19
 - Added First time password prompt sets darkflows user, darkflows samba user, and pihole password
 - Fixed a bug with route to secondary interface
 - Removed the need for a username to login, only a password
@@ -133,12 +133,12 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed ability to easily edit host names by clicking fields
 - Auto adds reservations any time you edit name
 
-##v0.18
+### v0.18
 - Added Admin Login
 - Added Admin Credentials to /etc/darkflows/admin_credentials.json
 - Added Security to All API Routes
 
-##v0.17
+### v0.17
 - Removed Network Reboot
 - Removed DHCP Service Restart
 - Added Server Reboot   
@@ -147,14 +147,14 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed Cake Settings not being saved
 - Made add external port forward script more intelligent
 
-##v0.16
+### v0.16
 - Added Navigation Bar
 - Fixed losing layout on reload
 
-##v0.15
+### v0.15
 - Fixed build errors on website
 
-##v0.14
+### v0.14
 - New Design
 - Added Routing System for Docker
 - Kea Installer Fixes
