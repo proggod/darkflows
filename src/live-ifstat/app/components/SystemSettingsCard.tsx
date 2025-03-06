@@ -15,6 +15,11 @@ interface NetworkSettings {
   cakeDefault?: string;
   cakeParams?: string;
   error?: string;
+  // Cloudflare DNS Settings
+  zoneId?: string;
+  recordId?: string;
+  apiToken?: string;
+  recordName?: string;
 }
 
 function calculateDefaultPools(gatewayIp: string, subnetMask: string): IpPool[] {
@@ -52,7 +57,12 @@ export function SystemSettingsCard() {
     subnetMask: "255.255.254.0",
     ipPools: [{ start: "192.168.0.10", end: "192.168.1.200" }],
     cakeDefault: "",
-    cakeParams: ""
+    cakeParams: "",
+    // Cloudflare DNS Settings
+    zoneId: "",
+    recordId: "",
+    apiToken: "",
+    recordName: ""
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isRebooting, setIsRebooting] = useState(false);
@@ -300,6 +310,54 @@ export function SystemSettingsCard() {
                   <RotateCcw className="h-3 w-3" />
                   Default
                 </button>
+              </div>
+            </div>
+
+            {/* Cloudflare DNS Settings */}
+            <div className="space-y-2 mt-6">
+              <h4 className="text-[10px] font-medium text-gray-700 dark:text-gray-300 mb-2">CloudFlare Dynamic DNS</h4>
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">Zone ID</label>
+                <input
+                  type="text"
+                  value={settings.zoneId || ''}
+                  onChange={(e) => setSettings({ ...settings, zoneId: e.target.value })}
+                  placeholder="Cloudflare Zone ID"
+                  className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
+                />
+              </div>
+
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">Record ID</label>
+                <input
+                  type="text"
+                  value={settings.recordId || ''}
+                  onChange={(e) => setSettings({ ...settings, recordId: e.target.value })}
+                  placeholder="Cloudflare Record ID"
+                  className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
+                />
+              </div>
+
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">API Token</label>
+                <input
+                  type="password"
+                  value={settings.apiToken || ''}
+                  onChange={(e) => setSettings({ ...settings, apiToken: e.target.value })}
+                  placeholder="Cloudflare API Token"
+                  className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
+                />
+              </div>
+
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] font-medium text-gray-700 dark:text-gray-300 w-[85px]">Domain Name</label>
+                <input
+                  type="text"
+                  value={settings.recordName || ''}
+                  onChange={(e) => setSettings({ ...settings, recordName: e.target.value })}
+                  placeholder="Domain Name (e.g., ai.darkflows.com)"
+                  className="px-1.5 py-1 text-[10px] rounded bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 w-full"
+                />
               </div>
             </div>
           </div>

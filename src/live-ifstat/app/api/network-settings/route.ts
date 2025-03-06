@@ -8,6 +8,11 @@ interface NetworkSettings {
   ipPools: { start: string; end: string }[]
   cakeDefault?: string
   cakeParams?: string
+  // Cloudflare DNS Settings
+  zoneId?: string
+  recordId?: string
+  apiToken?: string
+  recordName?: string
 }
 
 interface DhcpPool {
@@ -51,6 +56,16 @@ export async function GET(request: NextRequest) {
     const cakeDefault = cakeDefaultMatch ? cakeDefaultMatch[1] : ''
     const cakeParams = cakeParamsMatch ? cakeParamsMatch[1] : ''
 
+    // Parse Cloudflare DNS settings
+    const zoneIdMatch = networkConfig.match(/ZONE_ID="([^"]*)"/)
+    const recordIdMatch = networkConfig.match(/RECORD_ID="([^"]*)"/)
+    const apiTokenMatch = networkConfig.match(/API_TOKEN="([^"]*)"/)
+    const recordNameMatch = networkConfig.match(/RECORD_NAME="([^"]*)"/)
+    const zoneId = zoneIdMatch ? zoneIdMatch[1] : ''
+    const recordId = recordIdMatch ? recordIdMatch[1] : ''
+    const apiToken = apiTokenMatch ? apiTokenMatch[1] : ''
+    const recordName = recordNameMatch ? recordNameMatch[1] : ''
+
     // Parse IP pools from DHCP config
     const dhcpJson = JSON.parse(dhcpConfig)
     const pools = dhcpJson.Dhcp4.subnet4[0].pools.map((pool: DhcpPool) => {
@@ -63,7 +78,11 @@ export async function GET(request: NextRequest) {
       subnetMask, 
       ipPools: pools, 
       cakeDefault,
-      cakeParams 
+      cakeParams,
+      zoneId,
+      recordId,
+      apiToken,
+      recordName
     })
   } catch (error) {
     console.error('Error reading network settings:', error)
@@ -130,11 +149,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Keep the CAKE_DEFAULT update
+    // Update CAKE_DEFAULT in network config
     if (settings.cakeDefault) {
       networkConfig = networkConfig.replace(
         /CAKE_DEFAULT="[^"]*"/,
         `CAKE_DEFAULT="${settings.cakeDefault}"`
+      )
+    }
+
+    // Update Cloudflare DNS settings in network config
+    if (settings.zoneId !== undefined) {
+      networkConfig = networkConfig.replace(
+        /ZONE_ID="[^"]*"/,
+        `ZONE_ID="${settings.zoneId}"`
+      )
+    }
+
+    if (settings.recordId !== undefined) {
+      networkConfig = networkConfig.replace(
+        /RECORD_ID="[^"]*"/,
+        `RECORD_ID="${settings.recordId}"`
+      )
+    }
+
+    if (settings.apiToken !== undefined) {
+      networkConfig = networkConfig.replace(
+        /API_TOKEN="[^"]*"/,
+        `API_TOKEN="${settings.apiToken}"`
+      )
+    }
+
+    if (settings.recordName !== undefined) {
+      networkConfig = networkConfig.replace(
+        /RECORD_NAME="[^"]*"/,
+        `RECORD_NAME="${settings.recordName}"`
       )
     }
 
