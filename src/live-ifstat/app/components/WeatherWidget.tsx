@@ -34,18 +34,107 @@ interface Location {
   latitude: string
   longitude: string
   cityName: string
+  zipCode?: string
+  country?: string
 }
+
+interface CountryOption {
+  code: string
+  name: string
+  hasState: boolean
+}
+
+const SUPPORTED_COUNTRIES: CountryOption[] = [
+  { code: 'AD', name: 'Andorra', hasState: false },
+  { code: 'AR', name: 'Argentina', hasState: false },
+  { code: 'AS', name: 'American Samoa', hasState: false },
+  { code: 'AT', name: 'Austria', hasState: false },
+  { code: 'AU', name: 'Australia', hasState: false },
+  { code: 'BD', name: 'Bangladesh', hasState: false },
+  { code: 'BE', name: 'Belgium', hasState: false },
+  { code: 'BG', name: 'Bulgaria', hasState: false },
+  { code: 'BR', name: 'Brazil', hasState: false },
+  { code: 'CA', name: 'Canada', hasState: true },
+  { code: 'CH', name: 'Switzerland', hasState: false },
+  { code: 'CZ', name: 'Czech Republic', hasState: false },
+  { code: 'DE', name: 'Germany', hasState: false },
+  { code: 'DK', name: 'Denmark', hasState: false },
+  { code: 'DO', name: 'Dominican Republic', hasState: false },
+  { code: 'ES', name: 'Spain', hasState: false },
+  { code: 'FI', name: 'Finland', hasState: false },
+  { code: 'FO', name: 'Faroe Islands', hasState: false },
+  { code: 'FR', name: 'France', hasState: false },
+  { code: 'GB', name: 'Great Britain', hasState: false },
+  { code: 'GF', name: 'French Guyana', hasState: false },
+  { code: 'GG', name: 'Guernsey', hasState: false },
+  { code: 'GL', name: 'Greenland', hasState: false },
+  { code: 'GP', name: 'Guadeloupe', hasState: false },
+  { code: 'GT', name: 'Guatemala', hasState: false },
+  { code: 'GU', name: 'Guam', hasState: false },
+  { code: 'GY', name: 'Guyana', hasState: false },
+  { code: 'HR', name: 'Croatia', hasState: false },
+  { code: 'HU', name: 'Hungary', hasState: false },
+  { code: 'IM', name: 'Isle of Man', hasState: false },
+  { code: 'IN', name: 'India', hasState: false },
+  { code: 'IS', name: 'Iceland', hasState: false },
+  { code: 'IT', name: 'Italy', hasState: false },
+  { code: 'JE', name: 'Jersey', hasState: false },
+  { code: 'JP', name: 'Japan', hasState: false },
+  { code: 'LI', name: 'Liechtenstein', hasState: false },
+  { code: 'LK', name: 'Sri Lanka', hasState: false },
+  { code: 'LT', name: 'Lithuania', hasState: false },
+  { code: 'LU', name: 'Luxembourg', hasState: false },
+  { code: 'MC', name: 'Monaco', hasState: false },
+  { code: 'MD', name: 'Moldavia', hasState: false },
+  { code: 'MH', name: 'Marshall Islands', hasState: false },
+  { code: 'MK', name: 'Macedonia', hasState: false },
+  { code: 'MP', name: 'Northern Mariana Islands', hasState: false },
+  { code: 'MQ', name: 'Martinique', hasState: false },
+  { code: 'MX', name: 'Mexico', hasState: false },
+  { code: 'MY', name: 'Malaysia', hasState: false },
+  { code: 'NL', name: 'Holland', hasState: false },
+  { code: 'NO', name: 'Norway', hasState: false },
+  { code: 'NZ', name: 'New Zealand', hasState: false },
+  { code: 'PH', name: 'Philippines', hasState: false },
+  { code: 'PK', name: 'Pakistan', hasState: false },
+  { code: 'PL', name: 'Poland', hasState: false },
+  { code: 'PM', name: 'Saint Pierre and Miquelon', hasState: false },
+  { code: 'PR', name: 'Puerto Rico', hasState: false },
+  { code: 'PT', name: 'Portugal', hasState: false },
+  { code: 'RE', name: 'French Reunion', hasState: false },
+  { code: 'RU', name: 'Russia', hasState: false },
+  { code: 'SE', name: 'Sweden', hasState: false },
+  { code: 'SI', name: 'Slovenia', hasState: false },
+  { code: 'SJ', name: 'Svalbard & Jan Mayen Islands', hasState: false },
+  { code: 'SK', name: 'Slovak Republic', hasState: false },
+  { code: 'SM', name: 'San Marino', hasState: false },
+  { code: 'TH', name: 'Thailand', hasState: false },
+  { code: 'TR', name: 'Turkey', hasState: false },
+  { code: 'US', name: 'United States', hasState: true },
+  { code: 'VA', name: 'Vatican', hasState: false },
+  { code: 'VI', name: 'Virgin Islands', hasState: false },
+  { code: 'YT', name: 'Mayotte', hasState: false },
+  { code: 'ZA', name: 'South Africa', hasState: false }
+].sort((a, b) => a.name.localeCompare(b.name));
 
 const WeatherWidget = forwardRef((props, ref) => {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [location, setLocation] = useState<Location | null>(null)
-  const [showZipInput, setShowZipInput] = useState(false)
+  const [showLocationInput, setShowLocationInput] = useState(false)
   const [zipCode, setZipCode] = useState('')
+  const [city, setCity] = useState('')
+  const [state, setState] = useState('')
+  const [country, setCountry] = useState('US')
+  const [inputType, setInputType] = useState<'zip' | 'city'>('zip')
   const [error, setError] = useState('')
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('temperature')
   const [tempUnit, setTempUnit] = useState<TempUnit>('F')
   const { isDarkMode } = useTheme()
+
+  const selectedCountry = useMemo(() => 
+    SUPPORTED_COUNTRIES.find(c => c.code === country) || SUPPORTED_COUNTRIES.find(c => c.code === 'US')!
+  , [country]);
 
   useEffect(() => {
     // Load preferences from localStorage on client-side
@@ -148,17 +237,39 @@ const WeatherWidget = forwardRef((props, ref) => {
       
       localStorage.setItem('weatherLocation', JSON.stringify(data))
       setLocation(data)
-      setShowZipInput(false)
+      setShowLocationInput(false)
       setError('')
     } catch {
       setError('Invalid ZIP code')
     }
   }
 
-  const handleZipSubmit = (e: React.FormEvent) => {
+  const getLocationFromCity = async (city: string, state: string, country: string) => {
+    try {
+      const response = await fetch('/api/weather', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city, state, country })
+      })
+      
+      if (!response.ok) throw new Error('City not found')
+      const data = await response.json()
+      
+      localStorage.setItem('weatherLocation', JSON.stringify(data))
+      setLocation(data)
+      setShowLocationInput(false)
+      setError('')
+    } catch {
+      setError('City not found')
+    }
+  }
+
+  const handleLocationSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (zipCode.length === 5) {
+    if (inputType === 'zip' && zipCode.length === 5) {
       getLocationFromZip(zipCode)
+    } else if (inputType === 'city' && city && country) {
+      getLocationFromCity(city, state, country)
     }
   }
 
@@ -319,36 +430,94 @@ const WeatherWidget = forwardRef((props, ref) => {
     <div className="flex flex-col h-full">
       {/* Location and Update */}
       <div className="flex justify-between items-center mb-2 px-3">
-        <span className="text-label">
-          {location.cityName} ({weatherData.timezone})
-        </span>
-        <div className="flex gap-2">
-          {showZipInput ? (
-            <form onSubmit={handleZipSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-                placeholder="Enter ZIP code"
-                className="input w-24"
-                maxLength={5}
-              />
-              <button 
-                type="submit" 
-                className="btn btn-blue"
-              >
-                Update
-              </button>
-            </form>
-          ) : (
+        {!showLocationInput ? (
+          <>
+            <span className="text-label">
+              {location?.cityName} {location?.country ? `(${location.country})` : ''} ({weatherData?.timezone})
+            </span>
             <button 
-              onClick={() => setShowZipInput(true)} 
+              onClick={() => setShowLocationInput(true)} 
               className="btn btn-blue"
             >
-              Change ZIP Code
+              Change Location
             </button>
-          )}
-        </div>
+          </>
+        ) : (
+          <form onSubmit={handleLocationSubmit} className="w-full">
+            <div className="flex gap-2 items-center">
+              <select 
+                value={inputType}
+                onChange={(e) => setInputType(e.target.value as 'zip' | 'city')}
+                className="input w-24"
+              >
+                <option value="zip">ZIP Code</option>
+                <option value="city">City</option>
+              </select>
+              
+              {inputType === 'zip' ? (
+                <input
+                  type="text"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="Enter ZIP code"
+                  className="input w-24"
+                  maxLength={5}
+                />
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Enter city"
+                    className="input w-32"
+                  />
+                  <select
+                    value={country}
+                    onChange={(e) => {
+                      setCountry(e.target.value);
+                      if (e.target.value !== 'US') {
+                        setState('');
+                      }
+                    }}
+                    className="input w-40"
+                  >
+                    {SUPPORTED_COUNTRIES.map(country => (
+                      <option key={country.code} value={country.code}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedCountry.hasState && (
+                    <input
+                      type="text"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      placeholder="State"
+                      className="input w-16"
+                      maxLength={2}
+                    />
+                  )}
+                </>
+              )}
+              <div className="flex gap-2">
+                <button 
+                  type="submit" 
+                  className="btn btn-blue"
+                >
+                  Update
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowLocationInput(false)}
+                  className="btn btn-gray"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </form>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto">

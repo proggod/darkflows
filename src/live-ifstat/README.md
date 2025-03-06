@@ -25,6 +25,8 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+###v0.36
+- Fixed weather component so it stores choice and works for non-US
 
 ###v0.35
 - Set docker to host networking only
