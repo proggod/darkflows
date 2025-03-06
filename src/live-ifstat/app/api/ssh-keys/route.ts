@@ -60,8 +60,7 @@ async function getUserKeys(username: string): Promise<SshKey[]> {
         
         try {
           const keyEnd = key.slice(-32) || key
-          const random = Math.floor(Math.random() * 10000)
-          const id = Buffer.from(`${username}-${keyEnd}-${random}`).toString('base64')
+          const id = Buffer.from(`${username}-${keyEnd}`).toString('base64')
           return { id, type, key, comment } as SshKey
         } catch (error) {
           console.error('Error processing key line:', error)
@@ -180,7 +179,24 @@ export async function DELETE(request: Request) {
     const userDir = path.join(SSH_DIR, username)
     const keyFile = path.join(userDir, 'authorized_keys')
 
+    try {
+      await fs.access(keyFile)
+    } catch {
+      return NextResponse.json(
+        { error: 'SSH key file not found' },
+        { status: 404 }
+      )
+    }
+
     const keys = await getUserKeys(username)
+    const keyToDelete = keys.find(k => k.id === keyId)
+    if (!keyToDelete) {
+      return NextResponse.json(
+        { error: 'SSH key not found' },
+        { status: 404 }
+      )
+    }
+
     const filteredKeys = keys.filter(k => k.id !== keyId)
     
     await fs.writeFile(

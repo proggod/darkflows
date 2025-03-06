@@ -161,19 +161,36 @@ export default function SshKeysCard() {
   const handleDeleteKey = async (username: string, keyId: string) => {
     try {
       setError('')
-      const response = await fetch(`/api/ssh-keys?username=${encodeURIComponent(username)}&keyId=${encodeURIComponent(keyId)}`, {
+      console.log('Attempting to delete key:', { username, keyId })
+      const url = `/api/ssh-keys?username=${encodeURIComponent(username)}&keyId=${encodeURIComponent(keyId)}`
+      
+      const response = await fetch(url, {
         method: 'DELETE',
       })
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await response.json().catch(e => ({ error: 'No response body' }))
         throw new Error(data.error || 'Failed to delete key')
       }
 
+      // Force immediate data refresh
       await loadData()
+      
+      // Optimistically update the UI
+      setUsers(prevUsers => 
+        prevUsers.map(user => {
+          if (user.username === username) {
+            return {
+              ...user,
+              keys: user.keys.filter(key => key.id !== keyId)
+            }
+          }
+          return user
+        })
+      )
     } catch (error) {
-      console.error('Error deleting key:', error)
-      setError('Failed to delete key')
+      console.error('Detailed error deleting key:', error)
+      setError(error instanceof Error ? error.message : 'Failed to delete key')
     }
   }
 
