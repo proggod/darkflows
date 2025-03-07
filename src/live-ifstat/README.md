@@ -29,6 +29,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed weather component so it stores choice and works for non-US
 - Fixed delete ssh key
 - Added CloudFlare dynamic dns settings to web admin
+- Added wifi network setup script in bin/wifi/ - Full wifi support
 
 ### v0.35
 - Set docker to host networking only

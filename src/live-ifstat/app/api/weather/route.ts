@@ -8,6 +8,19 @@ interface Location {
   country?: string
 }
 
+interface ZippopotamResponse {
+  'post code'?: string;
+  country: string;
+  'country abbreviation': string;
+  places: Array<{
+    'place name': string;
+    longitude: string;
+    latitude: string;
+    state?: string;
+    'state abbreviation'?: string;
+  }>;
+}
+
 const MAX_RETRIES = 3
 
 async function retryFetch(url: string, maxRetries: number): Promise<Response> {
@@ -83,7 +96,7 @@ export async function POST(request: NextRequest) {
       const country = body.country.toLowerCase()
       const state = body.state?.toLowerCase() || ''
       let response: Response
-      let data: any
+      let data: ZippopotamResponse
       
       if (state && country === 'us') {
         // Use state-based lookup for US cities

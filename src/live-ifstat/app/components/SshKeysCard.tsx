@@ -169,7 +169,7 @@ export default function SshKeysCard() {
       })
 
       if (!response.ok) {
-        const data = await response.json().catch(e => ({ error: 'No response body' }))
+        const data = await response.json().catch(() => ({ error: 'No response body' }))
         throw new Error(data.error || 'Failed to delete key')
       }
 

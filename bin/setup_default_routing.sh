@@ -11,6 +11,7 @@ python3 /usr/local/darkflows/bin/verify_configs.py
 /usr/local/darkflows/bin/update_external_forwards.sh
 /usr/local/darkflows/bin/update_local_forwards.sh
 /usr/local/darkflows/bin/update_secondary_routes.sh
+#/usr/local/darkflows/bin/wifi-routing.sh
 
 
 /usr/bin/screen -dmS dyndns /usr/local/darkflows/bin/update_dyndns.sh
@@ -21,7 +22,7 @@ python3 /usr/local/darkflows/bin/verify_configs.py
 /usr/bin/screen -dmS unbound /usr/bin/python3 /usr/local/darkflows/bin/run_unbound.py
 
 
-/usr/local/darkflows/bin/update_dyndns.sh
+#/usr/local/darkflows/bin/update_dyndns.sh
 
 
 
