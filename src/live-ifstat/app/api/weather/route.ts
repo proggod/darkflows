@@ -21,6 +21,11 @@ interface ZippopotamResponse {
   }>;
 }
 
+interface NominatimResponse {
+  lat: string;
+  lon: string;
+}
+
 const MAX_RETRIES = 3
 
 async function retryFetch(url: string, maxRetries: number): Promise<Response> {
@@ -122,7 +127,7 @@ export async function POST(request: NextRequest) {
           throw new Error('City not found')
         }
         
-        data = await response.json()
+        const data: NominatimResponse[] = await response.json()
         if (!data || data.length === 0) {
           throw new Error('City not found')
         }

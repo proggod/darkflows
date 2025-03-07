@@ -24,4 +24,5 @@ export const DEFAULT_ITEMS = [
   'CustomDNSLists',
   'bandwidth',
   'speedTest',
+  'wifiSettings',
 ]; 

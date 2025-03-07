@@ -30,6 +30,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed delete ssh key
 - Added CloudFlare dynamic dns settings to web admin
 - Added wifi network setup script in bin/wifi/ - Full wifi support
+- Added wifi settings component on web admin
 
 ### v0.35
 - Set docker to host networking only

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const APP_VERSION = '0.33'; // Match your current version from README.md
+const APP_VERSION = '0.37';
 
 export async function GET() {
   // Add cache control headers

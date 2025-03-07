@@ -50,6 +50,7 @@ export const CATEGORIES: CategoryDefinition[] = [
     label: 'System Configuration',
     defaultComponents: [
       'systemSettings',
+      'wifiSettings',
       'sshKeys',
       'connectionTuning',
       'portForwards',

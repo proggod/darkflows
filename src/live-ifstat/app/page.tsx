@@ -13,6 +13,7 @@ import SambaSharesCard from '@/components/SambaSharesCard'
 import { useEditMode } from '@/contexts/EditModeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { SystemSettingsCard } from '@/components/SystemSettingsCard'
+import { WifiSettingsCard } from '@/components/WifiSettingsCard'
 import { BlockClientsCard } from '@/components/BlockClientsCard'
 import {
   DndContext,
@@ -73,9 +74,46 @@ const CombinedDashboard = () => {
   const deviceUpdatePending = useRef(false)
   const [isLoading, setIsLoading] = useState(true)
   const versionCheckComplete = useRef(false)
-  const [needsReset, setNeedsReset] = useState(false)
+  const isFirstRender = useRef(true)
   
+  // Version check effect - run this first
+  useEffect(() => {
+    const checkVersion = async () => {
+      if (!isFirstRender.current) return;
+      isFirstRender.current = false;
+      
+      try {
+        const response = await fetch('/api/version');
+        const { version } = await response.json();
+        const savedVersion = localStorage.getItem('betaDashboardVersion');
+        
+        if (savedVersion !== version) {
+          // Clear all localStorage
+          localStorage.clear();
+          // Set new version
+          localStorage.setItem('betaDashboardVersion', version);
+          // Set default layouts
+          const defaultLayouts = CATEGORIES.reduce((acc, cat) => ({
+            ...acc,
+            [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
+          }), {});
+          localStorage.setItem('categoryLayouts', JSON.stringify(defaultLayouts));
+          window.location.reload();
+          return;
+        }
+        
+        versionCheckComplete.current = true;
+      } catch (error) {
+        console.error('Failed to check version:', error);
+      }
+    };
+
+    checkVersion();
+  }, []); // Empty deps array to run only once
+
+  // Delay other state initialization until version check completes
   const [currentCategory, setCurrentCategory] = useState<ComponentCategory>(() => {
+    if (!versionCheckComplete.current) return 'all';
     try {
       const saved = localStorage.getItem('selectedCategory')
       return saved ? JSON.parse(saved) : 'all'
@@ -85,6 +123,12 @@ const CombinedDashboard = () => {
   })
 
   const [categoryLayouts, setCategoryLayouts] = useState<Record<ComponentCategory, string[]>>(() => {
+    if (!versionCheckComplete.current) {
+      return CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
+      }), {});
+    }
     try {
       const saved = localStorage.getItem('categoryLayouts')
       return saved ? JSON.parse(saved) : CATEGORIES.reduce((acc, cat) => ({
@@ -257,56 +301,6 @@ const CombinedDashboard = () => {
     document.documentElement.classList.toggle('dark', isDarkMode)
   }, [isDarkMode])
 
-  // First effect to check version
-  useEffect(() => {
-    const checkVersion = async () => {
-      if (versionCheckComplete.current) return;
-      
-      try {
-        const response = await fetch('/api/version');
-        const { version } = await response.json();
-        const savedVersion = localStorage.getItem('betaDashboardVersion');
-        
-        if (savedVersion !== version) {
-          setNeedsReset(true);
-          // Store the new version for use in reset effect
-          localStorage.setItem('betaDashboardVersion', version);
-        }
-        
-        versionCheckComplete.current = true;
-      } catch (error) {
-        console.error('Failed to check version:', error);
-      }
-    };
-
-    checkVersion();
-  }, []); // No dependencies needed
-
-  // Second effect to handle the reset
-  useEffect(() => {
-    if (needsReset && initialLoadComplete.current) {
-      console.log('Resetting dashboard state...');
-      localStorage.clear();
-      
-      const newLayouts = CATEGORIES.reduce((acc, cat) => ({
-        ...acc,
-        [cat.id]: cat.id === 'all' ? DEFAULT_ITEMS : cat.defaultComponents
-      }), {} as Record<ComponentCategory, string[]>);
-      
-      setCategoryLayouts(newLayouts);
-      setCategoryHiddenItems(CATEGORIES.reduce((acc, cat) => ({
-        ...acc,
-        [cat.id]: new Set()
-      }), {} as Record<ComponentCategory, Set<string>>));
-      
-      // Version was already set in the check effect
-      setNeedsReset(false);
-    }
-  }, [needsReset, initialLoadComplete]);
-
-  // Add debug logging for networkConfig and networkStats
-
-
   const colors = [
     { light: '#10b981', dark: '#059669' }, // green
     { light: '#3b82f6', dark: '#2563eb' }, // blue
@@ -332,9 +326,13 @@ const CombinedDashboard = () => {
         const newOrder = arrayMove(currentLayout, oldIndex, newIndex);
         
         try {
-          localStorage.setItem('betaDashboardOrder', JSON.stringify(newOrder));
+          const newLayouts = {
+            ...layouts,
+            [currentCategory]: newOrder
+          };
+          localStorage.setItem('categoryLayouts', JSON.stringify(newLayouts));
         } catch (e) {
-          console.error('Failed to save order after drag:', e);
+          console.error('Failed to save layout state:', e);
         }
         
         return {
@@ -345,23 +343,38 @@ const CombinedDashboard = () => {
     }
   }
 
-
-  // Modify the save effect to only log errors
+  // Update save effect to use consistent keys
   useEffect(() => {
     if (!initialLoadComplete.current) return;
     
     try {
-      const currentSaved = localStorage.getItem('betaDashboardOrder');
-      const newOrder = JSON.stringify(categoryLayouts[currentCategory]);
-      
-      if (currentSaved !== newOrder) {
-        localStorage.setItem('betaDashboardOrder', newOrder);
-        localStorage.setItem('betaDashboardHidden', JSON.stringify(Array.from(categoryHiddenItems[currentCategory])));
-      }
+      // Save all state using new keys
+      localStorage.setItem('categoryLayouts', JSON.stringify(categoryLayouts));
+      const hiddenItemsObj = Object.fromEntries(
+        Object.entries(categoryHiddenItems).map(([key, value]) => [key, Array.from(value)])
+      );
+      localStorage.setItem('categoryHiddenItems', JSON.stringify(hiddenItemsObj));
     } catch (e) {
       console.error('Failed to save dashboard state:', e);
     }
-  }, [categoryLayouts, categoryHiddenItems, currentCategory]);
+  }, [categoryLayouts, categoryHiddenItems]);
+
+  // Add cleanup effect to remove old keys after migration
+  useEffect(() => {
+    const cleanupOldKeys = () => {
+      try {
+        // Remove old localStorage keys
+        localStorage.removeItem('betaDashboardOrder');
+        localStorage.removeItem('betaDashboardHidden');
+      } catch (e) {
+        console.error('Failed to cleanup old keys:', e);
+      }
+    };
+
+    if (versionCheckComplete.current) {
+      cleanupOldKeys();
+    }
+  }, []);
 
   const toggleVisibility = (id: string) => {
     setCategoryHiddenItems(current => {
@@ -447,6 +460,8 @@ const CombinedDashboard = () => {
         return <ErrorBoundary><BandwidthUsage /></ErrorBoundary>
       case 'systemSettings':
         return <ErrorBoundary><SystemSettingsCard /></ErrorBoundary>
+      case 'wifiSettings':
+        return <ErrorBoundary><WifiSettingsCard /></ErrorBoundary>
       case 'blockClients':
         return <ErrorBoundary><BlockClientsCard /></ErrorBoundary>
       case 'sshKeys':
@@ -548,6 +563,8 @@ const CombinedDashboard = () => {
         return 'Bandwidth Usage'
       case 'systemSettings':
         return 'System Settings'
+      case 'wifiSettings':
+        return 'WiFi Settings'
       case 'blockClients':
         return 'Block Clients'
       case 'sshKeys':
@@ -623,7 +640,7 @@ const CombinedDashboard = () => {
                     className={
                       id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || 
                       id === 'sambaShares' || id === 'dnsClients' || id === 'CustomDNSLists' || id === 'bandwidth' || 
-                      id === 'systemSettings' || id === 'blockClients' 
+                      id === 'systemSettings' || id === 'blockClients'
                         ? 'row-span-2 col-span-2'
                         : id === 'clock' || id === 'interfaceStatus'
                         ? 'row-span-1 col-span-1'
