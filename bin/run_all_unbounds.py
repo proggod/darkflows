@@ -24,7 +24,6 @@ LOG_DIR = "/var/log"
 # Database configuration
 DB_CONFIG = {
     "host": "localhost",
-    "unix_socket": "/var/run/mysqld/mysqld.sock",
     "user": "root",
     "passwd": "",  # Update if needed
 }
@@ -32,6 +31,7 @@ DB_NAME = "unbound"
 DNS_QUERIES_TABLE = "dns_queries"
 BLACKLIST_TABLE = "blacklist"
 WHITELIST_TABLE = "whitelist"
+BLOCKLISTS_TABLE = "blocklists"
 
 def ensure_directory_exists(directory_path: str) -> None:
     """
@@ -137,6 +137,17 @@ def init_database() -> None:
                     vlan_id INT NOT NULL DEFAULT 0,
                     PRIMARY KEY (domain, vlan_id)
                 ) ENGINE=InnoDB
+            """,
+            BLOCKLISTS_TABLE: """
+                CREATE TABLE {table} (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    url VARCHAR(2048) NOT NULL,
+                    vlan_id INT NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY idx_name_vlan (name, vlan_id)
+                ) ENGINE=InnoDB
             """
         }
         
@@ -199,6 +210,27 @@ def init_database() -> None:
                             print(f"Recreated table {table_name} with proper structure")
                         else:
                             print(f"Table {table_name} has correct structure")
+                
+                # For blocklists table, check for all required columns and unique index
+                elif table_name == BLOCKLISTS_TABLE:
+                    required_columns = ['id', 'name', 'url', 'vlan_id', 'created_at', 'updated_at']
+                    missing_columns = [col for col in required_columns if col not in columns]
+                    
+                    # Check for unique index on name and vlan_id
+                    has_unique_index = False
+                    for idx_name, idx_row in indexes.items():
+                        if idx_name == 'idx_name_vlan':
+                            has_unique_index = True
+                            break
+                    
+                    if missing_columns or not has_unique_index:
+                        print(f"Table {table_name} is missing required columns or indexes. Recreating...")
+                        cursor.execute(f"DROP TABLE {table_name}")
+                        cursor.execute(create_sql.format(table=table_name))
+                        conn.commit()
+                        print(f"Recreated table {table_name} with proper structure")
+                    else:
+                        print(f"Table {table_name} has correct structure")
             else:
                 # Table doesn't exist, create it
                 print(f"Creating table {table_name}")

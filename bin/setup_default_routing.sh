@@ -20,6 +20,7 @@ python3 /usr/local/darkflows/bin/verify_configs.py
 /usr/bin/screen -dmS ping_monitor /usr/bin/python3 /usr/local/darkflows/bin/run_ping.py
 /usr/bin/screen -dmS bandwidth_monitor /usr/bin/python3 /usr/local/darkflows/bin/monitor_bandwidth.py
 /usr/bin/screen /usr/bin/python3 /usr/local/darkflows/bin/run_all_unbounds.py
+/usr/bin/python3 /usr/local/darkflows/bin/verify_blocklists.py
 
 
 #/usr/local/darkflows/bin/update_dyndns.sh

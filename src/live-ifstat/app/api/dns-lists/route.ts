@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid list type' }, { status: 400 })
   }
 
+  const vlanIdParam = request.nextUrl.searchParams.get('vlanId')
+  const vlanId = vlanIdParam === 'default' ? 0 : Number(vlanIdParam) || 0
+
   let connection: mysql.Connection | undefined
 
   try {
@@ -22,7 +25,8 @@ export async function GET(request: NextRequest) {
     })
 
     const [entries] = await connection.execute<mysql.RowDataPacket[]>(
-      `SELECT domain FROM ${type} ORDER BY domain`
+      `SELECT domain FROM ${type} WHERE vlan_id = ? ORDER BY domain`,
+      [vlanId]
     )
 
     return NextResponse.json({ entries: entries.map(e => e.domain) })
@@ -47,7 +51,8 @@ export async function POST(request: NextRequest) {
   let connection: mysql.Connection | undefined
 
   try {
-    const { type, domain } = await request.json()
+    const { type, domain, vlanId: vlanIdParam = 'default' } = await request.json()
+    const vlanId = vlanIdParam === 'default' ? 0 : Number(vlanIdParam)
     
     if (!type || !['whitelist', 'blacklist'].includes(type)) {
       return NextResponse.json({ error: 'Invalid list type' }, { status: 400 })
@@ -64,8 +69,8 @@ export async function POST(request: NextRequest) {
     })
 
     await connection.execute(
-      `INSERT INTO ${type} (domain) VALUES (?)`,
-      [domain]
+      `INSERT INTO ${type} (domain, vlan_id) VALUES (?, ?)`,
+      [domain, vlanId]
     )
 
     return NextResponse.json({ success: true })
@@ -90,7 +95,8 @@ export async function DELETE(request: NextRequest) {
   let connection: mysql.Connection | undefined
 
   try {
-    const { type, domain } = await request.json()
+    const { type, domain, vlanId: vlanIdParam = 'default' } = await request.json()
+    const vlanId = vlanIdParam === 'default' ? 0 : Number(vlanIdParam)
     
     if (!type || !['whitelist', 'blacklist'].includes(type)) {
       return NextResponse.json({ error: 'Invalid list type' }, { status: 400 })
@@ -107,8 +113,8 @@ export async function DELETE(request: NextRequest) {
     })
 
     await connection.execute(
-      `DELETE FROM ${type} WHERE domain = ?`,
-      [domain]
+      `DELETE FROM ${type} WHERE domain = ? AND vlan_id = ?`,
+      [domain, vlanId]
     )
 
     return NextResponse.json({ success: true })

@@ -981,6 +981,15 @@ export default function VLANCard() {
         throw new Error(data.error || 'Failed to save VLAN')
       }
 
+      // Run the unbound script after successfully saving the VLAN
+      const unboundResponse = await fetch('/api/run-unbound', {
+        method: 'POST',
+      });
+      
+      if (!unboundResponse.ok) {
+        console.error('Failed to run unbound script, but VLAN was saved successfully');
+      }
+
       setShowAddVlan(false)
       setEditingVlan(undefined)
       await loadData()
@@ -1000,6 +1009,15 @@ export default function VLANCard() {
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to delete VLAN')
+      }
+
+      // Run the unbound script after successfully deleting the VLAN
+      const unboundResponse = await fetch('/api/run-unbound', {
+        method: 'POST',
+      });
+      
+      if (!unboundResponse.ok) {
+        console.error('Failed to run unbound script, but VLAN was deleted successfully');
       }
 
       await loadData()

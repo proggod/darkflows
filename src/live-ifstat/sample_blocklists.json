@@ -1,0 +1,22 @@
+[
+  {
+    "name": "StevenBlackHosts",
+    "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+  },
+  {
+    "name": "AdAwayDefault",
+    "url": "https://adaway.org/hosts.txt"
+  },
+  {
+    "name": "DanPollocksHosts",
+    "url": "https://someonewhocares.org/hosts/hosts"
+  },
+  {
+    "name": "MVPSHosts",
+    "url": "https://winhelp2002.mvps.org/hosts.txt"
+  },
+  {
+    "name": "MalwareDomainList",
+    "url": "https://www.malwaredomainlist.com/hostslist/hosts.txt"
+  }
+] 

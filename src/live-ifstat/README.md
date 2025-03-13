@@ -25,6 +25,15 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+### v0.37
+- Modified the blocklist fetch scripts
+- Modified and created scripts to run unbound for each VLAN so every VLAN gets its own DNS server
+- Modified the web to use new unbound tables
+- Added drop down to select vlan on custom block lists
+- Added ability to add blocklists
+- Added ability to automatically fetch block lists when applied, plus extra db stuff
+- /usr/bin/python3 /usr/local/darkflows/bin/run_all_unbounds.py is executed when vlan is created to add dns server or deleting
+
 ### v0.36
 - Fixed weather component so it stores choice and works for non-US
 - Fixed delete ssh key
