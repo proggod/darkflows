@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import SyncIcon from '@mui/icons-material/Sync'
+import LanguageIcon from '@mui/icons-material/Language'
 import { VLANConfig } from '@/types/dashboard'
 import MenuItem from '@mui/material/MenuItem'
 import Select from '@mui/material/Select'
@@ -388,13 +389,24 @@ export default function CustomDNSLists() {
       <div className={verifying ? 'opacity-50 pointer-events-none' : ''}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300">Block Lists</h3>
-          <button
-            onClick={() => setBlocklists(prev => ({ ...prev, showAdd: true, error: null, nameError: null }))}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-            disabled={verifying}
-          >
-            Add
-          </button>
+          <div className="flex items-center gap-2">
+            <a 
+              href="https://oisd.nl/setup/unbound" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              title="OISD Unbound Setup"
+            >
+              <LanguageIcon sx={{ fontSize: '1rem' }} />
+            </a>
+            <button
+              onClick={() => setBlocklists(prev => ({ ...prev, showAdd: true, error: null, nameError: null }))}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              disabled={verifying}
+            >
+              Add
+            </button>
+          </div>
         </div>
         
         {blocklists.showAdd && (
