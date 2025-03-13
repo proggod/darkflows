@@ -48,10 +48,58 @@ def update_interfaces_file(internal_interface, wifi_device, bridge_name, network
     new_content = []
     i = 0
     while i < len(content):
-        line = content[i]
+        line = content[i].strip()
+        original_line = content[i]
         
-        # If we find any configuration for our interfaces, skip it
-        if any(pattern in line for pattern in [
+        # Check for VLAN interfaces in various formats
+        # Format 1: interface.vlan (e.g., lan0.10)
+        # Format 2: interface-vlan (e.g., lan0-10)
+        # Format 3: interfacevlan (e.g., lan0vlan10)
+        vlan_patterns = [
+            rf"^(?:auto|allow-hotplug|iface)\s+{internal_interface}\.(\d+)(?:\s|$)",  # dot notation
+            rf"^(?:auto|allow-hotplug|iface)\s+{internal_interface}-(\d+)(?:\s|$)",   # hyphen notation
+            rf"^(?:auto|allow-hotplug|iface)\s+{internal_interface}vlan(\d+)(?:\s|$)" # vlan suffix notation
+        ]
+        
+        is_vlan = False
+        vlan_id = None
+        old_interface_name = None
+        
+        # Check all VLAN patterns
+        for pattern in vlan_patterns:
+            vlan_match = re.match(pattern, line)
+            if vlan_match:
+                vlan_id = vlan_match.group(1)
+                # Determine which format was matched to properly replace
+                if f"{internal_interface}.{vlan_id}" in line:
+                    old_interface_name = f"{internal_interface}.{vlan_id}"
+                elif f"{internal_interface}-{vlan_id}" in line:
+                    old_interface_name = f"{internal_interface}-{vlan_id}"
+                elif f"{internal_interface}vlan{vlan_id}" in line:
+                    old_interface_name = f"{internal_interface}vlan{vlan_id}"
+                is_vlan = True
+                break
+        
+        if is_vlan and old_interface_name:
+            # Use consistent format for new VLAN interface name (using dot notation)
+            new_interface_name = f"{bridge_name}.{vlan_id}"
+            new_content.append(original_line.replace(old_interface_name, new_interface_name))
+            i += 1
+            
+            # Handle the VLAN configuration block
+            while i < len(content) and (not content[i].strip() or content[i].startswith(" ") or content[i].startswith("\t")):
+                line = content[i]
+                # Update vlan-raw-device and other potential interface references
+                if "vlan-raw-device" in line:
+                    line = line.replace(internal_interface, bridge_name)
+                elif old_interface_name in line:
+                    line = line.replace(old_interface_name, new_interface_name)
+                new_content.append(line)
+                i += 1
+            continue
+        
+        # If we find any non-VLAN configuration for our interfaces, skip it
+        elif any(pattern in line for pattern in [
             f"auto {internal_interface}",
             f"allow-hotplug {internal_interface}",
             f"iface {internal_interface}",
@@ -68,7 +116,7 @@ def update_interfaces_file(internal_interface, wifi_device, bridge_name, network
                 i += 1
             continue
         
-        new_content.append(line)
+        new_content.append(original_line)
         i += 1
     
     # Add bridge configuration
@@ -95,7 +143,45 @@ def setup_hostapd(wifi_device, ssid, password, hw_mode, channel, bridge_name, wi
     # Install required packages
     print("Installing required packages...")
     run_command("apt update")
-    run_command("apt install -y hostapd bridge-utils iw wireless-tools")
+    run_command("apt install -y hostapd bridge-utils iw wireless-tools rfkill", check=False)
+    
+    # Set US regulatory domain using multiple methods to ensure it sticks
+    print("Setting US regulatory domain...")
+    
+    # Method 1: Direct iw command
+    run_command("iw reg set US")
+    
+    # Method 2: Through wireless-regdb if available
+    wireless_regdb = "/etc/default/wireless-regdb"
+    try:
+        with open(wireless_regdb, 'w') as f:
+            f.write("REGDOMAIN=US\n")
+        print("Updated wireless-regdb configuration")
+    except:
+        print("Note: Could not update wireless-regdb (file not found)")
+    
+    # Method 3: Through regulatory.db
+    try:
+        run_command("mkdir -p /lib/firmware/regulatory.db")
+        run_command("echo 'US' > /etc/regulatory.domain")
+    except:
+        print("Note: Could not create regulatory domain file")
+    
+    # Prepare wireless interface
+    print(f"Preparing wireless interface {wifi_device}...")
+    # Stop NetworkManager if it's running (it might interfere with the interface)
+    run_command("systemctl stop NetworkManager.service", check=False)
+    run_command("systemctl disable NetworkManager.service", check=False)
+    
+    # Ensure interface is up and not blocked
+    run_command(f"ip link set {wifi_device} down")
+    run_command("rfkill unblock wifi")
+    run_command(f"iw dev {wifi_device} set type managed")
+    run_command(f"ip link set {wifi_device} up")
+    
+    # Wait a moment for interface to be ready
+    import time
+    time.sleep(2)
     
     # Enable and unmask hostapd service
     run_command("systemctl unmask hostapd")
@@ -105,29 +191,30 @@ def setup_hostapd(wifi_device, ssid, password, hw_mode, channel, bridge_name, wi
     hostapd_conf_path = "/etc/hostapd/hostapd.conf"
     backup_file(hostapd_conf_path)
     
-    # Get country code or default to US
-    stdout, stderr, retcode = run_command("iw reg get | grep 'country' | head -1 | awk '{print $2}'", check=False)
-    country_code = stdout.strip() if retcode == 0 and stdout.strip() else "US"
-    
-    # Basic configuration
+    # Basic configuration with US regulatory domain
     hostapd_config = f"""interface={wifi_device}
 driver=nl80211
 bridge={bridge_name}
 ssid={ssid}
 hw_mode={hw_mode}
 channel={channel}
-country_code={country_code}
-ieee80211d=1
-"""
 
-    # Add WPA configuration
-    hostapd_config += f"""
-# Security settings
+# Country code and regulatory domain settings (US)
+country_code=US
+ieee80211d=1
+ieee80211h=0
+
+# Basic security settings
 auth_algs=1
 wpa=2
 wpa_passphrase={password}
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
+
+# Interface settings
+ignore_broadcast_ssid=0
+ap_isolate=0
+macaddr_acl=0
 """
 
     # Add advanced features based on capabilities
@@ -135,10 +222,12 @@ rsn_pairwise=CCMP
         hostapd_config += f"""
 # 802.11n support
 ieee80211n=1
+wmm_enabled=1
+ht_capab=[HT40+][SHORT-GI-20][SHORT-GI-40]
 """
         # Add HT capabilites for 40MHz channels if using 5GHz (less congested)
         if hw_mode == 'a':  # 5GHz
-            hostapd_config += f"""ht_capab=[HT40+][SHORT-GI-20][SHORT-GI-40][DSSS_CCK-40]
+            hostapd_config += f"""require_ht=1
 """
 
     # Add 802.11ac support if available and using 5GHz
@@ -146,18 +235,19 @@ ieee80211n=1
         hostapd_config += f"""
 # 802.11ac support
 ieee80211ac=1
+require_vht=1
 vht_oper_chwidth=1
 vht_oper_centr_freq_seg0_idx={int(channel) + 6}
 vht_capab=[MAX-MPDU-11454][SHORT-GI-80]
 """
 
-    # Add WMM (QoS) support
+    # Add WMM (QoS) support with more conservative settings
     hostapd_config += f"""
 # QoS support
 wmm_enabled=1
 """
 
-    # Add VLAN configuration
+    # Add VLAN configuration if needed
     hostapd_config += f"""
 # VLAN configuration
 vlan_file=/etc/hostapd/hostapd.vlan
@@ -191,6 +281,13 @@ vlan_bridge={bridge_name}
     
     with open(daemon_conf_path, 'w') as f:
         f.write(daemon_conf)
+    
+    # Verify regulatory domain
+    stdout, stderr, retcode = run_command("iw reg get | grep -i 'country' | head -1")
+    if "country US" not in stdout:
+        print("Warning: Regulatory domain may not be properly set. Please check 'iw reg get' output.")
+    else:
+        print("Successfully set US regulatory domain")
     
     print(f"Configured hostapd in {hostapd_conf_path}")
 

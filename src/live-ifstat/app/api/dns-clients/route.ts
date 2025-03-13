@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
       user: 'root',
-      database: 'dns_logs'
+      database: 'unbound'
     });
     
 

@@ -174,7 +174,9 @@ export function BlockClientsCard() {
           lastSeen: client.lastSeen,
           isReserved: client.isReserved,
           status: client.status
-        }));
+        }))
+        // Filter out clients without valid MAC addresses
+        .filter(client => client.mac !== undefined);
         setClients(formattedClients);
       } else {
         setClients([]);

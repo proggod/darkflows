@@ -9,12 +9,12 @@ module.exports = {
   ],
   theme: {
     screens: {
-      'sm': '640px',
-      'md': '768px',
-      'lg': '1024px',
-      'xl': '1280px',
-      '2xl': '1650px',
-      '3xl': '1800px',
+      'sm': '540px',
+      'md': '668px',
+      'lg': '924px',
+      'xl': '1180px',
+      '2xl': '1550px',
+      '3xl': '1700px',
     },
     container: {
       center: true,

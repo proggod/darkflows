@@ -5,6 +5,8 @@ import time
 import re
 import MySQLdb
 import signal
+import argparse
+import os
 from collections import deque
 
 # === CONFIGURATION ===
@@ -16,9 +18,25 @@ MYSQL_CONFIG = {
     "passwd": "",        # leave empty if not required
 }
 
-DB_NAME = "dns_logs"
+# Get database name from environment or use default
+DB_NAME = os.environ.get("UNBOUND_DB_NAME", "unbound")
 TABLE_NAME = "dns_queries"
 MAX_DOMAIN_LENGTH = 255  # Maximum length for the domain column
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Run Unbound DNS server and log queries.')
+parser.add_argument('--vlan-id', type=int, default=0, help='VLAN ID (default: 0 for default instance)')
+args = parser.parse_args()
+
+# Get VLAN ID from command line or environment variable
+VLAN_ID = args.vlan_id
+if VLAN_ID == 0 and "UNBOUND_VLAN_ID" in os.environ:
+    try:
+        VLAN_ID = int(os.environ["UNBOUND_VLAN_ID"])
+    except ValueError:
+        print(f"Warning: Invalid VLAN ID in environment: {os.environ['UNBOUND_VLAN_ID']}, using default (0)")
+
+print(f"Starting Unbound for VLAN ID: {VLAN_ID}, using database: {DB_NAME}")
 
 # Deduplication settings
 DEDUP_WINDOW = 5.0  # seconds
@@ -80,23 +98,62 @@ def init_mysql():
             else:
                 raise
         cursor = cnx.cursor()
-        table_sql = (
-            "CREATE TABLE IF NOT EXISTS {} ("
+        
+        # Define expected table structure
+        expected_table_sql = (
+            "CREATE TABLE {} ("
             "  id INT AUTO_INCREMENT PRIMARY KEY,"
             "  ts DATETIME NOT NULL,"
             "  client_ip VARCHAR(45),"
             "  domain VARCHAR({}),"
             "  query_type VARCHAR(20) DEFAULT 'unknown',"
             "  status VARCHAR(20),"
+            "  vlan_id INT NOT NULL DEFAULT 0,"
             "  KEY idx_ts (ts),"
             "  KEY idx_domain (domain),"
             "  KEY idx_client_ip (client_ip),"
+            "  KEY idx_vlan_id (vlan_id),"
             "  KEY idx_ts_domain (ts, domain),"
-            "  KEY idx_ts_client (ts, client_ip)"
+            "  KEY idx_ts_client (ts, client_ip),"
+            "  KEY idx_ts_vlan (ts, vlan_id)"
             ") ENGINE=InnoDB".format(TABLE_NAME, MAX_DOMAIN_LENGTH)
         )
-        cursor.execute(table_sql)
-        cnx.commit()
+        
+        # Check if table exists
+        cursor.execute("SHOW TABLES LIKE '{}'".format(TABLE_NAME))
+        table_exists = cursor.fetchone() is not None
+        
+        if table_exists:
+            # Check table structure
+            cursor.execute("DESCRIBE {}".format(TABLE_NAME))
+            columns = {row[0]: row for row in cursor.fetchall()}
+            
+            # Check for indexes
+            cursor.execute("SHOW INDEX FROM {}".format(TABLE_NAME))
+            indexes = {row[2]: row for row in cursor.fetchall()}
+            
+            # Required columns and indexes
+            required_columns = ['id', 'ts', 'client_ip', 'domain', 'query_type', 'status', 'vlan_id']
+            required_indexes = ['PRIMARY', 'idx_ts', 'idx_domain', 'idx_client_ip', 'idx_vlan_id', 
+                               'idx_ts_domain', 'idx_ts_client', 'idx_ts_vlan']
+            
+            missing_columns = [col for col in required_columns if col not in columns]
+            missing_indexes = [idx for idx in required_indexes if idx not in indexes]
+            
+            if missing_columns or missing_indexes:
+                print("Table {} is missing required columns or indexes. Recreating...".format(TABLE_NAME))
+                cursor.execute("DROP TABLE {}".format(TABLE_NAME))
+                cursor.execute(expected_table_sql)
+                cnx.commit()
+                print("Recreated table {} with proper structure".format(TABLE_NAME))
+            else:
+                print("Table {} has correct structure".format(TABLE_NAME))
+        else:
+            # Create table
+            print("Creating table {}".format(TABLE_NAME))
+            cursor.execute(expected_table_sql)
+            cnx.commit()
+        
         cursor.close()
         print("MySQL database '{}' and table '{}' are ready with indexes.".format(DB_NAME, TABLE_NAME))
         return cnx
@@ -123,6 +180,7 @@ def parse_line(line):
         parsed["ts"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(epoch))
         parsed["status"] = "allowed"
         parsed["query_type"] = "A"
+        parsed["vlan_id"] = VLAN_ID  # Add VLAN ID to the parsed data
         if len(parsed.get("domain", "")) > MAX_DOMAIN_LENGTH:
             parsed["domain"] = parsed["domain"][:MAX_DOMAIN_LENGTH]
         return parsed
@@ -139,6 +197,7 @@ def parse_line(line):
         parsed["client"] = "unknown"
         parsed["status"] = "blocked"
         parsed["query_type"] = "A"
+        parsed["vlan_id"] = VLAN_ID  # Add VLAN ID to the parsed data
         if len(parsed.get("domain", "")) > MAX_DOMAIN_LENGTH:
             parsed["domain"] = parsed["domain"][:MAX_DOMAIN_LENGTH]
         return parsed
@@ -150,15 +209,16 @@ def insert_log(db_cnx, data):
     try:
         cursor = db_cnx.cursor()
         insert_stmt = (
-            "INSERT INTO {} (ts, client_ip, domain, query_type, status) "
-            "VALUES (%s, %s, %s, %s, %s)".format(TABLE_NAME)
+            "INSERT INTO {} (ts, client_ip, domain, query_type, status, vlan_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)".format(TABLE_NAME)
         )
         cursor.execute(insert_stmt, (
             data["ts"],
             data["client"],
             data["domain"],
             data["query_type"],
-            data["status"]
+            data["status"],
+            data["vlan_id"]
         ))
         db_cnx.commit()
         record_id = cursor.lastrowid
@@ -207,13 +267,13 @@ def flush_pending(db_cnx):
 def process_line(db_cnx, parsed_data):
     """
     Process a parsed log record using a linked list approach (pending_queue).
-    Key: (domain, epoch).
+    Key: (domain, epoch, vlan_id).
     If a new record with the same key arrives, update its status if blocked.
     """
-    key = (parsed_data["domain"], parsed_data["epoch"])
+    key = (parsed_data["domain"], parsed_data["epoch"], parsed_data["vlan_id"])
     found = False
     for pending in pending_queue:
-        pending_key = (pending["data"]["domain"], pending["data"]["epoch"])
+        pending_key = (pending["data"]["domain"], pending["data"]["epoch"], pending["data"]["vlan_id"])
         if pending_key == key:
             if parsed_data["status"] == "blocked" and pending["data"]["status"] != "blocked":
                 pending["data"]["status"] = "blocked"
@@ -229,12 +289,18 @@ def process_line(db_cnx, parsed_data):
         })
 
 def print_stats_line():
-    """Print the current statistics on one fixed-width line."""
-    stats = "Processed: {:5d} | Pending: {:3d} | Errors: {:3d} | Allowed: {:5d} | Blocked: {:5d}".format(
-        total_processed, len(pending_queue), total_errors, total_allowed, total_blocked
+    """Print the current statistics on one fixed-width line with CR only."""
+    stats = "VLAN {}: Processed: {:5d} | Pending: {:3d} | Errors: {:3d} | Allowed: {:5d} | Blocked: {:5d}".format(
+        VLAN_ID, total_processed, len(pending_queue), total_errors, total_allowed, total_blocked
     )
-    # Pad the line to 80 characters to ensure complete overwrite.
-    print("\r" + stats.ljust(80), end="", flush=True)
+    # Add plenty of spaces at the end to overwrite any previous longer line
+    padded_stats = stats + " " * 30
+    # Use carriage return only (no newline)
+    print("\r" + padded_stats, end="", flush=True)
+
+# Remove the time-based throttling since we're going back to continuous updates
+last_stats_time = 0
+STATS_INTERVAL = 5  # seconds between stats updates
 
 def main():
     global total_processed, total_errors, total_allowed, total_blocked, proc
@@ -263,14 +329,16 @@ def main():
 
             total_processed += 1
             print_stats_line()
+                
     except KeyboardInterrupt:
         print("\nInterrupted by user. Terminating Unbound...")
         proc.terminate()
     finally:
         flush_pending(db_cnx)
-        print_stats_line()
-        print("\nFinal Stats: Processed: {} | Pending: {} | Errors: {} | Allowed: {} | Blocked: {}"
-              .format(total_processed, len(pending_queue), total_errors, total_allowed, total_blocked))
+        # Print a newline to ensure final stats appear on their own line
+        print("\n")
+        print("Final Stats for VLAN {}: Processed: {} | Pending: {} | Errors: {} | Allowed: {} | Blocked: {}"
+              .format(VLAN_ID, total_processed, len(pending_queue), total_errors, total_allowed, total_blocked))
         db_cnx.close()
 
 if __name__ == "__main__":

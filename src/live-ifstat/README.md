@@ -31,6 +31,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Added CloudFlare dynamic dns settings to web admin
 - Added wifi network setup script in bin/wifi/ - Full wifi support
 - Added wifi settings component on web admin
+- Changed response breakpoints to add more columns on slightly smaller screens
 
 ### v0.35
 - Set docker to host networking only

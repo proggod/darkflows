@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
       user: 'root',
-      database: 'dns_logs'
+      database: 'unbound'
     })
 
     const [entries] = await connection.execute<mysql.RowDataPacket[]>(
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
       user: 'root',
-      database: 'dns_logs'
+      database: 'unbound'
     })
 
     await connection.execute(
@@ -103,7 +103,7 @@ export async function DELETE(request: NextRequest) {
     connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
       user: 'root',
-      database: 'dns_logs'
+      database: 'unbound'
     })
 
     await connection.execute(

@@ -125,11 +125,11 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       setGateway(vlan.gateway)
       setIpRange(vlan.ipRange)
       setDhcpEnabled(vlan.dhcp?.enabled ?? true)
-      setDnsServers(vlan.dhcp?.dnsServers?.length ? vlan.dhcp.dnsServers : [gateway])
+      setDnsServers(vlan.dhcp?.dnsServers?.length ? vlan.dhcp.dnsServers : [vlan.gateway])
       setEgressBandwidth(vlan.egressBandwidth || '')
       setIngressBandwidth(vlan.ingressBandwidth || '')
     }
-  }, [vlan, networkCards, gateway])  // Remove resetForm from dependencies
+  }, [vlan, networkCards])  // Remove gateway from dependencies
 
   // Validation functions
   const isValidIp = (ip: string): boolean => {
@@ -511,12 +511,10 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
       const defaultGateway = ipParts.join('.')
       console.log('Calculated gateway:', defaultGateway);
       
-      // Set gateway if it's not already set
-      if (!gateway) {
-        setGateway(defaultGateway)
-        // Set primary DNS to gateway
-        setDnsServers([defaultGateway])
-      }
+      // Always set gateway when subnet changes
+      setGateway(defaultGateway)
+      // Set primary DNS to gateway
+      setDnsServers([defaultGateway])
       
       // Calculate default IP range
       const range = calculateIpRange(defaultGateway, subnet)
@@ -536,8 +534,12 @@ function VLANDialog({ open, onClose, onSave, vlan, networkCards, vlans, networkC
 
   // Add this handler function
   const handleIdChange = (value: string) => {
+    if (value === '') {
+      setId(0); // Allow empty value
+      return;
+    }
     const parsedId = parseInt(value);
-    setId(isNaN(parsedId) ? 1 : parsedId); // Default to 1 if NaN
+    setId(isNaN(parsedId) ? 0 : parsedId); // Default to 0 if NaN instead of 1
   }
 
   return (

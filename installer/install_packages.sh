@@ -17,6 +17,7 @@ echo "Disabling X-Windows"
 systemctl set-default multi-user.target
 #sudo systemctl set-default graphical.target
 
+systemctl disable --now unbound
 
 # Notify the user
 #echo "Packages installed successfully: nftables, kea, mariadb-server, curl, screen"
