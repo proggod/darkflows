@@ -26,6 +26,7 @@ MAX_DOMAIN_LENGTH = 255  # Maximum length for the domain column
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Run Unbound DNS server and log queries.')
 parser.add_argument('--vlan-id', type=int, default=0, help='VLAN ID (default: 0 for default instance)')
+parser.add_argument('--config', type=str, help='Path to Unbound configuration file')
 args = parser.parse_args()
 
 # Get VLAN ID from command line or environment variable
@@ -36,7 +37,14 @@ if VLAN_ID == 0 and "UNBOUND_VLAN_ID" in os.environ:
     except ValueError:
         print(f"Warning: Invalid VLAN ID in environment: {os.environ['UNBOUND_VLAN_ID']}, using default (0)")
 
+# Get configuration file path
+CONFIG_FILE = args.config
+
 print(f"Starting Unbound for VLAN ID: {VLAN_ID}, using database: {DB_NAME}")
+if CONFIG_FILE:
+    print(f"Using configuration file: {CONFIG_FILE}")
+else:
+    print("No configuration file specified, using Unbound defaults")
 
 # Deduplication settings
 DEDUP_WINDOW = 5.0  # seconds
@@ -306,7 +314,12 @@ def main():
     global total_processed, total_errors, total_allowed, total_blocked, proc
     db_cnx = init_mysql()
 
-    cmd = ["/usr/sbin/unbound", "-d", "-vvvv"]
+    cmd = ["/usr/sbin/unbound", "-d", "-vvvv", "-p"]
+    
+    # Add configuration file if specified
+    if CONFIG_FILE:
+        cmd.extend(["-c", CONFIG_FILE])
+        
     print("Launching Unbound with command: {}".format(" ".join(cmd)))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 

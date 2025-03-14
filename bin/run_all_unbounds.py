@@ -33,6 +33,42 @@ BLACKLIST_TABLE = "blacklist"
 WHITELIST_TABLE = "whitelist"
 BLOCKLISTS_TABLE = "blocklists"
 
+def disable_apparmor_for_unbound() -> None:
+    """
+    Disable AppArmor for Unbound to prevent permission issues.
+    This function creates a symlink in the AppArmor disable directory and reloads the AppArmor profile.
+    """
+    try:
+        # Check if the AppArmor profile exists
+        apparmor_profile = "/etc/apparmor.d/usr.sbin.unbound"
+        apparmor_disable_dir = "/etc/apparmor.d/disable"
+        
+        if not os.path.exists(apparmor_profile):
+            print("AppArmor profile for Unbound not found, skipping AppArmor disabling")
+            return
+        
+        # Create the disable directory if it doesn't exist
+        if not os.path.exists(apparmor_disable_dir):
+            print(f"Creating AppArmor disable directory: {apparmor_disable_dir}")
+            os.makedirs(apparmor_disable_dir, exist_ok=True)
+        
+        # Create the symlink if it doesn't exist
+        symlink_path = os.path.join(apparmor_disable_dir, "usr.sbin.unbound")
+        if not os.path.exists(symlink_path):
+            print("Creating symlink to disable AppArmor for Unbound")
+            os.symlink(apparmor_profile, symlink_path)
+        else:
+            print("AppArmor symlink for Unbound already exists")
+        
+        # Reload the AppArmor profile
+        print("Reloading AppArmor profile for Unbound")
+        subprocess.run(["apparmor_parser", "-R", apparmor_profile], check=False)
+        
+        print("Successfully disabled AppArmor for Unbound")
+    except Exception as e:
+        print(f"Warning: Failed to disable AppArmor for Unbound: {e}", file=sys.stderr)
+        print("Continuing anyway, but this might cause permission issues")
+
 def ensure_directory_exists(directory_path: str) -> None:
     """
     Ensure that the specified directory exists.
@@ -43,6 +79,14 @@ def ensure_directory_exists(directory_path: str) -> None:
     if not os.path.exists(directory_path):
         print(f"Creating directory: {directory_path}")
         os.makedirs(directory_path, exist_ok=True)
+        
+        # Set ownership to unbound user
+        try:
+            subprocess.run(f"chown unbound:unbound {directory_path}", shell=True, check=True)
+            print(f"Set ownership of {directory_path} to unbound user")
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to set ownership of {directory_path}: {e}", file=sys.stderr)
+            print("Continuing anyway, but this might cause permission issues")
 
 def copy_template_to_directory(source_dir: str, target_dir: str) -> None:
     """
@@ -77,6 +121,14 @@ def copy_template_to_directory(source_dir: str, target_dir: str) -> None:
                     shutil.copy2(source_item, target_item)
         else:
             shutil.copytree(source_dir, target_dir)
+    
+    # Set ownership of the target directory and all its contents to unbound user
+    try:
+        subprocess.run(f"chown -R unbound:unbound {target_dir}", shell=True, check=True)
+        print(f"Set ownership of {target_dir} and its contents to unbound user")
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to set ownership of {target_dir}: {e}", file=sys.stderr)
+        print("Continuing anyway, but this might cause permission issues")
 
 def init_database() -> None:
     """
@@ -418,6 +470,20 @@ def update_unbound_conf(config_dir: str, interface_ip: Optional[str] = None) -> 
         if not os.path.exists(include_dir):
             print(f"Creating include directory: {include_dir}")
             os.makedirs(include_dir, exist_ok=True)
+            
+            # Set ownership to unbound user
+            try:
+                subprocess.run(f"chown unbound:unbound {include_dir}", shell=True, check=True)
+                print(f"Set ownership of {include_dir} to unbound user")
+            except subprocess.CalledProcessError as e:
+                print(f"Warning: Failed to set ownership of {include_dir}: {e}", file=sys.stderr)
+    
+    # Set ownership of the configuration file to unbound user
+    try:
+        subprocess.run(f"chown unbound:unbound {conf_file}", shell=True, check=True)
+        print(f"Set ownership of {conf_file} to unbound user")
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to set ownership of {conf_file}: {e}", file=sys.stderr)
     
     print(f"Updated configuration paths in {conf_file}" + 
           (f" with interface IP: {interface_ip}" if interface_ip else "") +
@@ -440,10 +506,67 @@ def read_vlans_json() -> List[Dict]:
 def kill_unbound_processes() -> None:
     """
     Kill all running unbound processes, which will also terminate their parent screen sessions.
+    First tries to kill processes using PIDs from PID files, then falls back to more general methods.
     """
     try:
-        # First, use killall to directly kill unbound processes
-        print("Using killall to terminate all unbound processes...")
+        # First, try to kill processes using PIDs from PID files
+        print("Looking for PID files to terminate specific processes...")
+        pid_files = []
+        
+        # Find all unbound.pid files in the ETC_UNBOUND_DIR and its subdirectories
+        for root, dirs, files in os.walk(ETC_UNBOUND_DIR):
+            for file in files:
+                if file == "unbound.pid":
+                    pid_files.append(os.path.join(root, file))
+        
+        if pid_files:
+            print(f"Found {len(pid_files)} PID files")
+            for pid_file in pid_files:
+                try:
+                    with open(pid_file, 'r') as f:
+                        pid_data = {}
+                        for line in f:
+                            if ':' in line:
+                                key, value = line.strip().split(':', 1)
+                                pid_data[key] = value
+                    
+                    # Try to kill the unbound process first
+                    if 'unbound_pid' in pid_data:
+                        unbound_pid = pid_data['unbound_pid']
+                        print(f"Killing Unbound process with PID {unbound_pid} from {pid_file}")
+                        try:
+                            subprocess.run(f"kill -9 {unbound_pid}", shell=True, check=False)
+                        except Exception as e:
+                            print(f"Error killing Unbound process {unbound_pid}: {e}", file=sys.stderr)
+                    
+                    # Then kill the Python process
+                    if 'python_pid' in pid_data:
+                        python_pid = pid_data['python_pid']
+                        print(f"Killing Python process with PID {python_pid} from {pid_file}")
+                        try:
+                            subprocess.run(f"kill -9 {python_pid}", shell=True, check=False)
+                        except Exception as e:
+                            print(f"Error killing Python process {python_pid}: {e}", file=sys.stderr)
+                    
+                    # Finally, kill the screen session
+                    if 'screen_session' in pid_data:
+                        screen_session = pid_data['screen_session']
+                        print(f"Killing screen session {screen_session} from {pid_file}")
+                        try:
+                            subprocess.run(f"screen -S {screen_session} -X quit", shell=True, check=False)
+                        except Exception as e:
+                            print(f"Error killing screen session {screen_session}: {e}", file=sys.stderr)
+                    
+                except Exception as e:
+                    print(f"Error processing PID file {pid_file}: {e}", file=sys.stderr)
+        else:
+            print("No PID files found")
+        
+        # Wait a moment to ensure processes are terminated
+        time.sleep(2)
+        
+        # Now use killall as a fallback to directly kill any remaining unbound processes
+        print("Using killall to terminate any remaining unbound processes...")
         try:
             subprocess.run("killall -9 unbound", shell=True, check=False)
             print("Executed killall command for unbound")
@@ -481,6 +604,18 @@ def kill_unbound_processes() -> None:
         if ps_result.stdout.strip():
             print("Warning: Some unbound processes are still running:")
             print(ps_result.stdout)
+            print("Attempting to kill remaining processes forcefully...")
+            
+            # Extract PIDs and kill them
+            for line in ps_result.stdout.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 1:
+                    pid = parts[0]
+                    try:
+                        print(f"Forcefully killing process with PID {pid}")
+                        subprocess.run(f"kill -9 {pid}", shell=True, check=False)
+                    except Exception as e:
+                        print(f"Error killing process {pid}: {e}", file=sys.stderr)
         else:
             print("All unbound processes successfully terminated")
         
@@ -528,8 +663,23 @@ def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 0) -> 
     screen_name = f"unbound_{config_name}"
     log_file = os.path.join(LOG_DIR, f"{screen_name}.log")
     pid_file = os.path.join(config_dir, "unbound.pid")
+    config_file = os.path.join(config_dir, "unbound.conf")
+    
+    # Verify that the configuration file exists
+    if not os.path.exists(config_file):
+        print(f"Error: Configuration file {config_file} does not exist", file=sys.stderr)
+        return None
     
     try:
+        # Change ownership of the configuration directory to unbound user
+        print(f"Changing ownership of {config_dir} to unbound user")
+        try:
+            subprocess.run(f"chown -R unbound:unbound {config_dir}", shell=True, check=True)
+            print(f"Successfully changed ownership of {config_dir} to unbound user")
+        except subprocess.CalledProcessError as e:
+            print(f"Warning: Failed to change ownership of {config_dir}: {e}", file=sys.stderr)
+            print("Continuing anyway, but this might cause permission issues")
+        
         # First check if a screen with this name already exists
         check_screen_cmd = f"screen -ls | grep {screen_name}"
         result = subprocess.run(check_screen_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -545,13 +695,16 @@ def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 0) -> 
         env['UNBOUND_DB_NAME'] = DB_NAME
         
         # Start a new screen session with the VLAN ID as a command line argument
+        # and pass the configuration file path
+        # Note: run_unbound.py uses the -p flag with unbound to prevent it from creating its own PID file
         screen_cmd = [
             '/usr/bin/screen',
             '-dmS',
             screen_name,
             '/usr/bin/python3',
             RUN_UNBOUND_SCRIPT,
-            f'--vlan-id={vlan_id}'
+            f'--vlan-id={vlan_id}',
+            f'--config={config_file}'
         ]
         
         print(f"Starting screen session: {' '.join(screen_cmd)}")
@@ -560,21 +713,101 @@ def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 0) -> 
         # Wait a moment for the process to start
         time.sleep(2)
         
-        # Find the PID of the process inside the screen session
-        # This is more complex with screen, we need to find the screen PID first
+        # Find the screen session PID
         screen_pid_cmd = f"screen -ls | grep {screen_name} | cut -d. -f1 | awk '{{print $1}}'"
         screen_pid_result = subprocess.run(screen_pid_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         screen_pid = screen_pid_result.stdout.strip()
         
+        # Find the Python process PID (run_unbound.py)
+        python_pid = None
+        python_pid_cmd = f"ps -eo pid,cmd | grep 'python.*run_unbound.py.*--vlan-id={vlan_id}' | grep -v grep"
+        python_pid_result = subprocess.run(python_pid_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        if python_pid_result.stdout.strip():
+            python_pid_line = python_pid_result.stdout.strip().split('\n')[0]
+            python_pid = python_pid_line.strip().split()[0]
+            print(f"Found Python process (run_unbound.py) with PID: {python_pid}")
+        
+        # Find the actual Unbound process PID
+        unbound_pid = None
+        # Wait a bit more to ensure unbound has started
+        time.sleep(3)
+        
+        # Try to find the unbound process
+        unbound_pid_cmd = "ps -eo pid,ppid,cmd | grep '/usr/sbin/unbound -d' | grep -v grep"
+        unbound_pid_result = subprocess.run(unbound_pid_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        if unbound_pid_result.stdout.strip():
+            # We need to find the unbound process that corresponds to our VLAN
+            # This is tricky since there might be multiple unbound processes
+            # We'll look for the one that has the config file in its command line
+            
+            for line in unbound_pid_result.stdout.strip().split('\n'):
+                parts = line.strip().split()
+                pid = parts[0]
+                ppid = parts[1]
+                
+                # Check if this unbound process is using our config file
+                # We can do this by checking if the Python process is its parent
+                if python_pid and ppid == python_pid:
+                    unbound_pid = pid
+                    print(f"Found Unbound process with PID: {unbound_pid} (parent: {ppid})")
+                    break
+            
+            # If we couldn't match by parent PID, try to match by config file
+            if not unbound_pid:
+                # Get the command line for each unbound process
+                for line in unbound_pid_result.stdout.strip().split('\n'):
+                    parts = line.strip().split()
+                    pid = parts[0]
+                    
+                    # Check the command line arguments
+                    cmd_line_cmd = f"ps -p {pid} -o args="
+                    cmd_line_result = subprocess.run(cmd_line_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    cmd_line = cmd_line_result.stdout.strip()
+                    
+                    # If the config file is in the command line, this is our process
+                    if config_file in cmd_line:
+                        unbound_pid = pid
+                        print(f"Found Unbound process with PID: {unbound_pid} using config: {config_file}")
+                        break
+        
+        # If we still don't have an unbound PID, try one more approach - look at processes started recently
+        if not unbound_pid:
+            # Get all unbound processes sorted by start time (newest first)
+            unbound_pid_cmd = "ps -eo pid,lstart,cmd | grep '/usr/sbin/unbound -d' | grep -v grep | sort -k2,5 -r"
+            unbound_pid_result = subprocess.run(unbound_pid_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            if unbound_pid_result.stdout.strip():
+                # Take the most recently started unbound process
+                newest_line = unbound_pid_result.stdout.strip().split('\n')[0]
+                unbound_pid = newest_line.strip().split()[0]
+                print(f"Using most recently started Unbound process with PID: {unbound_pid}")
+        
         if screen_pid:
-            # Write the screen session name to the PID file
+            # Make sure the PID file is writable by changing its ownership back to root
+            try:
+                subprocess.run(f"chown root:root {pid_file}", shell=True, check=False)
+            except Exception as e:
+                print(f"Warning: Failed to change ownership of PID file: {e}", file=sys.stderr)
+            
+            # Write the PIDs to the PID file
             with open(pid_file, 'w') as f:
                 f.write(f"screen_session:{screen_name}\n")
                 f.write(f"screen_pid:{screen_pid}\n")
+                if python_pid:
+                    f.write(f"python_pid:{python_pid}\n")
+                if unbound_pid:
+                    f.write(f"unbound_pid:{unbound_pid}\n")
                 f.write(f"vlan_id:{vlan_id}\n")
+                f.write(f"config_file:{config_file}\n")
             
-            print(f"Started unbound process for {config_name} in screen session {screen_name} with VLAN ID {vlan_id}")
-            return int(screen_pid) if screen_pid.isdigit() else None
+            print(f"Started unbound process for {config_name} in screen session {screen_name} with VLAN ID {vlan_id} using config {config_file}")
+            print(f"PIDs - Screen: {screen_pid}, Python: {python_pid}, Unbound: {unbound_pid}")
+            
+            # Return the unbound PID if available, otherwise the screen PID
+            return int(unbound_pid) if unbound_pid and unbound_pid.isdigit() else (
+                int(screen_pid) if screen_pid.isdigit() else None)
         
         print(f"Warning: Could not find screen session for {screen_name}", file=sys.stderr)
         return None
@@ -587,6 +820,9 @@ def main() -> None:
     Main function to check directories and copy templates.
     Always kills existing unbound processes and starts all instances.
     """
+    # Disable AppArmor for Unbound
+    disable_apparmor_for_unbound()
+    
     # Kill any existing unbound processes
     kill_unbound_processes()
     
