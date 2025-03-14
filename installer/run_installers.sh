@@ -41,6 +41,7 @@ echo "" > /var/log/installer.log
 /usr/bin/python3 /usr/local/darkflows/installer/setup_crontab.py 2>&1 | tee -a $output_target
 /usr/local/darkflows/installer/update_ssh_key_location.sh 2>&1 | tee -a $output_target
 /usr/local/darkflows/installer/install_nginx.sh 2>&1 | tee -a $output_target
+/usr/local/darkflows/installer/install_speedtest.sh 2>&1 | tee -a $output_target
 echo "************ Detecting network... ************" | tee -a $output_target
 if ! /usr/local/darkflows/installer/detect_network.sh 2>&1 | tee -a $output_target; then
     if [ -f /tmp/network_setup_status ] && [ "$(cat /tmp/network_setup_status)" == "NETWORK_SETUP_FAILED" ]; then

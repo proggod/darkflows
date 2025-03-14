@@ -640,7 +640,7 @@ const CombinedDashboard = () => {
                     className={
                       id === 'reservations' || id === 'leases' || id === 'weather' || id === 'processes' || 
                       id === 'sambaShares' || id === 'dnsClients' || id === 'CustomDNSLists' || id === 'bandwidth' || 
-                      id === 'systemSettings' || id === 'blockClients'
+                      id === 'systemSettings' || id === 'blockClients' || id === 'speedTest'
                         ? 'row-span-2 col-span-2'
                         : id === 'clock' || id === 'interfaceStatus'
                         ? 'row-span-1 col-span-1'

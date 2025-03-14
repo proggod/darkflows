@@ -27,6 +27,7 @@ echo "" > /var/log/installer.log
 /usr/bin/python3 /usr/local/darkflows/bin/verify_configs.py
 /usr/local/darkflows/installer/install_packages.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 /usr/local/darkflows/installer/setup_web.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
+/usr/local/darkflows/installer/install_speedtest.sh 2>&1 | tee -a /dev/tty1 /var/log/installer.log
 /usr/bin/python3 /usr/local/darkflows/installer/setup_crontab.py 2>&1 | tee -a $output_target
 
 # Add verification at end
