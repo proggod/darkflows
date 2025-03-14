@@ -2,7 +2,9 @@
 const nextConfig = {
   // Enable Edge Runtime
   experimental: {
-    serverActions: true
+    serverActions: {
+      allowedOrigins: ['localhost:3000']
+    }
   },
   logging: {
     fetches: {

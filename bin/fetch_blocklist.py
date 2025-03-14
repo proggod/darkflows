@@ -181,75 +181,6 @@ def write_blocklist_conf(domains, name, vlan_id=None):
         print("Error writing blocklist configuration: {}".format(e))
         sys.exit(1)
 
-def reload_unbound():
-    """Reload Unbound's configuration."""
-    try:
-        subprocess.run(["unbound-control", "reload"], check=True)
-        print("Unbound reloaded successfully.")
-    except Exception as e:
-        print("Error reloading Unbound: {}".format(e))
-
-def send_hup_to_run_unbound_scripts(vlan_id=None):
-    """
-    Find all processes running 'run_unbound.py' and send them a SIGHUP.
-    Uses 'pgrep -f' to locate processes by command-line pattern.
-    Only matches processes that are actually running the Python script directly,
-    not SCREEN sessions or other processes that might have 'run_unbound.py' in their arguments.
-    
-    Args:
-        vlan_id: The VLAN ID to filter processes by. If None, only sends SIGHUP to the default process.
-    """
-    try:
-        # Use a more specific pattern to match only direct Python processes running run_unbound.py
-        # This excludes SCREEN processes and only matches the actual Python processes
-        pattern = "^/usr/bin/python[0-9]* /usr/local/darkflows/bin/run_unbound\.py"
-        print(f"Searching for processes matching: {pattern}")
-        
-        try:
-            output = subprocess.check_output(["pgrep", "-f", pattern]).decode().split()
-            print(f"Found {len(output)} run_unbound.py processes: {', '.join(output)}")
-        except subprocess.CalledProcessError:
-            print("No run_unbound.py processes found.")
-            return
-        
-        if not output:
-            print("No run_unbound.py processes found to send SIGHUP.")
-            return
-            
-        # Get the VLAN ID we're configuring for
-        vlan_id_arg = f"--vlan-id={vlan_id}" if vlan_id is not None else "--vlan-id=0"
-        print(f"Looking for processes with VLAN ID: {vlan_id if vlan_id is not None else '0'}")
-        
-        # For each process, check if it's for our VLAN before sending SIGHUP
-        matching_processes = 0
-        for pid in output:
-            try:
-                # Get the command line for this process
-                cmdline = subprocess.check_output(["ps", "-p", pid, "-o", "args="]).decode().strip()
-                print(f"Process {pid} command line: {cmdline}")
-                
-                # If we're configuring a specific VLAN, only send SIGHUP to the process for that VLAN
-                # If we're configuring the default instance, only send SIGHUP to the default process with --vlan-id=0
-                if vlan_id is not None and vlan_id_arg in cmdline:
-                    os.kill(int(pid), signal.SIGHUP)
-                    print(f"Sent SIGHUP to run_unbound.py process with PID {pid}")
-                    matching_processes += 1
-                elif vlan_id is None and "--vlan-id=0" in cmdline:
-                    os.kill(int(pid), signal.SIGHUP)
-                    print(f"Sent SIGHUP to run_unbound.py process with PID {pid}")
-                    matching_processes += 1
-                else:
-                    print(f"Skipping process {pid} (VLAN ID mismatch)")
-            except Exception as e:
-                print(f"Error processing PID {pid}: {e}")
-        
-        if matching_processes == 0:
-            print(f"Warning: No matching run_unbound.py processes found for VLAN ID: {vlan_id if vlan_id is not None else '0'}")
-        else:
-            print(f"Successfully sent SIGHUP to {matching_processes} processes")
-    except Exception as e:
-        print(f"Error in send_hup_to_run_unbound_scripts: {e}")
-
 def parse_arguments():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description='Fetch and configure DNS blocklist for Unbound.')
@@ -293,12 +224,6 @@ def main():
 
     # Write the Unbound configuration file.
     write_blocklist_conf(final_blocklist, name, vlan_id)
-
-    # Reload Unbound.
-    reload_unbound()
-
-    # Also, send SIGHUP to all running run_unbound.py scripts.
-    send_hup_to_run_unbound_scripts(vlan_id)
 
 if __name__ == "__main__":
     main()

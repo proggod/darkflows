@@ -29,7 +29,7 @@ async function readBlocklists(vlanId: number | string): Promise<{ name: string; 
     
     const data = await fs.readFile(filePath, 'utf-8')
     return JSON.parse(data)
-  } catch (error) {
+  } catch  {
     // If file doesn't exist or is invalid, return empty array
     return []
   }

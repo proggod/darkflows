@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import CheckIcon from '@mui/icons-material/Check'
 import CloseIcon from '@mui/icons-material/Close'
 import SyncIcon from '@mui/icons-material/Sync'
@@ -96,7 +96,7 @@ export default function CustomDNSLists() {
     }
   }
 
-  const fetchList = async (type: ListType) => {
+  const fetchList = useCallback(async (type: ListType) => {
     const setState = type === 'whitelist' ? setWhitelist : setBlacklist
     
     try {
@@ -108,9 +108,9 @@ export default function CustomDNSLists() {
       console.error(`Error fetching ${type}:`, error)
       setState(prev => ({ ...prev, error: `Failed to load ${type}` }))
     }
-  }
+  }, [selectedVlanId])
 
-  const fetchBlocklists = async () => {
+  const fetchBlocklists = useCallback(async () => {
     setBlocklists(prev => ({ ...prev, loading: true, error: null }))
     try {
       const response = await fetch(`/api/block-lists?vlanId=${selectedVlanId}`)
@@ -125,7 +125,7 @@ export default function CustomDNSLists() {
         loading: false
       }))
     }
-  }
+  }, [selectedVlanId])
 
   const verifyBlocklists = async () => {
     setVerifying(true)
@@ -169,7 +169,7 @@ export default function CustomDNSLists() {
     fetchList('whitelist')
     fetchList('blacklist')
     fetchBlocklists()
-  }, [selectedVlanId])
+  }, [selectedVlanId, fetchList, fetchBlocklists])
 
   const handleAdd = async (type: ListType) => {
     const state = type === 'whitelist' ? whitelist : blacklist

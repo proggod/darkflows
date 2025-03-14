@@ -34,6 +34,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Added ability to automatically fetch block lists when applied, plus extra db stuff
 - /usr/bin/python3 /usr/local/darkflows/bin/run_all_unbounds.py is executed when vlan is created to add dns server or deleting
 - Disabled apparmor for unbound
+- Added crontab to update blocklists at night
 
 ### v0.36
 - Fixed weather component so it stores choice and works for non-US

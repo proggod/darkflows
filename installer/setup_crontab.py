@@ -11,6 +11,7 @@ from datetime import datetime
 REQUIRED_CRON_JOBS = [
     ("*/5 * * * *", "/usr/bin/python3 /usr/local/darkflows/bin/block_scheduler.py", "Block scheduler"),
     ("*/5 * * * *", "/usr/local/darkflows/bin/update_dyndns.sh", "DynDNS updater"),
+    ("15 3 * * *", "/usr/bin/python3 /usr/local/darkflows/bin/verify_blocklists.py ; /usr/bin/python3 /usr/local/bin/run_all_unbounds.py", "Update Blocklists"),
     # Add more entries here as needed, following the same format
 ]
 
@@ -88,6 +89,9 @@ def ensure_cron_jobs():
     # Update crontab if changes were made
     if changes_needed:
         new_crontab = '\n'.join(lines)
+        # Ensure the crontab content ends with a newline
+        if not new_crontab.endswith('\n'):
+            new_crontab += '\n'
         if write_crontab(new_crontab):
             print("Crontab updated successfully")
         else:
