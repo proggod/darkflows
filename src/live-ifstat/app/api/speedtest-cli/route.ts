@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
       try {
         // Use the SpeedTest++ CLI tool
         const speedtest = spawn('/usr/local/bin/SpeedTest', [])
-        let buffer = ''
         let currentPhase = 'Initializing'
         let ipInfo = null
         let serverInfo = null
@@ -32,7 +31,6 @@ export async function GET(request: NextRequest) {
 
         speedtest.stdout.on('data', (data) => {
           const output = data.toString()
-          buffer += output
           
           // Count dots for progress tracking
           if (currentPhase === 'Testing download speed') {
@@ -61,7 +59,7 @@ export async function GET(request: NextRequest) {
             if (line.includes('IP:')) {
               const ipMatch = line.match(/IP: "([^"]+)" \("([^"]+)"\) Location: \[([^,]+), ([^\]]+)\]/)
               if (ipMatch) {
-                const [_, ip, isp, lat, lon] = ipMatch
+                const [, ip, isp, lat, lon] = ipMatch
                 ipInfo = { ip, isp, location: [parseFloat(lat), parseFloat(lon)] }
                 controller.enqueue(`data: ${JSON.stringify({ 
                   phase: "Detected IP and location",
@@ -82,7 +80,7 @@ export async function GET(request: NextRequest) {
             else if (line.includes('Server:')) {
               const serverMatch = line.match(/Server: ([^:]+):(\d+) by ([^(]+) \(([^)]+) km from you\): (\d+) ms/)
               if (serverMatch) {
-                const [_, location, port, provider, distance, ping] = serverMatch
+                const [, location, , provider, distance, ping] = serverMatch
                 serverInfo = { 
                   serverName: `${location} (${provider})`,
                   location,
@@ -103,7 +101,7 @@ export async function GET(request: NextRequest) {
               currentPhase = 'Testing ping'
               const pingMatch = line.match(/Ping: (\d+) ms/)
               if (pingMatch) {
-                const [_, ping] = pingMatch
+                const [, ping] = pingMatch
                 pingInfo = { ping: parseInt(ping) }
                 controller.enqueue(`data: ${JSON.stringify({ 
                   phase: currentPhase,
@@ -116,7 +114,7 @@ export async function GET(request: NextRequest) {
             else if (line.includes('Jitter:')) {
               const jitterMatch = line.match(/Jitter: (\d+) ms/)
               if (jitterMatch) {
-                const [_, jitter] = jitterMatch
+                const [, jitter] = jitterMatch
                 jitterInfo = { jitter: parseInt(jitter) }
                 controller.enqueue(`data: ${JSON.stringify({ 
                   phase: "Measuring jitter",
@@ -142,7 +140,7 @@ export async function GET(request: NextRequest) {
             else if (line.includes('Download:')) {
               const downloadMatch = line.match(/Download: ([0-9.]+) Mbit\/s/)
               if (downloadMatch) {
-                const [_, download] = downloadMatch
+                const [, download] = downloadMatch
                 downloadInfo = { download: parseFloat(download) }
                 controller.enqueue(`data: ${JSON.stringify({ 
                   phase: "Download completed",
@@ -163,7 +161,7 @@ export async function GET(request: NextRequest) {
             else if (line.includes('Upload:')) {
               const uploadMatch = line.match(/Upload: ([0-9.]+) Mbit\/s/)
               if (uploadMatch) {
-                const [_, upload] = uploadMatch
+                const [, upload] = uploadMatch
                 uploadInfo = { upload: parseFloat(upload) }
                 controller.enqueue(`data: ${JSON.stringify({ 
                   phase: "Upload completed",

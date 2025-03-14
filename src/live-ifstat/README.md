@@ -37,6 +37,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Added crontab to update blocklists at night
 - Added crontab to sync tailscale hosts
 - Modified tailscale hosts sync to not do anything if no changes
+- New multi-threaded speed test
 
 ### v0.36
 - Fixed weather component so it stores choice and works for non-US
