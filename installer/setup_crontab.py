@@ -11,6 +11,7 @@ from datetime import datetime
 REQUIRED_CRON_JOBS = [
     ("*/5 * * * *", "/usr/bin/python3 /usr/local/darkflows/bin/block_scheduler.py", "Block scheduler"),
     ("*/5 * * * *", "/usr/local/darkflows/bin/update_dyndns.sh", "DynDNS updater"),
+    ("*/1 * * * *", "/usr/bin/python3 /usr/local/darkflows/bin/tailscale2unbound.py", "Update Tailscale Hosts"),
     ("15 3 * * *", "/usr/bin/python3 /usr/local/darkflows/bin/verify_blocklists.py ; /usr/bin/python3 /usr/local/bin/run_all_unbounds.py", "Update Blocklists"),
     # Add more entries here as needed, following the same format
 ]
@@ -65,7 +66,6 @@ def ensure_cron_jobs():
         
         if count == 0:
             print(f"{description} not found in crontab, adding it now...")
-            lines.append(f"# {description} - added {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             lines.append(f"{schedule} {command}")
             changes_needed = True
         elif count > 1:
@@ -78,7 +78,6 @@ def ensure_cron_jobs():
             lines = [line for line in lines if not pattern.search(line)]
             
             # Add back just one entry
-            lines.append(f"# {description} - fixed {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             lines.append(f"{schedule} {command}")
             
             print(f"Removed duplicates and kept only one instance of {description}")

@@ -35,6 +35,8 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - /usr/bin/python3 /usr/local/darkflows/bin/run_all_unbounds.py is executed when vlan is created to add dns server or deleting
 - Disabled apparmor for unbound
 - Added crontab to update blocklists at night
+- Added crontab to sync tailscale hosts
+- Modified tailscale hosts sync to not do anything if no changes
 
 ### v0.36
 - Fixed weather component so it stores choice and works for non-US
