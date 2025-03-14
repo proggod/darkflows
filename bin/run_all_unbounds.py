@@ -665,10 +665,33 @@ def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 0) -> 
     pid_file = os.path.join(config_dir, "unbound.pid")
     config_file = os.path.join(config_dir, "unbound.conf")
     
-    # Verify that the configuration file exists
+    # Verify that the configuration file exists, if not copy the template
     if not os.path.exists(config_file):
-        print(f"Error: Configuration file {config_file} does not exist", file=sys.stderr)
-        return None
+        print(f"Configuration file {config_file} does not exist, copying template", file=sys.stderr)
+        
+        # Ensure the directory exists
+        ensure_directory_exists(config_dir)
+        
+        # Copy template to the directory
+        copy_template_to_directory(TEMPLATE_DIR, config_dir)
+        
+        # Get the appropriate IP address based on VLAN ID
+        if vlan_id == 0:
+            # For default instance, use internal interface IP
+            network_config = read_network_config()
+            internal_interface = network_config.get('INTERNAL_INTERFACE', 'br1')
+            interface_ip = get_interface_ip(internal_interface)
+        else:
+            # For VLAN instance, use VLAN interface IP
+            interface_ip = get_vlan_interface_ip(str(vlan_id))
+        
+        # Update the configuration with the correct IP
+        update_unbound_conf(config_dir, interface_ip)
+        
+        # Verify again that the configuration file exists after copying
+        if not os.path.exists(config_file):
+            print(f"Error: Failed to create configuration file {config_file} from template", file=sys.stderr)
+            return None
     
     try:
         # Change ownership of the configuration directory to unbound user
@@ -846,15 +869,10 @@ def main() -> None:
     ensure_directory_exists(ETC_UNBOUND_DIR)
     
     # Handle default unbound instance
-    if not os.path.exists(DEFAULT_DIR):
-        ensure_directory_exists(DEFAULT_DIR)
-        copy_template_to_directory(TEMPLATE_DIR, DEFAULT_DIR)
-        update_unbound_conf(DEFAULT_DIR, internal_ip)
-    else:
-        print(f"Default directory {DEFAULT_DIR} already exists")
-        update_unbound_conf(DEFAULT_DIR, internal_ip)
+    ensure_directory_exists(DEFAULT_DIR)
     
     # Start the default unbound process
+    # run_unbound_process will check for unbound.conf and copy template if needed
     run_unbound_process(DEFAULT_DIR, "default", 0)
     
     # Read the VLANS configuration
@@ -866,21 +884,11 @@ def main() -> None:
             vlan_id = int(vlan.get('id', 0))
             vlan_dir = os.path.join(ETC_UNBOUND_DIR, str(vlan_id))
             
-            # Get the IP address for this VLAN interface
-            vlan_ip = get_vlan_interface_ip(str(vlan_id))
-            if not vlan_ip:
-                print(f"Warning: Could not determine IP for VLAN {vlan_id}", file=sys.stderr)
-            
-            if not os.path.exists(vlan_dir):
-                ensure_directory_exists(vlan_dir)
-                copy_template_to_directory(TEMPLATE_DIR, vlan_dir)
-                update_unbound_conf(vlan_dir, vlan_ip)
-                print(f"Created and configured directory for VLAN {vlan_id} with IP {vlan_ip}")
-            else:
-                print(f"Directory for VLAN {vlan_id} already exists")
-                update_unbound_conf(vlan_dir, vlan_ip)
+            # Ensure the VLAN directory exists
+            ensure_directory_exists(vlan_dir)
             
             # Start the VLAN unbound process
+            # run_unbound_process will check for unbound.conf and copy template if needed
             run_unbound_process(vlan_dir, str(vlan_id), vlan_id)
         
         print("Unbound directory setup and processes started successfully")

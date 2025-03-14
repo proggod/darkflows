@@ -38,6 +38,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Added crontab to sync tailscale hosts
 - Modified tailscale hosts sync to not do anything if no changes
 - New multi-threaded speed test
+- Made sure startup script continues on subscript failured
+- Fixed local forwarding script
+- Verified unbound conf file exists and repaired directory if not
 
 ### v0.36
 - Fixed weather component so it stores choice and works for non-US
