@@ -516,6 +516,18 @@ export default function CustomDNSLists() {
     '.MuiSelect-select': {
       paddingTop: '0.25rem',
       paddingBottom: '0.25rem',
+    },
+    '.MuiOutlinedInput-notchedOutline': {
+      borderColor: 'white',
+    },
+    '&:hover .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'white',
+    },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+      borderColor: 'white',
+    },
+    '.MuiSelect-icon': {
+      color: 'white',
     }
   }
 
