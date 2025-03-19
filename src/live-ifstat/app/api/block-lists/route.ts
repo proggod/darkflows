@@ -17,7 +17,7 @@ async function ensureDirectoryExists(dirPath: string): Promise<void> {
 
 // Helper to get blocklists file path
 function getBlocklistsFilePath(vlanId: number | string): string {
-  const vlanDir = vlanId === 0 ? 'default' : vlanId.toString()
+  const vlanDir = vlanId === 1 ? 'default' : vlanId.toString()
   return path.join(BLOCKLISTS_DIR, vlanDir, 'blocklists.json')
 }
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
   if (authResponse) return authResponse
 
   const vlanIdParam = request.nextUrl.searchParams.get('vlanId')
-  const vlanId = vlanIdParam === 'default' ? 0 : Number(vlanIdParam) || 0
+  const vlanId = vlanIdParam === 'default' ? 1 : Number(vlanIdParam) || 1
 
   let connection: mysql.Connection | undefined
 
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { name, url, vlanId: vlanIdParam = 'default' } = await request.json()
-    const vlanId = vlanIdParam === 'default' ? 0 : Number(vlanIdParam)
+    const vlanId = vlanIdParam === 'default' ? 1 : Number(vlanIdParam)
     
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: 'Invalid name' }, { status: 400 })
@@ -177,7 +177,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const { name, vlanId: vlanIdParam = 'default' } = await request.json()
-    const vlanId = vlanIdParam === 'default' ? 0 : Number(vlanIdParam)
+    const vlanId = vlanIdParam === 'default' ? 1 : Number(vlanIdParam)
     
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: 'Invalid name' }, { status: 400 })
