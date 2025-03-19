@@ -14,14 +14,6 @@ interface BandwidthStats {
   last_updated: number;
 }
 
-interface DnsClient {
-  ip: string;
-  name: string;
-  mac: string | null;
-  status: 'reserved' | 'dynamic' | 'static';
-  lastSeen: number;
-}
-
 interface ApiResponse {
   timestamp: number;
   hosts: { [ip: string]: BandwidthStats };
@@ -79,34 +71,74 @@ export default function BandwidthUsage() {
   const [selectedIP, setSelectedIP] = useState<string | null>(null);
   const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [staleIPs, setStaleIPs] = useState<Set<string>>(new Set());
+  
+  // Utility to check if an IP is likely stale
+  const checkForStaleIPs = (hosts: { [ip: string]: BandwidthStats }, hostnames: { [ip: string]: string }): Set<string> => {
+    const staleSet = new Set<string>();
+    
+    Object.entries(hosts).forEach(([ip, stats]) => {
+      // Consider an IP stale if it has very low activity and no hostname
+      const hasMinimalActivity = 
+        parseValue(stats.last_2s_sent) < 500 && 
+        parseValue(stats.last_2s_received) < 500 &&
+        !hostnames[ip];
+        
+      if (hasMinimalActivity) {
+        staleSet.add(ip);
+      }
+    });
+    
+    return staleSet;
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [bandwidthResponse, dnsResponse] = await Promise.all([
-        fetch('/api/bandwidth'),
-        fetch('/api/dns-clients')
+      
+      // Add timestamp for cache busting
+      const timestamp = Date.now();
+      const cacheOptions = {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      } as RequestInit;
+      
+      const [bandwidthResponse, hostnamesResponse] = await Promise.all([
+        fetch(`/api/bandwidth?t=${timestamp}`, cacheOptions),
+        fetch(`/api/hostnames?t=${timestamp}`, cacheOptions)
       ]);
 
       if (!bandwidthResponse.ok) {
         throw new Error(`Bandwidth API error: ${bandwidthResponse.status}`);
       }
-      if (!dnsResponse.ok) {
-        throw new Error(`DNS API error: ${dnsResponse.status}`);
+      if (!hostnamesResponse.ok) {
+        throw new Error(`Hostnames API error: ${hostnamesResponse.status}`);
       }
 
       const bandwidthData: ApiResponse = await bandwidthResponse.json();
-      const dnsClients: DnsClient[] = await dnsResponse.json();
+      const hostnames: { [ip: string]: string } = await hostnamesResponse.json();
       
-      if (bandwidthData.status === 'active' && Object.keys(bandwidthData.hosts).length > 0) {
-        setBandwidthData(bandwidthData.hosts);
-        
-        // Update hostnames
-        const newHostnames: { [ip: string]: string } = {};
-        dnsClients.forEach(client => {
-          newHostnames[client.ip] = client.name || client.ip;
-        });
-        setHostnames(newHostnames);
+      // Filter out stale IPs that haven't shown activity recently
+      const activeHosts: { [ip: string]: BandwidthStats } = {};
+      const timeThreshold = 300000; // 5 minutes in milliseconds
+      const currentTime = Date.now();
+      
+      Object.entries(bandwidthData.hosts).forEach(([ip, stats]) => {
+        // Only include IPs that have recent activity or known hostnames
+        if (hostnames[ip] || 
+            (stats.last_updated && (currentTime - stats.last_updated) < timeThreshold)) {
+          activeHosts[ip] = stats;
+        }
+      });
+      
+      if (bandwidthData.status === 'active' && Object.keys(activeHosts).length > 0) {
+        setBandwidthData(activeHosts);
+        setHostnames(hostnames);
+        setStaleIPs(checkForStaleIPs(activeHosts, hostnames));
         setError(null);
       } else if (bandwidthData.status === 'error') {
         throw new Error('Bandwidth service reported an error');
@@ -114,7 +146,6 @@ export default function BandwidthUsage() {
         setBandwidthData({});
       }
     } catch (err: unknown) {
-      console.error('Error fetching data:', err);
       setError(err instanceof Error ? err.message : 'Error fetching data');
       setBandwidthData({});
       setHostnames({});
@@ -127,7 +158,18 @@ export default function BandwidthUsage() {
     setIsLoading(true);
     try {
       const encodedIP = encodeURIComponent(ip);
-      const response = await fetch(`/api/bandwidth/${encodedIP}`);
+      // Add timestamp for cache busting
+      const timestamp = Date.now();
+      const cacheOptions = {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      } as RequestInit;
+      
+      const response = await fetch(`/api/bandwidth/${encodedIP}?t=${timestamp}`, cacheOptions);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -135,9 +177,9 @@ export default function BandwidthUsage() {
       if (!data || !data.peak_rates) {
         throw new Error('Invalid data format received');
       }
+
       setDetailedStats(data);
     } catch (err: unknown) {
-      console.error('Error fetching detailed stats:', err);
       setError(err instanceof Error ? err.message : 'Error fetching connection details');
     } finally {
       setIsLoading(false);
@@ -146,7 +188,7 @@ export default function BandwidthUsage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -245,7 +287,12 @@ export default function BandwidthUsage() {
   return (
     <div className="rounded-lg shadow-sm p-3 h-full flex flex-col">
       <div className="flex flex-col h-full">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-2 px-1">Bandwidth Usage</h3>
+        <div className="flex justify-between items-center mb-2 px-1">
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Bandwidth Usage</h3>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Last updated: {new Date().toLocaleTimeString()}
+          </span>
+        </div>
         
         <div className="flex-1 overflow-auto">
           {error && (
@@ -296,21 +343,26 @@ export default function BandwidthUsage() {
                     key={ip} 
                     className={`card-hover ${
                       index % 2 === 0 ? '' : 'card-alternate'
-                    } ${index === sortedIPs.length - 1 ? 'last-row' : ''}`}
+                    } ${index === sortedIPs.length - 1 ? 'last-row' : ''} ${
+                      staleIPs.has(ip) ? 'opacity-50' : ''
+                    }`}
                   >
                     <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
                       <div className="flex flex-col">
                         <span 
-                          className="font-medium cursor-pointer hover:text-blue-500"
+                          className={`font-medium cursor-pointer hover:text-blue-500 ${
+                            staleIPs.has(ip) ? 'italic text-gray-500 dark:text-gray-400' : ''
+                          }`}
                           onClick={() => {
                             setSelectedIP(ip);
                             fetchDetailedStats(ip);
                           }}
-                          title={(hostnames[ip] || 'Unknown').replace('Unknown ', '')}
+                          title={`${hostnames[ip] || ip}${staleIPs.has(ip) ? ' (possibly inactive)' : ''}`}
                         >
-                          {((hostnames[ip] || 'Unknown').replace('Unknown ', '')).length > 16 
-                            ? ((hostnames[ip] || 'Unknown').replace('Unknown ', '')).slice(0, 16) + '...'
-                            : (hostnames[ip] || 'Unknown').replace('Unknown ', '')}
+                          {(hostnames[ip] || ip).length > 16 
+                            ? (hostnames[ip] || ip).slice(0, 16) + '...'
+                            : hostnames[ip] || ip}
+                          {staleIPs.has(ip) && ' ⚠️'}
                         </span>
                         <span className="text-[10px] text-gray-500 dark:text-gray-400">{ip}</span>
                       </div>

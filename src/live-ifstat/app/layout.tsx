@@ -21,8 +21,9 @@ export const metadata = {
   },
 }
 
-// Force dynamic rendering for all routes
+// Force dynamic rendering for the entire app
 export const dynamic = 'force-dynamic'
+export const fetchCache = 'default-no-store'
 
 // Add revalidation at the app level
 export const revalidate = 0

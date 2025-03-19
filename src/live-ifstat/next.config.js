@@ -13,6 +13,7 @@ const nextConfig = {
   },
   // Disable strict mode for now while debugging auth
   reactStrictMode: false,
+  // Disable all caching
   headers: async () => [
     {
       source: '/:path*',  // Apply to ALL routes, not just API
@@ -33,6 +34,24 @@ const nextConfig = {
       ],
     },
   ],
+  // Disable static optimization
+  staticPageGenerationTimeout: 0,
+  // Disable image optimization caching
+  images: {
+    unoptimized: true,
+  },
+  // Disable route caching
+  experimental: {
+    // ... existing experimental config ...
+    // Disable route caching
+    serverActions: {
+      allowedOrigins: ['localhost:3000']
+    },
+    // Disable static optimization
+    optimizeCss: false,
+    // Disable static page generation
+    staticPageGenerationTimeout: 0,
+  },
   typescript: {
     ignoreBuildErrors: true,
   }
