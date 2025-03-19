@@ -49,44 +49,39 @@ const getDbConnection = async () => {
 }
 
 // GET handler to list all DNS entries
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const subnetId = searchParams.get('subnetId') || '1';
     
-    // Execute with full path and debug output
-    const scriptPath = DNS_MANAGER_SCRIPT;
+    const command = `python3 ${DNS_MANAGER_SCRIPT} list ${subnetId}`;
+    console.log('Executing DNS command:', command);
     
-    const { stdout, stderr } = await execAsync(`python3 ${scriptPath} list`);
-    
+    const { stdout, stderr } = await execAsync(command);
     if (stderr) {
-      console.error('Script stderr:', stderr);
+      console.error('Script stderr:', stderr)
+      return NextResponse.json({ error: stderr }, { status: 500 })
     }
     
-    const entries = parseListOutput(stdout);
-    
-    return NextResponse.json(
-      { entries },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'Surrogate-Control': 'no-store'
-        }
+    const entries = parseListOutput(stdout)
+    return NextResponse.json({ entries }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
-    );
+    })
   } catch (error) {
-    console.error('Error in GET:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
-      { status: 500 }
-    );
+    console.error('Error in GET:', error)
+    const message = error instanceof Error ? error.message : 'Failed to list DNS entries'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
 // POST handler to add new DNS entries
 export async function POST(request: NextRequest) {
   try {
-    const { ip, hostname } = await request.json()
+    const { ip, hostname, subnetId } = await request.json()
     
     if (!ip || !hostname) {
       return NextResponse.json(
@@ -95,13 +90,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname}`)
+    const addCommand = `python3 ${DNS_MANAGER_SCRIPT} add ${ip} ${hostname} ${subnetId || '1'}`;
+    console.log('Executing DNS command:', addCommand);
+    await execAsync(addCommand)
     
     // Re-fetch the updated list
-    const { stdout } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list`)
+    const listCommand = `python3 ${DNS_MANAGER_SCRIPT} list ${subnetId || '1'}`;
+    console.log('Executing DNS command:', listCommand);
+    const { stdout } = await execAsync(listCommand)
     const entries = parseListOutput(stdout)
     
-    return NextResponse.json({ entries })
+    return NextResponse.json({ entries }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
   } catch (error) {
     console.error('Error in POST:', error)
     return NextResponse.json(
@@ -114,18 +119,26 @@ export async function POST(request: NextRequest) {
 // DELETE handler to remove DNS entries
 export async function DELETE(request: NextRequest) {
   try {
-    const { hostname } = await request.json()
+    const { hostname, subnetId } = await request.json()
     
     if (!hostname) {
       return NextResponse.json({ error: 'Hostname is required' }, { status: 400 })
     }
 
-    const { stderr } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname}`)
+    const command = `python3 ${DNS_MANAGER_SCRIPT} remove ${hostname} ${subnetId || '1'}`;
+    console.log('Executing DNS command:', command);
+    const { stderr } = await execAsync(command)
     if (stderr) {
       console.error('Script stderr:', stderr)
       return NextResponse.json({ error: stderr }, { status: 500 })
     }
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
   } catch (error) {
     console.error('Error in DELETE:', error)
     const message = error instanceof Error ? error.message : 'Failed to remove DNS entry'

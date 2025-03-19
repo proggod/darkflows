@@ -33,15 +33,12 @@ def read_entries(vlan_id: str = "default"):
     comments = []
     config_path = get_config_path(vlan_id)
     
-    print(f"Reading entries from: {config_path}")
-    
     try:
         with config_path.open('r') as f:
             current_ip = None
             
             for line in f:
                 line = line.strip()
-                print(f"Reading line: {line}")
                 
                 if not line or line.startswith("#"):
                     comments.append(line)
@@ -52,7 +49,6 @@ def read_entries(vlan_id: str = "default"):
                 if local_data_match:
                     hostname, ip = local_data_match.groups()
                     hostname = hostname.lower()
-                    print(f"Found local-data entry: {hostname} -> {ip}")
                     
                     if ip in entries:
                         if hostname not in entries[ip]:
@@ -65,7 +61,6 @@ def read_entries(vlan_id: str = "default"):
                 if local_data_ptr_match:
                     ip, hostname = local_data_ptr_match.groups()
                     hostname = hostname.lower()
-                    print(f"Found local-data-ptr entry: {ip} -> {hostname}")
                     
                     if ip in entries:
                         if hostname not in entries[ip]:
@@ -74,11 +69,9 @@ def read_entries(vlan_id: str = "default"):
                         entries[ip] = [hostname]
     
     except FileNotFoundError:
-        print(f"Config file not found: {config_path}")
         # Create directory if it doesn't exist
         os.makedirs(config_path.parent, exist_ok=True)
     
-    print(f"Final entries: {entries}")
     return entries, comments
 
 def write_entries(entries, comments, vlan_id: str = "default"):
@@ -120,17 +113,12 @@ def add_entry(ip, hostname, vlan_id: str = "default"):
     print(f"Added: {hostname} -> {ip_str}")
 
 def remove_entry(target, vlan_id: str = "default"):
-    print(f"Attempting to remove target: {target} from VLAN: {vlan_id}")
     entries, comments = read_entries(vlan_id)
     removed = False
     
-    print(f"Current entries before removal: {entries}")
-    
     # First try to find if target is a hostname
     for ip, hostnames in list(entries.items()):
-        print(f"Checking IP {ip} with hostnames {hostnames}")
         if target in hostnames:
-            print(f"Found target {target} in hostnames for IP {ip}")
             entries[ip].remove(target)
             if not entries[ip]:
                 del entries[ip]
@@ -139,17 +127,14 @@ def remove_entry(target, vlan_id: str = "default"):
     
     # If not found as hostname, try as IP
     if not removed and target in entries:
-        print(f"Found target {target} as IP")
         del entries[target]
         removed = True
     
     if removed:
-        print(f"Entry found and removed. New entries: {entries}")
         write_entries(entries, comments, vlan_id)
         restart_dns()
         print(f"Removed {target}")
     else:
-        print(f"Entry not found. Target: {target}, Current entries: {entries}")
         print("Entry not found")
 
 def restart_dns():

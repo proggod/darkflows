@@ -5,6 +5,11 @@ import CloseIcon from '@mui/icons-material/Close'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import AddIcon from '@mui/icons-material/Add'
 import { useRefresh } from '../contexts/RefreshContext'
+import { VLANConfig } from '@/types/dashboard'
+import MenuItem from '@mui/material/MenuItem'
+import Select from '@mui/material/Select'
+import FormControl from '@mui/material/FormControl'
+import { SelectChangeEvent } from '@mui/material/Select'
 
 interface DnsEntry {
   ip: string
@@ -19,28 +24,46 @@ export default function DnsHosts() {
   const [newIp, setNewIp] = useState('')
   const [newHostname, setNewHostname] = useState('')
   const [isSyncing, setIsSyncing] = useState(false)
+  const [vlans, setVlans] = useState<VLANConfig[]>([])
+  const [selectedVlanId, setSelectedVlanId] = useState<string>('1')
+  const [loadingVlans, setLoadingVlans] = useState<boolean>(false)
   const { triggerRefresh, registerRefreshCallback } = useRefresh()
+
+  const fetchVlans = async () => {
+    setLoadingVlans(true)
+    try {
+      const response = await fetch('/api/vlans')
+      if (!response.ok) throw new Error('Failed to fetch VLANs')
+      const data = await response.json()
+      setVlans(data)
+    } catch (error) {
+      console.error('Error fetching VLANs:', error)
+    } finally {
+      setLoadingVlans(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchVlans()
+  }, [])
 
   const fetchEntries = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/dns-hosts', {
+      const response = await fetch(`/api/dns-hosts?subnetId=${selectedVlanId}`, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
         },
-        // Force a unique URL to prevent caching
         cache: 'no-store',
         next: { revalidate: 0 }
       })
-      
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
-      
       
       if (data.error) {
         throw new Error(data.error)
@@ -62,7 +85,11 @@ export default function DnsHosts() {
   useEffect(() => {
     fetchEntries()
     return registerRefreshCallback(fetchEntries)
-  }, [registerRefreshCallback])
+  }, [registerRefreshCallback, selectedVlanId])
+
+  const handleVlanChange = (e: SelectChangeEvent<string>) => {
+    setSelectedVlanId(e.target.value)
+  }
 
   const handleSyncDNS = async () => {
     try {
@@ -104,7 +131,11 @@ export default function DnsHosts() {
       const response = await fetch('/api/dns-hosts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip: newIp, hostname: newHostname })
+        body: JSON.stringify({ 
+          ip: newIp, 
+          hostname: newHostname,
+          subnetId: selectedVlanId 
+        })
       })
       
       const data = await response.json()
@@ -133,7 +164,10 @@ export default function DnsHosts() {
       const response = await fetch('/api/dns-hosts', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostname })
+        body: JSON.stringify({ 
+          hostname,
+          subnetId: selectedVlanId 
+        })
       })
       
       const data = await response.json()
@@ -157,7 +191,53 @@ export default function DnsHosts() {
       <div className="flex flex-col h-full">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Hosts</h3>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <FormControl size="small" className="min-w-[120px]">
+              <Select
+                value={selectedVlanId}
+                onChange={handleVlanChange}
+                className="text-gray-700 dark:text-gray-200"
+                disabled={loadingVlans}
+                sx={{
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  color: 'inherit',
+                  '.MuiSelect-select': {
+                    paddingTop: '0.25rem',
+                    paddingBottom: '0.25rem',
+                  },
+                  '.MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'white',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'white',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'white',
+                  },
+                  '.MuiSelect-icon': {
+                    color: 'white',
+                  }
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      '& .MuiMenuItem-root': {
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }
+                    }
+                  }
+                }}
+              >
+                <MenuItem value="1">Default</MenuItem>
+                {vlans.map((vlan) => (
+                  <MenuItem key={vlan.id} value={vlan.id.toString()}>
+                    {vlan.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <button
               onClick={handleSyncDNS}
               disabled={isSyncing || loading}
