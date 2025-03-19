@@ -648,14 +648,14 @@ def kill_unbound_processes() -> None:
     except Exception as e:
         print(f"Error managing unbound processes: {e}", file=sys.stderr)
 
-def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 0) -> Optional[int]:
+def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 1) -> Optional[int]:
     """
     Run an unbound process for the specified configuration using screen.
     
     Args:
         config_dir: The directory containing the unbound configuration
         config_name: Name of the configuration (e.g., 'default' or VLAN ID)
-        vlan_id: VLAN ID (0 for default)
+        vlan_id: VLAN ID (1 for default)
         
     Returns:
         Process ID of the started process, or None if failed
@@ -676,7 +676,7 @@ def run_unbound_process(config_dir: str, config_name: str, vlan_id: int = 0) -> 
         copy_template_to_directory(TEMPLATE_DIR, config_dir)
         
         # Get the appropriate IP address based on VLAN ID
-        if vlan_id == 0:
+        if vlan_id == 1:
             # For default instance, use internal interface IP
             network_config = read_network_config()
             internal_interface = network_config.get('INTERNAL_INTERFACE', 'br1')
@@ -873,7 +873,7 @@ def main() -> None:
     
     # Start the default unbound process
     # run_unbound_process will check for unbound.conf and copy template if needed
-    run_unbound_process(DEFAULT_DIR, "default", 0)
+    run_unbound_process(DEFAULT_DIR, "default", 1)
     
     # Read the VLANS configuration
     try:

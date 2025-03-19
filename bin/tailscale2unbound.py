@@ -360,10 +360,10 @@ def get_vlan_directories() -> List[Tuple[int, str]]:
     """
     vlan_dirs = []
     
-    # Add default VLAN (0)
+    # Add default VLAN (1)
     default_dir = os.path.join(ETC_UNBOUND_DIR, "default")
     if os.path.isdir(default_dir):
-        vlan_dirs.append((0, default_dir))
+        vlan_dirs.append((1, default_dir))
     
     # Add numbered VLANs
     for vlan_dir in glob.glob(os.path.join(ETC_UNBOUND_DIR, "[0-9]*")):

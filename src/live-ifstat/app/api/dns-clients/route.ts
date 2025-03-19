@@ -5,19 +5,22 @@ import { lookupHostnames } from '@/lib/hostname-lookup';
 import { DnsClient } from '@/types/dns';
 
 export async function GET(request: NextRequest) {
-  
   const authResponse = await requireAuth(request);
   if (authResponse) return authResponse;
 
   let connection: mysql.Connection | undefined;
 
   try {
+    // Get the subnet ID from query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const subnetId = searchParams.get('subnetId') || '1';
+
+    // Get DNS queries from unbound database
     connection = await mysql.createConnection({
       socketPath: '/var/run/mysqld/mysqld.sock',
       user: 'root',
       database: 'unbound'
     });
-    
 
     const [queries] = await connection.execute<mysql.RowDataPacket[]>(`
       SELECT 
@@ -25,13 +28,12 @@ export async function GET(request: NextRequest) {
         client_ip as ip
       FROM dns_queries 
       WHERE ts >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND vlan_id = ?
       GROUP BY client_ip 
       ORDER BY ts DESC
-    `);
-    
+    `, [subnetId]);
 
     const hostInfoMap = await lookupHostnames(queries.map(q => q.ip));
-    
 
     const clients: DnsClient[] = queries
       .map(query => {
@@ -60,8 +62,6 @@ export async function GET(request: NextRequest) {
         }
         return 0;
       });
-
-
 
     return NextResponse.json(clients);
   } catch (error) {

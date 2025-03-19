@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useRefresh } from '../contexts/RefreshContext';
+import { VLANConfig } from '@/types/dashboard';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import { SelectChangeEvent } from '@mui/material/Select';
 
 interface DnsClient {
   ip: string;
@@ -31,8 +36,31 @@ export function DnsClientsCard() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({});
   const [processingClients, setProcessingClients] = useState<{[key: string]: boolean}>({});
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [vlans, setVlans] = useState<VLANConfig[]>([]);
+  const [selectedVlanId, setSelectedVlanId] = useState<string>('1');
+  const [loadingVlans, setLoadingVlans] = useState(true);
   const { triggerRefresh, registerRefreshCallback } = useRefresh();
+
+  const fetchVlans = async () => {
+    try {
+      setLoadingVlans(true);
+      const response = await fetch('/api/vlans');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setVlans(data);
+    } catch (error) {
+      console.error('Error fetching VLANs:', error);
+      setError('Failed to load VLANs');
+    } finally {
+      setLoadingVlans(false);
+    }
+  };
+
+  const handleVlanChange = (event: SelectChangeEvent<string>) => {
+    setSelectedVlanId(event.target.value);
+  };
 
   const fetchClients = async () => {
     try {
@@ -41,7 +69,7 @@ export function DnsClientsCard() {
       
       // Fetch both DNS clients and reservations in parallel, like LeasesCard does
       const [clientsData, reservationsData] = await Promise.all([
-        fetch('/api/dns-clients', {
+        fetch(`/api/dns-clients?subnetId=${selectedVlanId}`, {
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
@@ -52,25 +80,25 @@ export function DnsClientsCard() {
           }
           return res.json();
         }),
-        fetch('/api/reservations').then(res => res.json())
+        fetch(`/api/reservations?subnetId=${selectedVlanId}`).then(res => res.json())
       ]);
 
       if (Array.isArray(clientsData)) {
         // Mark clients as reserved if they match a reservation by IP or MAC
         const formattedClients = clientsData.map((client: DnsClient) => {
           // Check if this client has a matching reservation
-          const isReserved = reservationsData.some((r: ReservationData) => 
+          const reservation = reservationsData.find((r: ReservationData) => 
             r['ip-address'] === client.ip || 
             (client.mac && client.mac !== 'N/A' && r['hw-address'].toLowerCase() === client.mac.toLowerCase())
           );
           
           return {
             ip: client.ip,
-            name: client.name || client.ip,
+            name: reservation?.hostname || client.name || client.ip,
             mac: client.mac !== 'N/A' ? client.mac : undefined,
             lastSeen: client.lastSeen,
-            isReserved: isReserved,
-            status: isReserved ? 'reserved' as const : (client.status === 'static' ? 'static' as const : 'dynamic' as const)
+            isReserved: !!reservation,
+            status: reservation ? 'reserved' as const : (client.status === 'static' ? 'static' as const : 'dynamic' as const)
           };
         });
 
@@ -115,7 +143,8 @@ export function DnsClientsCard() {
           ip: client.ip,
           oldHostname: client.name,
           newHostname: newName,
-          mac: client.mac
+          mac: client.mac,
+          subnetId: selectedVlanId
         })
       });
 
@@ -158,7 +187,8 @@ export function DnsClientsCard() {
             body: JSON.stringify({
               'ip-address': client.ip,
               'hw-address': client.mac,
-              'hostname': editedName
+              'hostname': editedName,
+              'subnetId': selectedVlanId
             })
           });
 
@@ -202,33 +232,103 @@ export function DnsClientsCard() {
     try {
       setProcessingClients(prev => ({ ...prev, [client.ip]: true }));
       
-      const hostname = editedNames[client.ip] || (client.name !== 'N/A' ? client.name : '');
+      // Debug logging
+      console.log('Available VLANs:', vlans);
+      console.log('Selected VLAN ID:', selectedVlanId);
       
+      let subnetCidr: string;
+      
+      // Handle default VLAN (id: 1) separately
+      if (selectedVlanId === '1') {
+        subnetCidr = '192.168.1.1-192.168.1.254'; // Default VLAN CIDR range
+      } else {
+        // Get the selected VLAN's subnet range
+        const selectedVlan = vlans.find(v => v.id === parseInt(selectedVlanId));
+        console.log('Found VLAN:', selectedVlan);
+        
+        if (!selectedVlan) {
+          console.error('VLAN lookup failed:', {
+            vlans,
+            selectedVlanId,
+            parsedId: parseInt(selectedVlanId)
+          });
+          throw new Error('Selected VLAN not found');
+        }
+        subnetCidr = selectedVlan.subnet;
+      }
+
+      // Get the hostname from edited names or fallback to current name
+      const hostname = editedNames[client.ip] || client.name || '';
+
       const reservation = {
         'ip-address': client.ip,
         'hw-address': client.mac,
-        'hostname': hostname
+        'hostname': hostname,
+        subnetId: selectedVlanId,
+        subnetCidr: subnetCidr
       };
 
- 
+      console.log('Creating reservation with:', reservation);
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reservation)
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Reservation failed:', {
-          status: response.status,
-          response: errorText
+      if (response.ok) {
+        // Update DNS hostname
+        const dnsResponse = await fetch('/api/dns-hosts', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: client.ip,
+            oldHostname: client.name,
+            newHostname: hostname,
+            mac: client.mac,
+            subnetId: selectedVlanId
+          })
         });
-        setError('Failed to create reservation');
-        return;
-      }
 
-      fetchClients();
-      triggerRefresh();
+        if (!dnsResponse.ok) {
+          const errorText = await dnsResponse.text();
+          console.error('Failed to update hostname:', errorText);
+          setError('Failed to update hostname');
+          return;
+        }
+
+        // Clear the edited name after successful reservation
+        setEditedNames(prev => {
+          const newState = { ...prev };
+          delete newState[client.ip];
+          return newState;
+        });
+
+        fetchClients();
+        triggerRefresh();
+      } else {
+        // Try to get error details
+        let errorMessage = 'Failed to create reservation';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // If not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              errorMessage = errorText;
+            }
+          } catch {
+            // If text also fails, use status text
+            errorMessage = `${response.status} ${response.statusText}`;
+          }
+        }
+        console.error('Failed to create reservation:', errorMessage);
+        setError(errorMessage);
+      }
     } catch (error) {
       console.error('Error creating reservation:', error);
       setError('Error creating reservation');
@@ -252,7 +352,8 @@ export function DnsClientsCard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ip: client.ip,
-          mac: client.mac
+          mac: client.mac,
+          subnetId: selectedVlanId
         })
       });
 
@@ -355,37 +456,12 @@ export function DnsClientsCard() {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
-  const handleSyncDNS = async () => {
-    try {
-      setIsSyncing(true);
-      
-      const response = await fetch('/api/reservations', {
-        method: 'PUT',
-        headers: {
-          'Accept': 'text/plain'
-        }
-      });
-      
-      const text = await response.text();
- 
-      if (!response.ok) {
-        throw new Error(text || 'Failed to sync DNS entries');
-      }
-
-      await fetchClients();
-    } catch (error) {
-      console.log('Error in handleSyncDNS:', error);
-      setError(error instanceof Error ? error.message : 'Failed to sync DNS entries');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const isProcessing = (ip: string) => {
     return processingClients[ip] || savingHostnames[ip];
   };
 
   useEffect(() => {
+    fetchVlans();
     fetchClients();
     
     const cleanup = registerRefreshCallback(() => {
@@ -395,20 +471,59 @@ export function DnsClientsCard() {
     return () => {
       cleanup();
     };
-  }, [registerRefreshCallback]);
+  }, [registerRefreshCallback, selectedVlanId]);
 
   return (
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="text-label">DNS Clients</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSyncDNS}
-            disabled={isSyncing}
-            className={`btn ${isSyncing ? 'btn-gray' : 'btn-green'}`}
-          >
-            {isSyncing ? 'Syncing...' : 'Sync DNS'}
-          </button>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">DNS Clients</h3>
+        <div className="flex gap-2 items-center">
+          <FormControl size="small" className="min-w-[120px]">
+            <Select
+              value={selectedVlanId}
+              onChange={handleVlanChange}
+              className="text-gray-700 dark:text-gray-200"
+              disabled={loadingVlans}
+              sx={{
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'inherit',
+                '.MuiSelect-select': {
+                  paddingTop: '0.25rem',
+                  paddingBottom: '0.25rem',
+                },
+                '.MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '.MuiSelect-icon': {
+                  color: 'white',
+                }
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                    }
+                  }
+                }
+              }}
+            >
+              <MenuItem value="1">Default</MenuItem>
+              {vlans.map((vlan) => (
+                <MenuItem key={vlan.id} value={vlan.id.toString()}>
+                  {vlan.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <RefreshIcon 
             onClick={fetchClients}
             className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
@@ -417,7 +532,7 @@ export function DnsClientsCard() {
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-small">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-2 py-1 rounded mb-2 text-xs">
           {error}
         </div>
       )}

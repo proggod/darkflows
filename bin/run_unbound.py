@@ -25,17 +25,17 @@ MAX_DOMAIN_LENGTH = 255  # Maximum length for the domain column
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Run Unbound DNS server and log queries.')
-parser.add_argument('--vlan-id', type=int, default=0, help='VLAN ID (default: 0 for default instance)')
+parser.add_argument('--vlan-id', type=int, default=1, help='VLAN ID (default: 1 for default instance)')
 parser.add_argument('--config', type=str, help='Path to Unbound configuration file')
 args = parser.parse_args()
 
 # Get VLAN ID from command line or environment variable
 VLAN_ID = args.vlan_id
-if VLAN_ID == 0 and "UNBOUND_VLAN_ID" in os.environ:
+if VLAN_ID == 1 and "UNBOUND_VLAN_ID" in os.environ:
     try:
         VLAN_ID = int(os.environ["UNBOUND_VLAN_ID"])
     except ValueError:
-        print(f"Warning: Invalid VLAN ID in environment: {os.environ['UNBOUND_VLAN_ID']}, using default (0)")
+        print(f"Warning: Invalid VLAN ID in environment: {os.environ['UNBOUND_VLAN_ID']}, using default (1)")
 
 # Get configuration file path
 CONFIG_FILE = args.config

@@ -189,3 +189,4 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 TODO:
 - Fix unbound dns manager script to use the new vlan stuff
 - fix all reservations to use vlan stuff
+- make sure the dns custom blocklists use 1 for default instead of 0
