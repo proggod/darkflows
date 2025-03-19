@@ -33,6 +33,11 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed bandwidth component issues
 - Fixed unbound template
 - Fixed default VLAN ID to 1 instead of 0 on DNS custom blocklists
+- Fixed DNS reservations logic
+- Fixed the sync dns hosts button
+- Fixed issue with unbound not starting
+- Fixed speedtest install to not prompt for key confirm
+- New Custom Based ISO installer asks only essential questions
 
 ### v0.37
 - Modified the blocklist fetch scripts
@@ -195,3 +200,7 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 
 
 
+
+
+##TODO: 
+- Check active dhcp leases for ips that shouldn't be there

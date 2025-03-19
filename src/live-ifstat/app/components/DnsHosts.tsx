@@ -96,7 +96,7 @@ export default function DnsHosts() {
       setIsSyncing(true)
       setError(null)
       
-      const response = await fetch('/api/reservations', {
+      const response = await fetch(`/api/reservations?subnetId=${selectedVlanId}`, {
         method: 'PUT',
         headers: {
           'Accept': 'text/plain'

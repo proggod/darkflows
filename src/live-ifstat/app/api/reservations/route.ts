@@ -253,26 +253,10 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
-  const authResponse = await requireAuth(request);
-  if (authResponse) {
-    return authResponse;
-  }
-
+// Helper function to sync DNS entries with DHCP reservations for a specific VLAN
+async function syncDnsWithReservations(subnetId: string): Promise<void> {
   let connection;
   try {
-    const { originalIp, ...reservation } = await request.json();
-    
-    // Validate the IP is in a valid subnet
-    const subnetId = await getSubnetIdForIp(reservation['ip-address'], reservation.subnetId, reservation.subnetCidr);
-    if (subnetId === null) {
-      return NextResponse.json({ error: 'IP address is not in any configured subnet' }, { status: 400 });
-    }
-    
-    // Convert MAC and IPs to binary format for database
-    const macHex = reservation['hw-address'].replace(/:/g, '');
-    const newIpNumber = ipToNumber(reservation['ip-address']);
-    
     connection = await getDbConnection();
     
     // Get correct identifier type for MAC addresses
@@ -289,43 +273,93 @@ export async function PUT(request: NextRequest) {
       // Use default macIdentifierType if query fails
     }
     
-    // Get existing reservation
-    const [rows] = await connection.execute<mysql.RowDataPacket[]>(
-      'SELECT hostname FROM hosts WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ?',
-      [macHex, macIdentifierType]
-    );
+    // Query the hosts table with the correct identifier type and subnet ID
+    const query = `
+      SELECT 
+        INET_NTOA(ipv4_address) as ip_address,
+        hostname
+      FROM hosts
+      WHERE dhcp_identifier_type = ?
+        AND dhcp4_subnet_id = ?
+        AND hostname IS NOT NULL
+        AND hostname != ''
+    `;
     
-    if (rows.length === 0) {
-      return NextResponse.json({ error: 'Reservation not found' }, { status: 404 });
+    const [rows] = await connection.execute<mysql.RowDataPacket[]>(query, [macIdentifierType, subnetId]);
+    
+    // Get current DNS entries for this subnet
+    const { stdout } = await execAsync(`python3 ${DNS_MANAGER_SCRIPT} list ${subnetId}`);
+    const entries = stdout.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        // Handle malformed lines safely
+        const parts = line.split(' -> ');
+        if (parts.length < 2 || !parts[1]) {
+          console.warn(`Skipping malformed DNS entry: ${line}`);
+          return null;
+        }
+        const [ip, hostnames] = parts;
+        return { ip, hostnames: hostnames.split(', ') };
+      })
+      .filter(entry => entry !== null) as { ip: string; hostnames: string[] }[];
+    
+    // Remove DNS entries that don't match reservations
+    for (const entry of entries) {
+      const reservation = rows.find(r => r.ip_address === entry.ip);
+      if (!reservation || !reservation.hostname) {
+        for (const hostname of entry.hostnames) {
+          await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname} ${subnetId}`);
+        }
+      } else if (entry.hostnames[0] !== reservation.hostname) {
+        // Remove old hostname and add new one
+        for (const hostname of entry.hostnames) {
+          await execAsync(`python3 ${DNS_MANAGER_SCRIPT} remove ${hostname} ${subnetId}`);
+        }
+        await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${entry.ip} ${reservation.hostname} ${subnetId}`);
+      }
     }
     
-    const existingHostname = rows[0].hostname;
-    
-    // If IP address changed and we have a hostname, update DNS
-    if (originalIp !== reservation['ip-address'] && existingHostname) {
-      // Remove old DNS entry
-      await syncDNSEntry(originalIp, existingHostname, true, subnetId.toString());
-      // Add new DNS entry
-      const ipAddress = reservation['ip-address'] ?? '';
-      await syncDNSEntry(ipAddress, reservation.hostname ?? existingHostname, false, subnetId.toString());
+    // Add missing DNS entries from reservations
+    for (const reservation of rows) {
+      const hasEntry = entries.some(entry => 
+        entry.ip === reservation.ip_address && 
+        entry.hostnames.includes(reservation.hostname)
+      );
+      if (!hasEntry && reservation.hostname) {
+        await execAsync(`python3 ${DNS_MANAGER_SCRIPT} add ${reservation.ip_address} ${reservation.hostname} ${subnetId}`);
+      }
     }
-    
-    // Update the reservation
-    await connection.execute(
-      'UPDATE hosts SET ipv4_address = ?, hostname = ?, dhcp4_subnet_id = ? WHERE dhcp_identifier = UNHEX(?) AND dhcp_identifier_type = ?',
-      [newIpNumber, reservation.hostname || null, subnetId, macHex, macIdentifierType]
-    );
-    
-    await syncAllSystems();
-    
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error updating reservation:', error);
-    return NextResponse.json({ error: 'Failed to update reservation' }, { status: 500 });
+    console.error('Error syncing DNS with reservations:', error);
+    throw error;
   } finally {
     if (connection) {
       await connection.end();
     }
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  const authResponse = await requireAuth(request);
+  if (authResponse) {
+    return authResponse;
+  }
+  
+  try {
+    // Get the subnet ID from query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const subnetId = searchParams.get('subnetId') || '1'; // Default to 1 if not specified
+    
+    // Sync DNS entries with DHCP reservations for this VLAN
+    await syncDnsWithReservations(subnetId);
+    
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in handleSyncDNS:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to sync DNS entries' },
+      { status: 500 }
+    );
   }
 }
 

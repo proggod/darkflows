@@ -7,9 +7,10 @@ const nextConfig = {
     },
     // Disable static optimization
     optimizeCss: false,
-    // Increase timeouts for the build process
-    staticWorkerTimeout: 120000, // 2 minutes in milliseconds
-    staticGenerationTimeout: 120000, // 2 minutes in milliseconds
+    // Configuration for static generation
+    staticGenerationMaxConcurrency: 8,
+    staticGenerationMinPagesPerWorker: 25,
+    staticGenerationRetryCount: 3,
   },
   // Moved from experimental.serverComponentsExternalPackages 
   serverExternalPackages: ['sharp'],
