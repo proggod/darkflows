@@ -184,3 +184,8 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed Network Stats Card to ignore ifb0 interface
 - Fixed Network Stats Card to show correct interface name
 
+
+
+TODO:
+- Fix unbound dns manager script to use the new vlan stuff
+- fix all reservations to use vlan stuff

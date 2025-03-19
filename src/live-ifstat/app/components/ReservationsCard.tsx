@@ -9,6 +9,11 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import { useRefresh } from '../contexts/RefreshContext'
+import { VLANConfig } from '@/types/dashboard'
+import MenuItem from '@mui/material/MenuItem'
+import Select from '@mui/material/Select'
+import FormControl from '@mui/material/FormControl'
+import { SelectChangeEvent } from '@mui/material/Select'
 
 interface Reservation {
   'ip-address': string
@@ -67,6 +72,44 @@ export default function ReservationsCard() {
 
   const [isCheckingIp, setIsCheckingIp] = useState<boolean>(false)
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [vlans, setVlans] = useState<VLANConfig[]>([])
+  const [selectedVlanId, setSelectedVlanId] = useState<string>('1')
+  const [loadingVlans, setLoadingVlans] = useState<boolean>(false)
+  const [ipRange, setIpRange] = useState<string>('')
+
+  const fetchVlans = async () => {
+    setLoadingVlans(true)
+    try {
+      const [vlansResponse, networkSettingsResponse] = await Promise.all([
+        fetch('/api/vlans'),
+        fetch('/api/network-settings')
+      ])
+      
+      if (!vlansResponse.ok) throw new Error('Failed to fetch VLANs')
+      if (!networkSettingsResponse.ok) throw new Error('Failed to fetch network settings')
+      
+      const [vlansData, networkSettings] = await Promise.all([
+        vlansResponse.json(),
+        networkSettingsResponse.json()
+      ])
+      
+      setVlans(vlansData)
+      
+      // Set initial IP range for default VLAN from network settings IP pools
+      if (networkSettings.ipPools && networkSettings.ipPools.length > 0) {
+        const pool = networkSettings.ipPools[0]
+        setIpRange(`${pool.start}-${pool.end}`)
+      }
+    } catch (error) {
+      console.error('Error fetching VLANs:', error)
+    } finally {
+      setLoadingVlans(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchVlans()
+  }, [])
 
   useEffect(() => {
     console.log('[ReservationsCard] useEffect triggered')
@@ -94,7 +137,7 @@ export default function ReservationsCard() {
       controller.abort();
       if (unregister) unregister();
     };
-  }, [registerRefreshCallback]);
+  }, [registerRefreshCallback, selectedVlanId]);
 
   const fetchReservations = async (signal?: AbortSignal) => {
     try {
@@ -102,7 +145,7 @@ export default function ReservationsCard() {
       console.log('[ReservationsCard] Fetching reservations...')
 
       const [reservationsResponse, dnsHostsResponse] = await Promise.all([
-        fetch(`/api/reservations?t=${Date.now()}`, {
+        fetch(`/api/reservations?t=${Date.now()}&subnetId=${selectedVlanId}`, {
           signal,
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -173,7 +216,8 @@ export default function ReservationsCard() {
           },
           body: JSON.stringify({
             ip: reservation['ip-address'],
-            mac: reservation['hw-address']
+            mac: reservation['hw-address'],
+            subnetId: selectedVlanId
           })
         })
 
@@ -213,6 +257,28 @@ export default function ReservationsCard() {
         return
       }
 
+      // Check if IP is within the selected VLAN's range
+      const [rangeStart, rangeEnd] = ipRange.split('-')
+      const ipParts = newReservation['ip-address'].split('.').map(Number)
+      const startParts = rangeStart.split('.').map(Number)
+      const endParts = rangeEnd.split('.').map(Number)
+      
+      const ipNum = (ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]
+      const startNum = (startParts[0] << 24) | (startParts[1] << 16) | (startParts[2] << 8) | startParts[3]
+      const endNum = (endParts[0] << 24) | (endParts[1] << 16) | (endParts[2] << 8) | endParts[3]
+
+      if (ipNum < startNum || ipNum > endNum) {
+        setError(`IP address must be within the range ${ipRange}`)
+        return
+      }
+
+      // Check if IP is already reserved
+      const isAlreadyReserved = reservations.some(r => r['ip-address'] === newReservation['ip-address'])
+      if (isAlreadyReserved) {
+        setError('This IP address is already reserved')
+        return
+      }
+
       // Before adding, check if the IP address is already in use by a device
       setIsCheckingIp(true)
       const isAlive = await pingIp(newReservation['ip-address'])
@@ -231,7 +297,11 @@ export default function ReservationsCard() {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache'
         },
-        body: JSON.stringify(newReservation)
+        body: JSON.stringify({
+          ...newReservation,
+          subnetId: selectedVlanId,
+          subnetCidr: ipRange
+        })
       })
 
       if (response.ok) {
@@ -300,7 +370,8 @@ export default function ReservationsCard() {
         },
         body: JSON.stringify({
           ...newReservation,
-          originalIp: originalReservation['ip-address']
+          originalIp: originalReservation['ip-address'],
+          subnetId: selectedVlanId
         })
       })
 
@@ -454,6 +525,31 @@ export default function ReservationsCard() {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  // Add handler for VLAN selection
+  const handleVlanChange = (e: SelectChangeEvent<string>) => {
+    const newVlanId = e.target.value
+    setSelectedVlanId(newVlanId)
+    
+    if (newVlanId === '1') {
+      // For default VLAN, get IP range from network settings IP pools
+      fetch('/api/network-settings')
+        .then(response => response.json())
+        .then(networkSettings => {
+          if (networkSettings.ipPools && networkSettings.ipPools.length > 0) {
+            const pool = networkSettings.ipPools[0]
+            setIpRange(`${pool.start}-${pool.end}`)
+          }
+        })
+        .catch(error => console.error('Error fetching network settings:', error))
+    } else {
+      // For other VLANs, get the IP range from the VLAN data
+      const selectedVlan = vlans.find(vlan => vlan.id.toString() === newVlanId)
+      if (selectedVlan?.ipRange) {
+        setIpRange(`${selectedVlan.ipRange.start}-${selectedVlan.ipRange.end}`)
+      }
+    }
+  }
+
   return (
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
@@ -463,7 +559,53 @@ export default function ReservationsCard() {
             ({process.env.NODE_ENV === 'production' ? 'prod' : 'dev'})
           </span>
         </h3>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <FormControl size="small" className="min-w-[120px]">
+            <Select
+              value={selectedVlanId}
+              onChange={handleVlanChange}
+              className="text-gray-700 dark:text-gray-200"
+              disabled={loadingVlans}
+              sx={{
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'inherit',
+                '.MuiSelect-select': {
+                  paddingTop: '0.25rem',
+                  paddingBottom: '0.25rem',
+                },
+                '.MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '.MuiSelect-icon': {
+                  color: 'white',
+                }
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                    }
+                  }
+                }
+              }}
+            >
+              <MenuItem value="1">Default</MenuItem>
+              {vlans.map((vlan) => (
+                <MenuItem key={vlan.id} value={vlan.id.toString()}>
+                  {vlan.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <RefreshIcon 
             onClick={() => {
               const controller = new AbortController();
@@ -495,7 +637,7 @@ export default function ReservationsCard() {
                 'ip-address': e.target.value
               })
             }
-            placeholder="IP Address"
+            placeholder={`IP Address (Range: ${ipRange})`}
             className="px-2 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
           />
           <input
@@ -556,7 +698,7 @@ export default function ReservationsCard() {
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="align-top">
             {reservations.length === 0 && (
               <tr>
                 <td colSpan={3} className="px-1 py-2 text-center text-xs text-gray-500 dark:text-gray-400">
