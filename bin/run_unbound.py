@@ -62,6 +62,9 @@ BLOCKED_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Regex for syslog switch message
+SYSLOG_SWITCH_REGEX = re.compile(r"switching log to syslog")
+
 # Pending records stored in a deque.
 pending_queue = deque(maxlen=MAX_PENDING)
 
@@ -306,10 +309,6 @@ def print_stats_line():
     # Use carriage return only (no newline)
     print("\r" + padded_stats, end="", flush=True)
 
-# Remove the time-based throttling since we're going back to continuous updates
-last_stats_time = 0
-STATS_INTERVAL = 5  # seconds between stats updates
-
 def main():
     global total_processed, total_errors, total_allowed, total_blocked, proc
     db_cnx = init_mysql()
@@ -328,6 +327,16 @@ def main():
             line = proc.stdout.readline()
             if not line:
                 break
+
+            # Check for syslog switch message
+            if SYSLOG_SWITCH_REGEX.search(line):
+                print("\nWARNING: Unbound is switching to syslog output. This means the script won't be able to capture DNS queries.")
+                print("To fix this, you need to modify your Unbound configuration to prevent syslog output.")
+                print("Add or modify these lines in your Unbound config file:")
+                print("  verbosity: 5")
+                print("  use-syslog: no")
+                print("\nExiting...")
+                sys.exit(1)
 
             # Process any line that contains " A IN" or "always_null"
             if " A IN" not in line and "always_null" not in line.lower():
