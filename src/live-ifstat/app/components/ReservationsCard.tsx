@@ -114,7 +114,6 @@ export default function ReservationsCard() {
   const fetchReservations = useCallback(async (signal?: AbortSignal) => {
     try {
       setIsLoading(true)
-      console.log('[ReservationsCard] Fetching reservations...')
 
       const [reservationsResponse, dnsHostsResponse] = await Promise.all([
         fetch(`/api/reservations?t=${Date.now()}&subnetId=${selectedVlanId}`, {
@@ -139,53 +138,13 @@ export default function ReservationsCard() {
       const reservationsData = await reservationsResponse.json()
       const dnsHostsData = await dnsHostsResponse.json()
 
-      // Debug logging to understand data format
-      console.log('DNS hosts data format:', JSON.stringify(dnsHostsData).substring(0, 200) + '...')
-      console.log('First few IPs from reservations:', reservationsData.slice(0, 3).map((r: Reservation) => r['ip-address']))
-      console.log('Are IPs found in dnsHostsData?', reservationsData.slice(0, 3).map((r: Reservation) => ({ 
-        ip: r['ip-address'], 
-        found: dnsHostsData[r['ip-address']] !== undefined 
-      })))
-      
-      // Check if the dnsHostsData might have a different structure (entries array)
-      if (dnsHostsData.entries && Array.isArray(dnsHostsData.entries)) {
-        console.log('dnsHostsData has entries array structure')
-        
-        // Check if this is the "No DNS entries found" message
-        if (dnsHostsData.entries.length === 1 && 
-            dnsHostsData.entries[0].ip === "No DNS entries found.") {
-          console.log('API returned "No DNS entries found" message')
-          // Just use empty mapping since there are no DNS entries
-          const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
-            ...reservation,
-            hostname: reservation.hostname || '' // Keep any existing hostname if present
-          }))
-          setReservations(reservationsWithHostnames)
-        } else {
-          // Create a mapping from IP to hostname
-          const hostnamesMapping: Record<string, string> = {};
-          dnsHostsData.entries.forEach((entry: { ip: string, hostnames: string[] }) => {
-            if (entry.ip && entry.hostnames && entry.hostnames.length > 0) {
-              hostnamesMapping[entry.ip] = entry.hostnames[0];
-            }
-          });
-          
-          // Use this mapping instead
-          const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
-            ...reservation,
-            hostname: hostnamesMapping[reservation['ip-address']] || ''
-          }))
-          setReservations(reservationsWithHostnames)
-        }
-      } else {
-        // Map DNS hostnames to reservations using original logic
-        const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
-          ...reservation,
-          hostname: dnsHostsData[reservation['ip-address']] || ''
-        }))
-        setReservations(reservationsWithHostnames)
-      }
+      // Map DNS hostnames to reservations
+      const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
+        ...reservation,
+        hostname: dnsHostsData[reservation['ip-address']] || ''
+      }))
 
+      setReservations(reservationsWithHostnames)
       setError(null)
     } catch (error) {
       console.error('Error fetching reservations:', error)
