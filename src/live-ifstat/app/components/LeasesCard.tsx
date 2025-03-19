@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react'
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useRefresh } from '../contexts/RefreshContext'
+import { VLANConfig } from '@/types/dashboard'
+import MenuItem from '@mui/material/MenuItem'
+import Select from '@mui/material/Select'
+import FormControl from '@mui/material/FormControl'
+import { SelectChangeEvent } from '@mui/material/Select'
 
 interface Lease {
   ip_address: string
@@ -31,17 +36,40 @@ export default function LeasesCard() {
   const [savingHostnames, setSavingHostnames] = useState<{[key: string]: boolean}>({});
   const { triggerRefresh, registerRefreshCallback } = useRefresh()
   const [processingClients, setProcessingClients] = useState<{[key: string]: boolean}>({});
+  const [vlans, setVlans] = useState<VLANConfig[]>([])
+  const [selectedVlanId, setSelectedVlanId] = useState<string>('1')
+  const [loadingVlans, setLoadingVlans] = useState<boolean>(false)
+
+  useEffect(() => {
+    fetchVlans()
+    return () => {}
+  }, [])
 
   useEffect(() => {
     fetchLeases()
     return registerRefreshCallback(fetchLeases)
-  }, [registerRefreshCallback])
+  }, [registerRefreshCallback, selectedVlanId])
+
+  const fetchVlans = async () => {
+    setLoadingVlans(true)
+    try {
+      const response = await fetch('/api/vlans')
+      if (!response.ok) throw new Error('Failed to fetch VLANs')
+      const data = await response.json()
+      setVlans(data)
+    } catch (error) {
+      console.error('Error fetching VLANs:', error)
+    } finally {
+      setLoadingVlans(false)
+    }
+  }
 
   const fetchLeases = async () => {
     try {
+      setError('') // Clear any existing errors
       const [leasesData, reservationsData] = await Promise.all([
-        fetch('/api/leases').then(res => res.json()),
-        fetch('/api/reservations').then(res => res.json())
+        fetch(`/api/leases?subnetId=${selectedVlanId}`).then(res => res.json()),
+        fetch(`/api/reservations?subnetId=${selectedVlanId}`).then(res => res.json())
       ])
 
       // Ensure leasesData is an array
@@ -62,14 +90,51 @@ export default function LeasesCard() {
     }
   }
 
+  const handleVlanChange = (e: SelectChangeEvent<string>) => {
+    setSelectedVlanId(e.target.value)
+  }
+
   const handleReserve = async (lease: Lease) => {
     try {
       setProcessingClients(prev => ({ ...prev, [lease.ip_address]: true }));
+      
+      // Debug logging
+      console.log('Available VLANs:', vlans);
+      console.log('Selected VLAN ID:', selectedVlanId);
+      
+      let subnetCidr: string;
+      
+      // Handle default VLAN (id: 1) separately
+      if (selectedVlanId === '1') {
+        subnetCidr = '192.168.1.1-192.168.1.254'; // Default VLAN CIDR range
+      } else {
+        // Get the selected VLAN's subnet range
+        const selectedVlan = vlans.find(v => v.id === parseInt(selectedVlanId));
+        console.log('Found VLAN:', selectedVlan);
+        
+        if (!selectedVlan) {
+          console.error('VLAN lookup failed:', {
+            vlans,
+            selectedVlanId,
+            parsedId: parseInt(selectedVlanId)
+          });
+          throw new Error('Selected VLAN not found');
+        }
+        subnetCidr = selectedVlan.subnet;
+      }
+
+      // Use edited name if it exists, otherwise use the current device name
+      const hostname = editedNames[lease.ip_address] || lease.device_name;
+
       const reservation = {
         'ip-address': lease.ip_address,
         'hw-address': lease.mac_address,
-        'hostname': lease.device_name
+        'hostname': hostname,
+        subnetId: selectedVlanId,
+        subnetCidr: subnetCidr
       }
+
+      console.log('Creating reservation with:', reservation);
 
       const response = await fetch('/api/reservations', {
         method: 'POST',
@@ -78,10 +143,56 @@ export default function LeasesCard() {
       })
 
       if (response.ok) {
+        // Update DNS hostname
+        const dnsResponse = await fetch('/api/dns-hosts', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ip: lease.ip_address,
+            oldHostname: lease.device_name,
+            newHostname: hostname,
+            mac: lease.mac_address,
+            subnetId: selectedVlanId
+          })
+        });
+
+        if (!dnsResponse.ok) {
+          const errorText = await dnsResponse.text();
+          console.error('Failed to update hostname:', errorText);
+          setError('Failed to update hostname');
+          return;
+        }
+
+        // Clear the edited name after successful reservation
+        setEditedNames(prev => {
+          const newState = { ...prev };
+          delete newState[lease.ip_address];
+          return newState;
+        });
         await fetchLeases()
         triggerRefresh()
       } else {
-        setError('Failed to create reservation')
+        // Try to get error details
+        let errorMessage = 'Failed to create reservation';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // If not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              errorMessage = errorText;
+            }
+          } catch {
+            // If text also fails, use status text
+            errorMessage = `${response.status} ${response.statusText}`;
+          }
+        }
+        console.error('Failed to create reservation:', errorMessage);
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('Error creating reservation:', error)
@@ -101,7 +212,8 @@ export default function LeasesCard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ip: lease.ip_address,
-          mac: lease.mac_address
+          mac: lease.mac_address,
+          subnetId: selectedVlanId
         })
       });
 
@@ -241,7 +353,8 @@ export default function LeasesCard() {
             body: JSON.stringify({
               'ip-address': lease.ip_address,
               'hw-address': lease.mac_address,
-              'hostname': editedName
+              'hostname': editedName,
+              subnetId: selectedVlanId
             })
           });
 
@@ -261,7 +374,8 @@ export default function LeasesCard() {
             ip: lease.ip_address,
             oldHostname: lease.device_name,
             newHostname: editedName,
-            mac: lease.mac_address
+            mac: lease.mac_address,
+            subnetId: selectedVlanId
           })
         });
 
@@ -299,10 +413,58 @@ export default function LeasesCard() {
     <div className="p-3 h-full flex flex-col">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Active DHCP Leases</h3>
-        <RefreshIcon 
-          onClick={fetchLeases}
-          className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
-        />
+        <div className="flex gap-2 items-center">
+          <FormControl size="small" className="min-w-[120px]">
+            <Select
+              value={selectedVlanId}
+              onChange={handleVlanChange}
+              className="text-gray-700 dark:text-gray-200"
+              disabled={loadingVlans}
+              sx={{
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'inherit',
+                '.MuiSelect-select': {
+                  paddingTop: '0.25rem',
+                  paddingBottom: '0.25rem',
+                },
+                '.MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '.MuiSelect-icon': {
+                  color: 'white',
+                }
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                    }
+                  }
+                }
+              }}
+            >
+              <MenuItem value="1">Default</MenuItem>
+              {vlans.map((vlan) => (
+                <MenuItem key={vlan.id} value={vlan.id.toString()}>
+                  {vlan.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <RefreshIcon 
+            onClick={fetchLeases}
+            className="w-2 h-2 btn-icon btn-icon-blue transform scale-25"
+          />
+        </div>
       </div>
 
       {error && (

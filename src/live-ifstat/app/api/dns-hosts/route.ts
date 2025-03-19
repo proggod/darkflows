@@ -1,9 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { readConfig } from '@/lib/config'
 import { syncAllSystems } from '@/lib/sync'
-import mysql from 'mysql2/promise'
+import { getDbConnection } from '@/lib/db'
 
 const execAsync = promisify(exec)
 const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py'
@@ -28,23 +27,6 @@ function parseListOutput(output: string): DnsEntry[] {
   } catch (error) {
     console.error('Error parsing list output:', error)
     return []
-  }
-}
-
-const getDbConnection = async () => {
-  try {
-    const config = await readConfig()
-    const dbConfig = config.Dhcp4['lease-database']
-    
-    return mysql.createConnection({
-      socketPath: '/var/run/mysqld/mysqld.sock',
-      user: dbConfig.user,
-      password: dbConfig.password,
-      database: dbConfig.name
-    })
-  } catch (error) {
-    console.error('Error connecting to database:', error)
-    throw new Error('Failed to connect to database')
   }
 }
 

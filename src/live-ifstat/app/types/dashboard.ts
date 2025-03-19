@@ -128,6 +128,7 @@ export interface CommunicationGroup {
 export interface VLANConfig {
   id: number;
   name: string;
+  cidr: string;
   networkCard: NetworkCard;
   subnet: string;
   gateway: string;

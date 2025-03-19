@@ -3,10 +3,9 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { requireAuth } from '@/lib/auth';
 import mysql from 'mysql2/promise';
-import { getDbConnection } from '@/lib/db';
 import { readConfig } from '@/lib/config';
 import { syncAllSystems } from '@/lib/sync';
-import { promises as fs } from 'fs';
+
 
 const execAsync = promisify(exec);
 const DNS_MANAGER_SCRIPT = '/usr/local/darkflows/bin/unbound-dns-manager.py';
@@ -365,17 +364,3 @@ async function getSubnetIdForIp(ip: string | undefined, subnetId: string, subnet
   }
 }
 
-// Helper function to check if an IP is in a subnet
-function isIpInSubnet(ip: string, cidr: string): boolean {
-  try {
-    const [subnet, bits] = cidr.split('/');
-    const mask = ~(2 ** (32 - parseInt(bits)) - 1);
-    
-    const ipNum = ipToNumber(ip);
-    const subnetNum = ipToNumber(subnet);
-    
-    return (ipNum & mask) === (subnetNum & mask);
-  } catch {
-    return false;
-  }
-} 
