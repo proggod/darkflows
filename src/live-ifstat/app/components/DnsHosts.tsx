@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import CloseIcon from '@mui/icons-material/Close'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import AddIcon from '@mui/icons-material/Add'
@@ -47,7 +47,7 @@ export default function DnsHosts() {
     fetchVlans()
   }, [])
 
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/dns-hosts?subnetId=${selectedVlanId}`, {
@@ -80,12 +80,12 @@ export default function DnsHosts() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedVlanId])
 
   useEffect(() => {
     fetchEntries()
     return registerRefreshCallback(fetchEntries)
-  }, [registerRefreshCallback, selectedVlanId])
+  }, [registerRefreshCallback, selectedVlanId, fetchEntries])
 
   const handleVlanChange = (e: SelectChangeEvent<string>) => {
     setSelectedVlanId(e.target.value)

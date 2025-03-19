@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import mysql from 'mysql2/promise';
 import { promises as fs } from 'fs';
-import { readConfig } from '@/lib/config';
 import { NextRequest } from 'next/server';
 
 // interface LeaseData {

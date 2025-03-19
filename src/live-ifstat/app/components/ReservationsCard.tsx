@@ -3,7 +3,7 @@
 // Add noStore directive to prevent caching
 import { unstable_noStore as noStore } from 'next/cache';
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -61,7 +61,7 @@ export default function ReservationsCard() {
     'hw-address': '',
     hostname: ''
   })
-  const [error, setError] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [editedNames, setEditedNames] = useState<{ [key: string]: string }>({})
@@ -84,10 +84,10 @@ export default function ReservationsCard() {
         fetch('/api/vlans'),
         fetch('/api/network-settings')
       ])
-      
+
       if (!vlansResponse.ok) throw new Error('Failed to fetch VLANs')
       if (!networkSettingsResponse.ok) throw new Error('Failed to fetch network settings')
-      
+
       const [vlansData, networkSettings] = await Promise.all([
         vlansResponse.json(),
         networkSettingsResponse.json()
@@ -111,22 +111,97 @@ export default function ReservationsCard() {
     fetchVlans()
   }, [])
 
+  const fetchReservations = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setIsLoading(true)
+      console.log('[ReservationsCard] Fetching reservations...')
+
+      const [reservationsResponse, dnsHostsResponse] = await Promise.all([
+        fetch(`/api/reservations?t=${Date.now()}&subnetId=${selectedVlanId}`, {
+          signal,
+          headers: {
+            'Cache-Control': 'no-cache',
+          },
+        }),
+        fetch(`/api/dns-hosts?t=${Date.now()}`, {
+          signal,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
+      ])
+
+      if (!reservationsResponse.ok) throw new Error('Failed to fetch reservations')
+      if (!dnsHostsResponse.ok) throw new Error('Failed to fetch DNS hosts')
+
+      const reservationsData = await reservationsResponse.json()
+      const dnsHostsData = await dnsHostsResponse.json()
+
+      // Debug logging to understand data format
+      console.log('DNS hosts data format:', JSON.stringify(dnsHostsData).substring(0, 200) + '...')
+      console.log('First few IPs from reservations:', reservationsData.slice(0, 3).map((r: Reservation) => r['ip-address']))
+      console.log('Are IPs found in dnsHostsData?', reservationsData.slice(0, 3).map((r: Reservation) => ({ 
+        ip: r['ip-address'], 
+        found: dnsHostsData[r['ip-address']] !== undefined 
+      })))
+      
+      // Check if the dnsHostsData might have a different structure (entries array)
+      if (dnsHostsData.entries && Array.isArray(dnsHostsData.entries)) {
+        console.log('dnsHostsData has entries array structure')
+        
+        // Check if this is the "No DNS entries found" message
+        if (dnsHostsData.entries.length === 1 && 
+            dnsHostsData.entries[0].ip === "No DNS entries found.") {
+          console.log('API returned "No DNS entries found" message')
+          // Just use empty mapping since there are no DNS entries
+          const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
+            ...reservation,
+            hostname: reservation.hostname || '' // Keep any existing hostname if present
+          }))
+          setReservations(reservationsWithHostnames)
+        } else {
+          // Create a mapping from IP to hostname
+          const hostnamesMapping: Record<string, string> = {};
+          dnsHostsData.entries.forEach((entry: { ip: string, hostnames: string[] }) => {
+            if (entry.ip && entry.hostnames && entry.hostnames.length > 0) {
+              hostnamesMapping[entry.ip] = entry.hostnames[0];
+            }
+          });
+          
+          // Use this mapping instead
+          const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
+            ...reservation,
+            hostname: hostnamesMapping[reservation['ip-address']] || ''
+          }))
+          setReservations(reservationsWithHostnames)
+        }
+      } else {
+        // Map DNS hostnames to reservations using original logic
+        const reservationsWithHostnames = reservationsData.map((reservation: Reservation) => ({
+          ...reservation,
+          hostname: dnsHostsData[reservation['ip-address']] || ''
+        }))
+        setReservations(reservationsWithHostnames)
+      }
+
+      setError(null)
+    } catch (error) {
+      console.error('Error fetching reservations:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load reservations')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [selectedVlanId]);
+
   useEffect(() => {
-    console.log('[ReservationsCard] useEffect triggered')
     let mounted = true;
     const controller = new AbortController();
 
     const fetchData = async () => {
       if (!mounted) return;
-      try {
-        await fetchReservations(controller.signal);
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.log('[ReservationsCard] Fetch aborted');
-          return;
-        }
-        throw error;
-      }
+      await fetchReservations(controller.signal);
     };
 
     fetchData();
@@ -137,72 +212,7 @@ export default function ReservationsCard() {
       controller.abort();
       if (unregister) unregister();
     };
-  }, [registerRefreshCallback, selectedVlanId]);
-
-  const fetchReservations = async (signal?: AbortSignal) => {
-    try {
-      setIsLoading(true)
-      console.log('[ReservationsCard] Fetching reservations...')
-
-      const [reservationsResponse, dnsHostsResponse] = await Promise.all([
-        fetch(`/api/reservations?t=${Date.now()}&subnetId=${selectedVlanId}`, {
-          signal,
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          }
-        }),
-        fetch(`/api/dns-hosts?t=${Date.now()}`, {
-          signal
-        })
-      ])
-
-      if (!reservationsResponse.ok) {
-        console.error(
-          `[ReservationsCard] Server responded with error: ${reservationsResponse.status} ${reservationsResponse.statusText}`
-        )
-        setError(`Failed to load reservations: ${reservationsResponse.status} ${reservationsResponse.statusText}`)
-        return
-      }
-
-      console.log('[ReservationsCard] Response received, parsing JSON')
-      const [reservationsData, dnsHostsData] = await Promise.all([
-        reservationsResponse.json(),
-        dnsHostsResponse.ok ? dnsHostsResponse.json() : []
-      ])
-
-      if (Array.isArray(reservationsData)) {
-        // Ensure dnsHostsData is an array and has the expected structure
-        const dnsHosts = Array.isArray(dnsHostsData) ? dnsHostsData : [];
-        console.log('[ReservationsCard] DNS Hosts:', dnsHosts.length);
-
-        // Merge DNS host information with reservations
-        const enrichedReservations = reservationsData.map(reservation => ({
-          ...reservation,
-          hostname: dnsHosts.find((host: { ip: string }) => 
-            host.ip === reservation['ip-address']
-          )?.hostname || reservation.hostname || ''
-        }))
-
-        console.log(`[ReservationsCard] Successfully loaded ${enrichedReservations.length} reservations`)
-        setReservations(enrichedReservations)
-        setError('')
-      } else {
-        console.error('[ReservationsCard] Expected array but got:', reservationsData)
-        setError('Received invalid data format from server')
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error('[ReservationsCard] Error fetching reservations:', error)
-        setError(`Failed to load reservations: ${error.message}`)
-      } else {
-        console.error('[ReservationsCard] Unknown error fetching reservations')
-        setError('Failed to load reservations: Unknown error')
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [registerRefreshCallback, selectedVlanId, fetchReservations]);
 
   const handleDelete = async (reservation: Reservation) => {
     if (confirm('Are you sure you want to delete this reservation?')) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useRefresh } from '../contexts/RefreshContext';
 import { VLANConfig } from '@/types/dashboard';
@@ -62,7 +62,7 @@ export function DnsClientsCard() {
     setSelectedVlanId(event.target.value);
   };
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -115,7 +115,7 @@ export function DnsClientsCard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedVlanId]);
 
   const handleNameChange = (ip: string, newName: string) => {
     setEditedNames(prev => ({
@@ -471,7 +471,7 @@ export function DnsClientsCard() {
     return () => {
       cleanup();
     };
-  }, [registerRefreshCallback, selectedVlanId]);
+  }, [registerRefreshCallback, selectedVlanId, fetchClients]);
 
   return (
     <div className="p-3 h-full flex flex-col">

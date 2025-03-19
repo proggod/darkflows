@@ -4,8 +4,15 @@ const nextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000']
-    }
+    },
+    // Disable static optimization
+    optimizeCss: false,
+    // Increase timeouts for the build process
+    staticWorkerTimeout: 120000, // 2 minutes in milliseconds
+    staticGenerationTimeout: 120000, // 2 minutes in milliseconds
   },
+  // Moved from experimental.serverComponentsExternalPackages 
+  serverExternalPackages: ['sharp'],
   logging: {
     fetches: {
       fullUrl: true
@@ -34,23 +41,11 @@ const nextConfig = {
       ],
     },
   ],
-  // Disable static optimization
-  staticPageGenerationTimeout: 0,
+  // Change from 0 to a reasonable timeout value
+  staticPageGenerationTimeout: 120000, // 2 minutes in milliseconds
   // Disable image optimization caching
   images: {
     unoptimized: true,
-  },
-  // Disable route caching
-  experimental: {
-    // ... existing experimental config ...
-    // Disable route caching
-    serverActions: {
-      allowedOrigins: ['localhost:3000']
-    },
-    // Disable static optimization
-    optimizeCss: false,
-    // Disable static page generation
-    staticPageGenerationTimeout: 0,
   },
   typescript: {
     ignoreBuildErrors: true,

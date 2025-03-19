@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 
 interface BandwidthStats {
   last_2s_sent: string;
@@ -65,16 +66,28 @@ export default function BandwidthUsage() {
   const [bandwidthData, setBandwidthData] = useState<{ [ip: string]: BandwidthStats }>({});
   const [hostnames, setHostnames] = useState<{ [ip: string]: string }>({});
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [sortField, setSortField] = useState<SortField>('total');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedIP, setSelectedIP] = useState<string | null>(null);
   const [detailedStats, setDetailedStats] = useState<DetailedStats | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [staleIPs, setStaleIPs] = useState<Set<string>>(new Set());
   
+  const parseValue = useCallback((value: string | undefined) => {
+    if (!value) return 0;
+    const num = parseFloat(value);
+    if (isNaN(num)) return 0;
+    if (value.includes('Mb')) return num * 1000000;
+    if (value.includes('MB')) return num * 1000000;
+    if (value.includes('Kb')) return num * 1000;
+    if (value.includes('KB')) return num * 1000;
+    if (value.includes('b')) return num;
+    return 0;
+  }, []);
+  
   // Utility to check if an IP is likely stale
-  const checkForStaleIPs = (hosts: { [ip: string]: BandwidthStats }, hostnames: { [ip: string]: string }): Set<string> => {
+  const checkForStaleIPs = useCallback((hosts: { [ip: string]: BandwidthStats }, hostnames: { [ip: string]: string }): Set<string> => {
     const staleSet = new Set<string>();
     
     Object.entries(hosts).forEach(([ip, stats]) => {
@@ -90,11 +103,11 @@ export default function BandwidthUsage() {
     });
     
     return staleSet;
-  };
+  }, [parseValue]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       
       // Add timestamp for cache busting
       const timestamp = Date.now();
@@ -150,12 +163,12 @@ export default function BandwidthUsage() {
       setBandwidthData({});
       setHostnames({});
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
+  }, [checkForStaleIPs]);
 
   const fetchDetailedStats = async (ip: string) => {
-    setIsLoading(true);
+    setIsLoadingDetails(true);
     try {
       const encodedIP = encodeURIComponent(ip);
       // Add timestamp for cache busting
@@ -182,7 +195,7 @@ export default function BandwidthUsage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error fetching connection details');
     } finally {
-      setIsLoading(false);
+      setIsLoadingDetails(false);
     }
   };
 
@@ -190,28 +203,16 @@ export default function BandwidthUsage() {
     fetchData();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
 
-  const parseValue = (value: string | undefined) => {
-    if (!value) return 0;
-    const num = parseFloat(value);
-    if (isNaN(num)) return 0;
-    if (value.includes('Mb')) return num * 1000000;
-    if (value.includes('MB')) return num * 1000000;
-    if (value.includes('Kb')) return num * 1000;
-    if (value.includes('KB')) return num * 1000;
-    if (value.includes('b')) return num;
-    return 0;
-  };
-
-  const handleSort = (field: SortField) => {
+  const handleSort = useCallback((field: SortField) => {
     if (field === sortField) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('desc');
     }
-  };
+  }, [sortField, sortDirection, setSortField, setSortDirection]);
 
   const sortedIPs = Object.entries(bandwidthData)
     .sort(([ipA, a], [ipB, b]) => {
@@ -251,16 +252,18 @@ export default function BandwidthUsage() {
     })
     .map(([ip]) => ip);
 
-  const SortArrow = ({ field }: { field: SortField }) => {
+  const SortArrow = React.memo(({ field }: { field: SortField }) => {
     if (field !== sortField) return null;
     return (
       <span className="ml-1 text-gray-400">
         {sortDirection === 'asc' ? '↑' : '↓'}
       </span>
     );
-  };
+  });
+  
+  SortArrow.displayName = 'SortArrow';
 
-  if (loading && Object.keys(bandwidthData).length === 0) {
+  if (isLoading && Object.keys(bandwidthData).length === 0) {
     return (
       <div className="text-gray-600 dark:text-gray-400 p-4">
         Loading bandwidth data...
@@ -405,7 +408,7 @@ export default function BandwidthUsage() {
               </button>
             </div>
             
-            {isLoading ? (
+            {isLoadingDetails ? (
               <div className="flex justify-center items-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
               </div>

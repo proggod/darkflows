@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useRefresh } from '../contexts/RefreshContext'
 import { VLANConfig } from '@/types/dashboard'
@@ -16,11 +16,6 @@ interface Lease {
   expire: Date | null
   state_name: string
   is_reserved?: boolean
-}
-
-interface ReservationData {
-  'ip-address': string
-  'hw-address': string
 }
 
 type SortField = 'ip_address' | 'mac_address' | 'device_name' | 'status';
@@ -39,6 +34,21 @@ export default function LeasesCard() {
   const [vlans, setVlans] = useState<VLANConfig[]>([])
   const [selectedVlanId, setSelectedVlanId] = useState<string>('1')
   const [loadingVlans, setLoadingVlans] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  const fetchLeases = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/leases?vlan_id=${selectedVlanId}`)
+      if (!response.ok) throw new Error('Failed to fetch leases')
+      const data = await response.json()
+      setLeases(data)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Error fetching leases')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [selectedVlanId])
 
   useEffect(() => {
     fetchVlans()
@@ -48,7 +58,7 @@ export default function LeasesCard() {
   useEffect(() => {
     fetchLeases()
     return registerRefreshCallback(fetchLeases)
-  }, [registerRefreshCallback, selectedVlanId])
+  }, [registerRefreshCallback, selectedVlanId, fetchLeases])
 
   const fetchVlans = async () => {
     setLoadingVlans(true)
@@ -61,32 +71,6 @@ export default function LeasesCard() {
       console.error('Error fetching VLANs:', error)
     } finally {
       setLoadingVlans(false)
-    }
-  }
-
-  const fetchLeases = async () => {
-    try {
-      setError('') // Clear any existing errors
-      const [leasesData, reservationsData] = await Promise.all([
-        fetch(`/api/leases?subnetId=${selectedVlanId}`).then(res => res.json()),
-        fetch(`/api/reservations?subnetId=${selectedVlanId}`).then(res => res.json())
-      ])
-
-      // Ensure leasesData is an array
-      const leasesArray = Array.isArray(leasesData) ? leasesData : [];
-      
-      // Mark leases that are reserved
-      const markedLeases = leasesArray.map((lease: Lease) => ({
-        ...lease,
-        is_reserved: reservationsData.some((r: ReservationData) => 
-          r['ip-address'] === lease.ip_address || 
-          r['hw-address'].toLowerCase() === lease.mac_address.toLowerCase()
-        )
-      }))
-      setLeases(markedLeases)
-    } catch (error) {
-      console.error('Error fetching leases:', error)
-      setError('Failed to load leases')
     }
   }
 
@@ -474,76 +458,82 @@ export default function LeasesCard() {
       )}
 
       <div className="overflow-auto flex-grow -mx-3">
-        <table className="w-full h-full table-container">
-          <thead className="sticky top-0 z-10">
-            <tr className="table-header">
-              <th className="w-[80px] card-hover" onClick={() => handleSort('ip_address')}>IP<SortArrow field="ip_address" /></th>
-              <th className="card-hover" onClick={() => handleSort('device_name')}>Name<SortArrow field="device_name" /></th>
-              <th className="w-[80px] card-hover" onClick={() => handleSort('status')}>Status<SortArrow field="status" /></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedLeases.map((lease, index) => (
-              <tr 
-                key={lease.ip_address} 
-                className={`card-hover ${
-                  index % 2 === 0 ? '' : 'card-alternate'
-                } ${index === sortedLeases.length - 1 ? 'last-row' : ''}`}
-              >
-                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
-                  {lease.ip_address}
-                </td>
-                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  {editingHostname === lease.ip_address ? (
-                    <input
-                      type="text"
-                      value={editedNames[lease.ip_address] ?? ''}
-                      onChange={(e) => handleNameChange(lease.ip_address, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, lease)}
-                      onBlur={() => setEditingHostname(null)}
-                      className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
-                        isProcessing(lease.ip_address) ? 'opacity-50' : ''
-                      }`}
-                      disabled={isProcessing(lease.ip_address)}
-                      autoFocus
-                      placeholder="N/A"
-                    />
-                  ) : (
-                    <span
-                      onClick={() => startHostnameEdit(lease.ip_address, lease.device_name || '')}
-                      className="cursor-pointer hover:text-blue-500"
-                    >
-                      {lease.device_name || 'N/A'}
-                    </span>
-                  )}
-                </td>
-                <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
-                  {lease.is_reserved ? (
-                    <button
-                      onClick={() => handleRemoveReservation(lease)}
-                      disabled={isProcessing(lease.ip_address)}
-                      className={`h-6 px-2 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 transition-colors w-[72px] ${
-                        isProcessing(lease.ip_address) ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      {isProcessing(lease.ip_address) ? 'SAVING...' : 'REMOVE'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleReserve(lease)}
-                      disabled={isProcessing(lease.ip_address)}
-                      className={`h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors w-[72px] ${
-                        isProcessing(lease.ip_address) ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                    >
-                      {isProcessing(lease.ip_address) ? 'SAVING...' : 'RESERVE'}
-                    </button>
-                  )}
-                </td>
+        {isLoading && leases.length === 0 ? (
+          <div className="text-center py-4 text-gray-600 dark:text-gray-400">Loading DHCP leases...</div>
+        ) : leases.length === 0 ? (
+          <div className="text-center py-4 text-gray-600 dark:text-gray-400">No DHCP leases found</div>
+        ) : (
+          <table className="w-full h-full table-container">
+            <thead className="sticky top-0 z-10">
+              <tr className="table-header">
+                <th className="w-[80px] card-hover" onClick={() => handleSort('ip_address')}>IP<SortArrow field="ip_address" /></th>
+                <th className="card-hover" onClick={() => handleSort('device_name')}>Name<SortArrow field="device_name" /></th>
+                <th className="w-[80px] card-hover" onClick={() => handleSort('status')}>Status<SortArrow field="status" /></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedLeases.map((lease, index) => (
+                <tr 
+                  key={lease.ip_address} 
+                  className={`card-hover ${
+                    index % 2 === 0 ? '' : 'card-alternate'
+                  } ${index === sortedLeases.length - 1 ? 'last-row' : ''}`}
+                >
+                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3 tabular-nums">
+                    {lease.ip_address}
+                  </td>
+                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                    {editingHostname === lease.ip_address ? (
+                      <input
+                        type="text"
+                        value={editedNames[lease.ip_address] ?? ''}
+                        onChange={(e) => handleNameChange(lease.ip_address, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(e, lease)}
+                        onBlur={() => setEditingHostname(null)}
+                        className={`w-full px-1 py-0 text-xs border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white ${
+                          isProcessing(lease.ip_address) ? 'opacity-50' : ''
+                        }`}
+                        disabled={isProcessing(lease.ip_address)}
+                        autoFocus
+                        placeholder="N/A"
+                      />
+                    ) : (
+                      <span
+                        onClick={() => startHostnameEdit(lease.ip_address, lease.device_name || '')}
+                        className="cursor-pointer hover:text-blue-500"
+                      >
+                        {lease.device_name || 'N/A'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-1 whitespace-nowrap text-xs text-gray-700 dark:text-gray-300 leading-3">
+                    {lease.is_reserved ? (
+                      <button
+                        onClick={() => handleRemoveReservation(lease)}
+                        disabled={isProcessing(lease.ip_address)}
+                        className={`h-6 px-2 py-0.5 bg-red-500 dark:bg-red-600 text-white rounded text-xs font-medium hover:bg-red-600 dark:hover:bg-red-700 focus:outline-none focus:ring-1 focus:ring-red-500 dark:focus:ring-red-400 transition-colors w-[72px] ${
+                          isProcessing(lease.ip_address) ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isProcessing(lease.ip_address) ? 'SAVING...' : 'REMOVE'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleReserve(lease)}
+                        disabled={isProcessing(lease.ip_address)}
+                        className={`h-6 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors w-[72px] ${
+                          isProcessing(lease.ip_address) ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {isProcessing(lease.ip_address) ? 'SAVING...' : 'RESERVE'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

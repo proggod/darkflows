@@ -25,6 +25,15 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+### v0.38
+- Added VLAN support to DNS clients
+- Added VLAN to active DHCP leases
+- Added VLAN to DNS hosts
+- Added VLAN support to DHCP reservations
+- Fixed bandwidth component issues
+- Fixed unbound template
+- Fixed default VLAN ID to 1 instead of 0 on DNS custom blocklists
+
 ### v0.37
 - Modified the blocklist fetch scripts
 - Modified and created scripts to run unbound for each VLAN so every VLAN gets its own DNS server
@@ -186,7 +195,3 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 
 
 
-TODO:
-- Fix unbound dns manager script to use the new vlan stuff
-- fix all reservations to use vlan stuff
-- make sure the dns custom blocklists use 1 for default instead of 0
