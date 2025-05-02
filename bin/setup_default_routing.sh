@@ -21,7 +21,10 @@ run_cmd "python3 /usr/local/darkflows/bin/verify_configs.py"
 run_cmd "/usr/local/darkflows/bin/setup_default_route.sh"
 
 run_cmd "/usr/local/darkflows/bin/nftables.sh"
+
 run_cmd "/usr/local/darkflows/bin/setup_vlans.sh"
+#run_cmd "/usr/local/darkflows/bin/disable_all_offloading.sh"
+
 run_cmd "/usr/local/darkflows/bin/setup_secondwan.sh"
 run_cmd "/usr/local/darkflows/bin/verify_dns.sh"
 run_cmd "/usr/local/darkflows/bin/update_external_forwards.sh"

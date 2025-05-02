@@ -25,6 +25,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+### v0.39
+- Updated NextJS for security reasons
+
 ### v0.38
 - Added VLAN support to DNS clients
 - Added VLAN to active DHCP leases

@@ -62,6 +62,41 @@ def get_blocklists_from_db(vlan_id: Optional[int] = None) -> List[Dict]:
         cursor = conn.cursor(MySQLdb.cursors.DictCursor)
         
         if vlan_id is not None:
+            if vlan_id == 0:
+                # For default VLAN, get blocklists for VLAN ID 0 or 1
+                query = f"SELECT id, name, url, vlan_id FROM {BLOCKLISTS_TABLE} WHERE vlan_id IN (0, 1)"
+                cursor.execute(query)
+            else:
+                query = f"SELECT id, name, url, vlan_id FROM {BLOCKLISTS_TABLE} WHERE vlan_id = %s"
+                cursor.execute(query, (vlan_id,))
+        else:
+            query = f"SELECT id, name, url, vlan_id FROM {BLOCKLISTS_TABLE}"
+            cursor.execute(query)
+            
+        blocklists = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return blocklists
+    except Exception as e:
+        print(f"Error getting blocklists from database: {e}", file=sys.stderr)
+        sys.exit(1)
+
+def get_blocklists_from_db_old(vlan_id: Optional[int] = None) -> List[Dict]:
+    """
+    Get blocklists from the database for a specific VLAN ID.
+    
+    Args:
+        vlan_id: The VLAN ID to get blocklists for, or None for all VLANs
+        
+    Returns:
+        List of blocklists with name, url, and vlan_id
+    """
+    try:
+        conn = MySQLdb.connect(db=DB_NAME, **DB_CONFIG)
+        cursor = conn.cursor(MySQLdb.cursors.DictCursor)
+        
+        if vlan_id is not None:
             query = f"SELECT id, name, url, vlan_id FROM {BLOCKLISTS_TABLE} WHERE vlan_id = %s"
             cursor.execute(query, (vlan_id,))
         else:

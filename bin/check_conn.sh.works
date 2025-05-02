@@ -200,10 +200,8 @@ update_ifb0() {
     # Attach ifb0 to new interface
     tc qdisc add dev "$new_interface" handle ffff: ingress
     tc filter replace dev "$new_interface" parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0
-    
-    # Use CAKE_PARAMS from config for ingress
-    tc qdisc add dev ifb0 root cake bandwidth "$ingress_bandwidth" $CAKE_PARAMS
-    log "CAKE ingress reconfigured for $new_interface with params: $CAKE_PARAMS"
+    tc qdisc add dev ifb0 root cake bandwidth "$ingress_bandwidth" memlimit 32mb ${CAKE_PARAMS:-}
+    log "CAKE ingress reconfigured for $new_interface."
 }
 
 # Function to configure CAKE for egress traffic
@@ -213,10 +211,8 @@ configure_cake_egress() {
 
     log "Configuring CAKE egress for $interface with bandwidth $bandwidth..."
     tc qdisc del dev "$interface" root > /dev/null 2>&1 || true
-    
-    # Use CAKE_PARAMS from config for egress
-    tc qdisc add dev "$interface" root cake bandwidth "$bandwidth" $CAKE_PARAMS
-    log "CAKE egress configured for $interface with params: $CAKE_PARAMS"
+    tc qdisc add dev "$interface" root cake bandwidth "$bandwidth" memlimit 32mb ${CAKE_PARAMS:-}
+    log "CAKE egress configured for $interface."
 }
 
 # Function to switch default route atomically and update monitoring routes
@@ -580,5 +576,4 @@ while true; do
     # Record the start time for the next iteration
     START_TIME=$(date +%s)
 done
-
 

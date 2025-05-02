@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# QoS Type Configuration - Set to "fq_codel" or "cake"
-QOS_TYPE="cake"
-
 sysctl -w net.ipv4.ip_forward=1
 sysctl -w net.ipv6.conf.all.disable_ipv6=1
 sysctl -w net.ipv6.conf.default.disable_ipv6=1
@@ -13,6 +10,9 @@ source /etc/darkflows/d_network.cfg || { echo "Failed to source network configur
 # Set CAKE parameters (default to empty string if not defined)
 COMMON_CAKE_PARAMS="${CAKE_PARAMS:-}"
 
+
+
+
 ############ CHANGE ######################
 # Flush existing rules
 echo "Flushing iptables rules..."
@@ -20,25 +20,31 @@ echo "Flushing iptables rules..."
 #iptables -t nat -F
 #iptables -t mangle -F
 #iptables -X
+
 #echo "Flushing nftables rules..."
 #nft flush ruleset
 
-# Flush only your tables/chains, not Docker's
+
+# Flush only your tables/chains, not Docker’s
 nft flush table inet filter 2>/dev/null || true
 nft delete table inet filter 2>/dev/null || true
 
-# Preserve Docker's NAT table
+# Preserve Docker’s NAT table
 if ! nft list table ip nat >/dev/null 2>&1; then
   nft add table ip nat
 fi
+
 ############ CHANGE ######################
+
 
 # Load and setup IFB
 modprobe ifb || { echo "Failed to load ifb module"; exit 1; }
+
 if ip link show ifb0 > /dev/null 2>&1; then
     echo "Deleting existing ifb0 interface..."
     ip link del ifb0 || { echo "Failed to delete ifb0 interface"; exit 1; }
 fi
+
 echo "Creating and enabling ifb0 interface..."
 ip link add ifb0 type ifb || { echo "Failed to create ifb0 interface"; exit 1; }
 ip link set ifb0 up || { echo "Failed to enable ifb0 interface"; exit 1; }
@@ -56,51 +62,32 @@ echo "Setting up ingress redirection..."
 tc qdisc add dev $PRIMARY_INTERFACE handle ffff: ingress || { echo "Failed to add ingress qdisc"; exit 1; }
 tc filter add dev $PRIMARY_INTERFACE parent ffff: protocol all u32 match u32 0 0 action mirred egress redirect dev ifb0 || { echo "Failed to add redirect filter"; exit 1; }
 
-# Configure QoS based on QOS_TYPE
-if [ "$QOS_TYPE" = "cake" ]; then
-    ### VERSION A - CAKE CONFIGURATION ###
-    # Primary interface (Upload)
-    echo "Configuring CAKE for $PRIMARY_INTERFACE (egress)..."
-    tc qdisc add dev $PRIMARY_INTERFACE root cake \
-        bandwidth ${PRIMARY_EGRESS_BANDWIDTH} \
-        $COMMON_CAKE_PARAMS
+### VERSION A START - AUTORATE-INGRESS ###
+# Primary interface (Upload)
+echo "Configuring CAKE for $PRIMARY_INTERFACE (egress)..."
+tc qdisc add dev $PRIMARY_INTERFACE root cake \
+    bandwidth ${PRIMARY_EGRESS_BANDWIDTH} \
+    $COMMON_CAKE_PARAMS 
 
-    # IFB0 (Download)
-    echo "Configuring CAKE for ifb0 (ingress)..."
-    tc qdisc add dev ifb0 root cake \
-        bandwidth ${PRIMARY_INGRESS_BANDWIDTH} \
-        $COMMON_CAKE_PARAMS
+# IFB0 (Download) - Using autorate-ingress with baseline from config
+echo "Configuring CAKE for ifb0 (ingress)..."
+tc qdisc add dev ifb0 root cake \
+    bandwidth ${PRIMARY_INGRESS_BANDWIDTH} \
+    $COMMON_CAKE_PARAMS 
 
-    # Internal interface
-    echo "Configuring CAKE for $INTERNAL_INTERFACE..."
-    tc qdisc add dev $INTERNAL_INTERFACE root cake \
-        bandwidth ${INTERNAL_EGRESS_BANDWIDTH} \
-        $COMMON_CAKE_PARAMS
 
-    # Secondary interface (if configured)
-    if [ -n "$SECONDARY_INTERFACE" ]; then
-        echo "Configuring CAKE for $SECONDARY_INTERFACE..."
-        tc qdisc add dev $SECONDARY_INTERFACE root cake \
-            bandwidth ${SECONDARY_EGRESS_BANDWIDTH} \
-            $COMMON_CAKE_PARAMS
-    fi
-else
+# Internal interface (same for both versions)
+echo "Configuring CAKE for $INTERNAL_INTERFACE..."
+tc qdisc add dev $INTERNAL_INTERFACE root cake \
+    bandwidth ${INTERNAL_EGRESS_BANDWIDTH} \
+    $COMMON_CAKE_PARAMS 
 
-    ### VERSION B - SIMPLE OPTIMIZED FQ_CODEL ###
-    # Primary interface (Upload)
-    echo "Configuring fq_codel for $PRIMARY_INTERFACE (egress)..."
-    tc qdisc add dev $PRIMARY_INTERFACE root fq_codel quantum 300 noecn
-
-    # IFB0 (Download) - Using simpler configuration
-    echo "Configuring fq_codel for ifb0 (ingress)..."
-    tc qdisc add dev ifb0 root fq_codel quantum 300 noecn
-
-    # Secondary interface (if configured)
-    if [ -n "$SECONDARY_INTERFACE" ]; then
-        echo "Configuring fq_codel for $SECONDARY_INTERFACE..."
-        tc qdisc add dev $SECONDARY_INTERFACE root fq_codel quantum 300 noecn
-    fi
-
+# Secondary interface (if configured)
+if [ -n "$SECONDARY_INTERFACE" ]; then
+    echo "Configuring CAKE for $SECONDARY_INTERFACE..."
+    tc qdisc add dev $SECONDARY_INTERFACE root cake \
+        bandwidth ${SECONDARY_EGRESS_BANDWIDTH} \
+        $COMMON_CAKE_PARAMS 
 fi
 
 # Set default policies
@@ -142,6 +129,7 @@ nft add rule inet filter input iif lo accept
 # Allow related incoming traffic for outgoing connections
 nft add rule inet filter input ct state established,related accept
 
+
 # NAT prerouting chain setup
 nft add chain ip nat prerouting { type nat hook prerouting priority 100 \; }
 
@@ -149,7 +137,7 @@ nft add chain ip nat prerouting { type nat hook prerouting priority 100 \; }
 nft add rule inet filter input iif "tailscale0" accept
 
 # Verify final configuration
-echo "### Verifying QoS configuration ($QOS_TYPE) ###"
+echo "### Verifying CAKE configuration ###"
 tc -s qdisc show dev $PRIMARY_INTERFACE
 tc -s qdisc show dev ifb0
 tc -s qdisc show dev $INTERNAL_INTERFACE
@@ -159,9 +147,9 @@ fi
 
 echo "### Verifying nftables configuration ###"
 nft list ruleset
+
 echo "Configuration applied successfully."
 
 #/usr/local/darkflows/bin/setup_blocking.sh
 /usr/local/darkflows/bin/setup_secondwan.sh
-
 
