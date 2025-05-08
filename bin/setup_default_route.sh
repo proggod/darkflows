@@ -7,10 +7,6 @@
 # Source the network configuration file
 source /etc/darkflows/d_network.cfg
 
-# Define monitoring IPs (keep these in sync with the monitor script)
-PRIMARY_MONITOR="8.8.4.4"
-SECONDARY_MONITOR="1.0.0.1"
-ADDITIONAL_MONITOR="8.8.8.8"
 
 # Define the lease file paths for primary and secondary interfaces
 LEASE_FILE_PRIMARY="/var/lib/dhcp/dhclient.${PRIMARY_INTERFACE}.leases"

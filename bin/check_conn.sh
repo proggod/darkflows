@@ -7,10 +7,6 @@
 # Configuration File Path
 CONFIG_FILE="/etc/darkflows/d_network.cfg"
 
-# Monitoring IPs
-PRIMARY_MONITOR="8.8.4.4"
-SECONDARY_MONITOR="1.0.0.1"
-ADDITIONAL_MONITOR="8.8.8.8"  # Added for comprehensive checks
 
 # Ping thresholds and interval
 PING_COUNT=5
