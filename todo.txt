@@ -1,0 +1,1 @@
+use unbound-dns-manager.py  to restart dns once blacklist is downloaded with verify_blacklist

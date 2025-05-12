@@ -172,6 +172,10 @@ def main():
     remove_parser.add_argument('target', help='IP or hostname to remove')
     remove_parser.add_argument('vlan_id', nargs='?', default="default", help='VLAN ID (default: default)')
 
+    restart_parser = subparsers.add_parser('restart', help='Reload Unbound by sending SIGHUP to run_unbound.py')
+
+
+
     args = parser.parse_args()
 
     try:
@@ -179,6 +183,8 @@ def main():
             list_entries(args.vlan_id)
         elif args.command == 'add':
             add_entry(str(args.ip), args.hostname, args.vlan_id)
+        elif args.command == 'restart':
+            restart_dns()
         elif args.command == 'remove':
             remove_entry(args.target, args.vlan_id)
     except Exception as e:

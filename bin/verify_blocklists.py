@@ -12,6 +12,8 @@ ETC_UNBOUND_DIR = "/etc/darkflows/unbound"
 DEFAULT_DIR = os.path.join(ETC_UNBOUND_DIR, "default")
 VLANS_JSON = "/etc/darkflows/vlans.json"
 FETCH_BLOCKLIST_SCRIPT = "/usr/local/darkflows/bin/fetch_blocklist.py"
+DNS_MANAGER_SCRIPT = "/usr/local/darkflows/bin/unbound-dns-manager.py"
+
 
 # Database configuration
 DB_CONFIG = {
@@ -212,6 +214,19 @@ def main() -> None:
     except Exception as e:
         print(f"Error processing VLAN configuration: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # Trigger Unbound reload via your DNS manager script
+    try:
+        print("Triggering Unbound reload via DNS manager…")
+        # If unbound-dns-manager.py is executable:
+        subprocess.run([DNS_MANAGER_SCRIPT, "restart"], check=True)
+        # Otherwise, explicitly invoke with python3:
+        # subprocess.run(["python3", DNS_MANAGER_SCRIPT, "restart"], check=True)
+        print("✅ DNS manager restart completed.")
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Failed to restart DNS manager: {e}", file=sys.stderr)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main() 
