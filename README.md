@@ -25,6 +25,12 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+### v0.39
+- Made unbound respect whitelist
+- Made unbound dns-manager restart after downloading black/white lists
+- Fixed failover script to be more robust
+- Fixed some cake related bugs in failover script
+
 ### v0.37
 - Modified the blocklist fetch scripts
 - Modified and created scripts to run unbound for each VLAN so every VLAN gets its own DNS server
