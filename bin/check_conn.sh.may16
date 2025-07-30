@@ -1,0 +1,580 @@
+#!/bin/bash
+
+# ==========================
+# Intelligent WAN Monitoring and Failover Script
+# ==========================
+
+# Configuration File Path
+CONFIG_FILE="/etc/darkflows/d_network.cfg"
+
+
+# Ping thresholds and interval
+PING_COUNT=5
+PING_TIMEOUT=1
+CHECK_INTERVAL=30
+
+# Stability thresholds
+PRIMARY_STABILITY_THRESHOLD=3  # Number of consecutive successful checks before switching back
+primary_stability_counter=0    # Counter for tracking consecutive successful primary checks
+
+# Log file
+LOG_FILE="/var/log/wann-monitor.log"
+
+# Initialize current_interface variable
+current_interface=""  # Will be set after sourcing config
+
+# Function to log messages to both console and log file
+log() {
+    local message="$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" | tee -a "$LOG_FILE"
+}
+
+# Function to load configuration
+load_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        source "$CONFIG_FILE"
+        log "Configuration loaded from $CONFIG_FILE."
+    else
+        log "Error: Configuration file $CONFIG_FILE not found."
+        exit 1
+    fi
+}
+
+# Function to validate configuration variables
+validate_config() {
+    # Check primary interface settings
+    if [[ -z "$PRIMARY_INTERFACE" || -z "$PRIMARY_EGRESS_BANDWIDTH" || -z "$PRIMARY_INGRESS_BANDWIDTH" ]]; then
+        log "Error: Incomplete Primary Interface configuration."
+        exit 1
+    fi
+
+    # Check secondary interface settings
+    if [[ -z "$SECONDARY_INTERFACE" || -z "$SECONDARY_EGRESS_BANDWIDTH" || -z "$SECONDARY_INGRESS_BANDWIDTH" ]]; then
+        log "Error: Incomplete Secondary Interface configuration."
+        exit 1
+    fi
+}
+
+# Function to extract gateway from lease file
+get_gateway() {
+    local lease_file="$1"
+    if [[ -f "$lease_file" ]]; then
+        # Extract the last 'option routers' entry
+        grep 'option routers' "$lease_file" | tail -1 | awk '{print $3}' | tr -d ';'
+    else
+        echo ""
+    fi
+}
+
+# Function to check if a default route exists
+default_route_exists() {
+    ip route | grep -q '^default'
+}
+
+# Function to check if a route to a specific IP exists
+route_exists() {
+    local target_ip="$1"
+    ip route get "$target_ip" 2>/dev/null | grep -q "^$target_ip via"
+}
+
+# Function to test if an IP is reachable through a specific interface
+test_ip_via_interface() {
+    local ip="$1"
+    local interface="$2"
+    local count="${3:-3}"
+    local timeout="${4:-2}"
+    
+    # Use ping with specific interface
+    ping -c "$count" -W "$timeout" -I "$interface" "$ip" > /dev/null 2>&1
+    return $?
+}
+
+# Function to run a comprehensive connectivity test
+comprehensive_connectivity_test() {
+    local interface="$1"
+    local primary_monitor="$2"
+    local additional_monitor="$3"
+    
+    log "Running comprehensive connectivity test on $interface..."
+    
+    # Test multiple targets with increased packet counts
+    if ! ping -c 8 -W 2 -I "$interface" "$primary_monitor" > /dev/null 2>&1; then
+        log "Comprehensive test failed: Cannot reach $primary_monitor via $interface"
+        return 1
+    fi
+    
+    if ! ping -c 8 -W 2 -I "$interface" "$additional_monitor" > /dev/null 2>&1; then
+        log "Comprehensive test failed: Cannot reach $additional_monitor via $interface"
+        return 1
+    fi
+    
+    # Try to resolve and ping google.com as a definitive internet test
+    if ! ping -c 5 -W 2 -I "$interface" google.com > /dev/null 2>&1; then
+        log "Comprehensive test failed: Cannot reach google.com via $interface"
+        return 1
+    fi
+    
+    log "Comprehensive connectivity test PASSED on $interface."
+    return 0
+}
+
+# Function to ensure route exists for monitoring IP
+ensure_monitoring_route() {
+    local monitor_ip="$1"
+    local gateway="$2"
+    local interface="$3"
+    
+    log "Checking route to monitoring IP $monitor_ip via $interface..."
+    
+    # Check if route exists
+    if ! ip route get "$monitor_ip" 2>/dev/null | grep -q "dev $interface"; then
+        log "Route to $monitor_ip via $interface does not exist. Adding..."
+        
+        # Try to add the route
+        if ip route add "$monitor_ip" via "$gateway" dev "$interface"; then
+            log "Added route to $monitor_ip via $gateway on $interface."
+        else
+            log "Failed to add route to $monitor_ip via $gateway on $interface."
+            return 1
+        fi
+    else
+        log "Route to $monitor_ip via $interface already exists."
+    fi
+    
+    # Test if route works
+    if test_ip_via_interface "$monitor_ip" "$interface"; then
+        log "Monitoring IP $monitor_ip is reachable via $interface."
+        return 0
+    else
+        log "Monitoring IP $monitor_ip is NOT reachable via $interface."
+        # Remove the route as it doesn't work
+        ip route del "$monitor_ip" via "$gateway" dev "$interface" 2>/dev/null
+        return 1
+    fi
+}
+
+# Function to clean up duplicate default routes
+clean_default_routes() {
+    local primary_gateway="$1"
+    local primary_interface="$2"
+    local secondary_gateway="$3"
+    local secondary_interface="$4"
+    
+    # Get count of default routes
+    local default_route_count=$(ip route | grep -c '^default')
+    
+    log "Checking default routes. Found $default_route_count default routes."
+    
+    if [[ $default_route_count -gt 1 ]]; then
+        log "Multiple default routes detected. Cleaning up..."
+        
+        # Get current active interface
+        local current_default=$(ip route | grep '^default' | grep -v "metric" | head -1)
+        log "Current primary default route: $current_default"
+        
+        # Remove all default routes except the current active one
+        ip route | grep '^default' | grep "metric" | while read -r route; do
+            log "Removing extra default route: $route"
+            ip route del $route
+        done
+    fi
+}
+
+# Function to configure ifb0 for ingress traffic shaping
+update_ifb0() {
+    local old_interface="$1"
+    local new_interface="$2"
+    local ingress_bandwidth="$3"
+
+    log "Reconfiguring CAKE ingress for switch from $old_interface to $new_interface..."
+
+    # Clear existing ifb0 and ingress configurations
+    tc qdisc del dev ifb0 root > /dev/null 2>&1 || true
+    tc qdisc del dev "$old_interface" ingress > /dev/null 2>&1 || true
+    tc qdisc del dev "$new_interface" ingress > /dev/null 2>&1 || true
+
+    # Attach ifb0 to new interface
+    tc qdisc add dev "$new_interface" handle ffff: ingress
+    tc filter replace dev "$new_interface" parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb0
+    
+    # Use CAKE_PARAMS from config for ingress
+    tc qdisc add dev ifb0 root cake bandwidth "$ingress_bandwidth" $CAKE_PARAMS
+    log "CAKE ingress reconfigured for $new_interface with params: $CAKE_PARAMS"
+}
+
+# Function to configure CAKE for egress traffic
+configure_cake_egress() {
+    local interface="$1"
+    local bandwidth="$2"
+
+    log "Configuring CAKE egress for $interface with bandwidth $bandwidth..."
+    tc qdisc del dev "$interface" root > /dev/null 2>&1 || true
+    
+    # Use CAKE_PARAMS from config for egress
+    tc qdisc add dev "$interface" root cake bandwidth "$bandwidth" $CAKE_PARAMS
+    log "CAKE egress configured for $interface with params: $CAKE_PARAMS"
+}
+
+# Function to switch default route atomically and update monitoring routes
+switch_to_interface() {
+    local new_interface="$1"
+    local gateway="$2"
+    local new_bandwidth="$3"
+    local new_ingress_bandwidth="$4"
+    local primary_monitor="$5"
+    local secondary_monitor="$6"
+    local additional_monitor="$7"
+
+    log "Attempting to switch to gateway $gateway on $new_interface..."
+
+    # Test connectivity to the gateway
+    if ping -c 3 -W 2 "$gateway" > /dev/null 2>&1; then
+        log "Gateway $gateway is reachable. Proceeding with switch."
+
+        # Replace the default route atomically
+        if ip route replace default via "$gateway" dev "$new_interface"; then
+            log "Default route successfully switched to $new_interface via $gateway."
+            
+            # Update routes for monitoring IPs
+            # We pass empty string as the third argument to ensure_monitoring_route
+            # to indicate that we're not testing reachability, just setting the route
+            if [[ "$new_interface" == "$PRIMARY_INTERFACE" ]]; then
+                # When switching to primary, use primary gateway for monitoring IPs
+                ip route replace "$primary_monitor" via "$gateway" dev "$new_interface" 2>/dev/null || ip route add "$primary_monitor" via "$gateway" dev "$new_interface" 2>/dev/null
+                ip route replace "$additional_monitor" via "$gateway" dev "$new_interface" 2>/dev/null || ip route add "$additional_monitor" via "$gateway" dev "$new_interface" 2>/dev/null
+            else
+                # When switching to secondary, use secondary gateway for monitoring IPs
+                ip route replace "$secondary_monitor" via "$gateway" dev "$new_interface" 2>/dev/null || ip route add "$secondary_monitor" via "$gateway" dev "$new_interface" 2>/dev/null
+                ip route replace "$additional_monitor" via "$gateway" dev "$new_interface" 2>/dev/null || ip route add "$additional_monitor" via "$gateway" dev "$new_interface" 2>/dev/null
+            fi
+            
+            update_ifb0 "$current_interface" "$new_interface" "$new_ingress_bandwidth"
+            configure_cake_egress "$new_interface" "$new_bandwidth"
+            current_interface="$new_interface"
+            
+            # Clean up any duplicate default routes
+            clean_default_routes "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+        else
+            log "Error: Failed to switch default route to $new_interface via $gateway."
+        fi
+    else
+        log "Error: Gateway $gateway is not reachable. Switch aborted."
+    fi
+}
+
+# Function to reset the default route to a specific gateway without switching interfaces
+reset_default_route() {
+    local gateway="$1"
+    local interface="$2"
+    local egress_bandwidth="$3"
+    local ingress_bandwidth="$4"
+    local primary_monitor="$5"
+    local secondary_monitor="$6"
+    local additional_monitor="$7"
+
+    log "Attempting to reset default route to $gateway on $interface..."
+
+    if ping -c 3 -W 2 "$gateway" > /dev/null 2>&1; then
+        log "Gateway $gateway is reachable. Proceeding to reset default route."
+        if ip route replace default via "$gateway" dev "$interface"; then
+            log "Default route successfully reset to $interface via $gateway."
+            
+            # Update routes for monitoring IPs based on which interface this is
+            if [[ "$interface" == "$PRIMARY_INTERFACE" ]]; then
+                ip route replace "$primary_monitor" via "$gateway" dev "$interface" 2>/dev/null || ip route add "$primary_monitor" via "$gateway" dev "$interface" 2>/dev/null
+                ip route replace "$additional_monitor" via "$gateway" dev "$interface" 2>/dev/null || ip route add "$additional_monitor" via "$gateway" dev "$interface" 2>/dev/null
+            else
+                ip route replace "$secondary_monitor" via "$gateway" dev "$interface" 2>/dev/null || ip route add "$secondary_monitor" via "$gateway" dev "$interface" 2>/dev/null
+                ip route replace "$additional_monitor" via "$gateway" dev "$interface" 2>/dev/null || ip route add "$additional_monitor" via "$gateway" dev "$interface" 2>/dev/null
+            fi
+            
+            update_ifb0 "$current_interface" "$interface" "$ingress_bandwidth"
+            configure_cake_egress "$interface" "$egress_bandwidth"
+            current_interface="$interface"
+            
+            # Clean up any duplicate default routes
+            clean_default_routes "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+        else
+            log "Error: Failed to reset default route to $interface via $gateway."
+        fi
+    else
+        log "Error: Gateway $gateway is not reachable. Cannot reset default route."
+    fi
+}
+
+# Function to get the current default gateway and interface
+get_current_gateway() {
+    ip route | grep '^default' | grep -v "metric" | awk '{print $3, $5}'
+}
+
+# Function to initialize routing properly
+initialize_routing() {
+    log "Initializing routing configuration..."
+    
+    # Clean up any duplicate default routes first
+    clean_default_routes "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+    
+    # Check Primary Interface and Gateway
+    log "Testing Primary Interface connectivity..."
+    if ping -c 3 -W 2 -I "$PRIMARY_INTERFACE" "$PRIMARY_GATEWAY" > /dev/null 2>&1; then
+        log "Primary Gateway is reachable via Primary Interface."
+        
+        # Check if Primary WAN can reach internet
+        if ensure_monitoring_route "$PRIMARY_MONITOR" "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE"; then
+            log "Primary WAN has internet connectivity. Setting as default route."
+            reset_default_route "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$PRIMARY_EGRESS_BANDWIDTH" "$PRIMARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+            return 0
+        else
+            log "Primary WAN doesn't have internet connectivity."
+        fi
+    else
+        log "Primary Gateway is NOT reachable via Primary Interface."
+    fi
+    
+    # If we're here, Primary is down or doesn't have internet, try Secondary
+    log "Testing Secondary Interface connectivity..."
+    if ping -c 3 -W 2 -I "$SECONDARY_INTERFACE" "$SECONDARY_GATEWAY" > /dev/null 2>&1; then
+        log "Secondary Gateway is reachable via Secondary Interface."
+        
+        # Check if Secondary WAN can reach internet
+        if ensure_monitoring_route "$SECONDARY_MONITOR" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"; then
+            log "Secondary WAN has internet connectivity. Setting as default route."
+            reset_default_route "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE" "$SECONDARY_EGRESS_BANDWIDTH" "$SECONDARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+            return 0
+        else
+            log "Secondary WAN doesn't have internet connectivity."
+        fi
+    else
+        log "Secondary Gateway is NOT reachable via Secondary Interface."
+    fi
+    
+    # If we're here, both WANs are down
+    log "Both WANs appear to be down. Will continue monitoring and try again."
+    
+    # Set a fallback default route to whichever gateway is reachable
+    if ping -c 1 -W 1 "$PRIMARY_GATEWAY" > /dev/null 2>&1; then
+        log "Setting fallback route to Primary Gateway (without internet)."
+        ip route replace default via "$PRIMARY_GATEWAY" dev "$PRIMARY_INTERFACE"
+        current_interface="$PRIMARY_INTERFACE"
+    elif ping -c 1 -W 1 "$SECONDARY_GATEWAY" > /dev/null 2>&1; then
+        log "Setting fallback route to Secondary Gateway (without internet)."
+        ip route replace default via "$SECONDARY_GATEWAY" dev "$SECONDARY_INTERFACE"
+        current_interface="$SECONDARY_INTERFACE"
+    else
+        log "No gateways are reachable. Cannot set default route."
+    fi
+    
+    return 1
+}
+
+# Initialize log file
+touch "$LOG_FILE"
+log "===== Intelligent WAN Monitoring Script Started ====="
+
+# Initialize timing variables for consistent intervals
+START_TIME=""
+
+# Load and validate configuration
+load_config
+validate_config
+
+# Extract gateways from lease files
+PRIMARY_LEASE_FILE="/var/lib/dhcp/dhclient.${PRIMARY_INTERFACE}.leases"
+SECONDARY_LEASE_FILE="/var/lib/dhcp/dhclient.${SECONDARY_INTERFACE}.leases"
+
+PRIMARY_GATEWAY=$(get_gateway "$PRIMARY_LEASE_FILE")
+SECONDARY_GATEWAY=$(get_gateway "$SECONDARY_LEASE_FILE")
+
+# Validate gateways
+if [[ -z "$PRIMARY_GATEWAY" || -z "$SECONDARY_GATEWAY" ]]; then
+    log "Error: Unable to retrieve gateways from lease files."
+    exit 1
+fi
+
+log "Primary Gateway: $PRIMARY_GATEWAY"
+log "Secondary Gateway: $SECONDARY_GATEWAY"
+
+# Initialize routing at startup
+initialize_routing
+
+# Main loop
+while true; do
+    # Extract gateways from lease files (in case they've changed)
+    PRIMARY_GATEWAY=$(get_gateway "$PRIMARY_LEASE_FILE")
+    SECONDARY_GATEWAY=$(get_gateway "$SECONDARY_LEASE_FILE")
+
+    # Validate gateways
+    if [[ -z "$PRIMARY_GATEWAY" || -z "$SECONDARY_GATEWAY" ]]; then
+        log "Error: Unable to retrieve gateways from lease files."
+        # Don't add sleep here - the end of loop will handle consistent timing
+        continue
+    fi
+
+    log "Primary Gateway: $PRIMARY_GATEWAY"
+    log "Secondary Gateway: $SECONDARY_GATEWAY"
+
+    # Check if default route exists
+    if default_route_exists; then
+        log "Default route exists."
+
+        # Get current default gateway and interface
+        read -r CURRENT_GATEWAY CURRENT_INTERFACE <<< "$(get_current_gateway)"
+        log "Current Default Gateway: $CURRENT_GATEWAY via $CURRENT_INTERFACE"
+
+        # Check if current default gateway matches the expected gateway based on current_interface
+        if [[ "$CURRENT_INTERFACE" == "$PRIMARY_INTERFACE" && "$CURRENT_GATEWAY" != "$PRIMARY_GATEWAY" ]]; then
+            log "Mismatch detected: Current default gateway does not match Primary Gateway."
+            reset_default_route "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$PRIMARY_EGRESS_BANDWIDTH" "$PRIMARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+        elif [[ "$CURRENT_INTERFACE" == "$SECONDARY_INTERFACE" && "$CURRENT_GATEWAY" != "$SECONDARY_GATEWAY" ]]; then
+            log "Mismatch detected: Current default gateway does not match Secondary Gateway."
+            reset_default_route "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE" "$SECONDARY_EGRESS_BANDWIDTH" "$SECONDARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+        fi
+
+    else
+        log "Default route is missing. Re-initializing routing..."
+        initialize_routing
+        # Don't add sleep here - the end of loop will handle consistent timing
+        continue
+    fi
+
+    # Clean up duplicate default routes
+    clean_default_routes "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+    
+    # Ensure routes to monitoring IPs exist and are functional
+    if [[ "$current_interface" == "$PRIMARY_INTERFACE" ]]; then
+        ensure_monitoring_route "$PRIMARY_MONITOR" "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE"
+        ensure_monitoring_route "$ADDITIONAL_MONITOR" "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE"
+    else
+        ensure_monitoring_route "$SECONDARY_MONITOR" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+        ensure_monitoring_route "$ADDITIONAL_MONITOR" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+    fi
+
+    # Perform ping checks
+    # Test primary WAN by pinging PRIMARY_MONITOR
+    log "Testing Primary WAN connectivity..."
+    PRIMARY_TEST_RESULT=1  # Default to failure
+    
+    # Only try to ping PRIMARY_MONITOR if the route exists
+    if route_exists "$PRIMARY_MONITOR"; then
+        # Test connectivity with more robust check
+        if ping -c "$PING_COUNT" -W "$PING_TIMEOUT" "$PRIMARY_MONITOR" > /dev/null 2>&1 && 
+           ping -c 2 -W 1 "$ADDITIONAL_MONITOR" > /dev/null 2>&1; then
+            PRIMARY_TEST_RESULT=0  # Success
+        fi
+    else
+        log "No route to $PRIMARY_MONITOR exists. Skipping primary connectivity test."
+    fi
+    
+    if [[ $PRIMARY_TEST_RESULT -ne 0 ]]; then
+        log "Primary WAN is down (no ping responses to $PRIMARY_MONITOR or $ADDITIONAL_MONITOR)."
+        # Reset stability counter when primary connection fails
+        primary_stability_counter=0
+        
+        if [[ "$current_interface" != "$SECONDARY_INTERFACE" ]]; then
+            log "Switching to Secondary WAN..."
+            switch_to_interface "$SECONDARY_INTERFACE" "$SECONDARY_GATEWAY" "$SECONDARY_EGRESS_BANDWIDTH" "$SECONDARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+        else
+            log "Already using Secondary WAN. Checking its health..."
+            
+            # Test secondary WAN connectivity
+            SECONDARY_TEST_RESULT=1  # Default to failure
+            
+            # Only try to ping SECONDARY_MONITOR if the route exists
+            if route_exists "$SECONDARY_MONITOR"; then
+                if ping -c "$PING_COUNT" -W "$PING_TIMEOUT" "$SECONDARY_MONITOR" > /dev/null 2>&1; then
+                    SECONDARY_TEST_RESULT=0  # Success
+                fi
+            else
+                log "No route to $SECONDARY_MONITOR exists. Setting up the route..."
+                ensure_monitoring_route "$SECONDARY_MONITOR" "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE"
+            fi
+            
+            if [[ $SECONDARY_TEST_RESULT -ne 0 ]]; then
+                log "Secondary WAN is also down (no ping responses to $SECONDARY_MONITOR)."
+                log "Both WANs appear to be down. Will try to re-initialize routing..."
+                initialize_routing
+            else
+                log "Secondary WAN is healthy and currently in use."
+            fi
+        fi
+    else
+        log "Primary WAN is healthy."
+        
+        # Increment stability counter when primary is healthy
+        primary_stability_counter=$((primary_stability_counter + 1))
+        log "Primary stability counter: $primary_stability_counter/$PRIMARY_STABILITY_THRESHOLD"
+        
+        # Check if we need to switch back to primary
+        if [[ "$current_interface" != "$PRIMARY_INTERFACE" ]]; then
+            # Only switch back if primary has been stable for multiple consecutive checks
+            if [[ $primary_stability_counter -ge $PRIMARY_STABILITY_THRESHOLD ]]; then
+                log "Primary WAN has been stable for $primary_stability_counter checks. Attempting to switch back..."
+                
+                # Perform more comprehensive testing before switching back
+                log "Performing comprehensive test of Primary WAN..."
+                
+                # Run the comprehensive test function instead of inline tests
+                if comprehensive_connectivity_test "$PRIMARY_INTERFACE" "$PRIMARY_MONITOR" "$ADDITIONAL_MONITOR"; then
+                    log "Primary WAN passed ALL comprehensive tests. Switching back."
+                    switch_to_interface "$PRIMARY_INTERFACE" "$PRIMARY_GATEWAY" "$PRIMARY_EGRESS_BANDWIDTH" "$PRIMARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+                else
+                    log "Primary WAN FAILED comprehensive testing. Continuing to use $current_interface."
+                    # Reset stability counter since comprehensive test failed
+                    primary_stability_counter=0
+                fi
+            else
+                log "Primary WAN detected but waiting for stability. Continuing to use $current_interface."
+            fi
+        else
+            log "Already using Primary WAN. No action needed."
+        fi
+    fi
+
+    # Additional Ping Check to Determine Route Integrity
+    if ping -c 2 -W 1 "$ADDITIONAL_MONITOR" > /dev/null 2>&1; then
+        log "Additional Monitor ($ADDITIONAL_MONITOR) is reachable."
+    else
+        log "Additional Monitor ($ADDITIONAL_MONITOR) is NOT reachable."
+
+        if ping -c 2 -W 1 "$PRIMARY_MONITOR" > /dev/null 2>&1 || ping -c 2 -W 1 "$SECONDARY_MONITOR" > /dev/null 2>&1; then
+            log "At least one other monitor is reachable but Additional Monitor ($ADDITIONAL_MONITOR) is not."
+            log "Possible default route misconfiguration detected. Resetting default route."
+
+            if [[ "$current_interface" == "$PRIMARY_INTERFACE" ]]; then
+                reset_default_route "$PRIMARY_GATEWAY" "$PRIMARY_INTERFACE" "$PRIMARY_EGRESS_BANDWIDTH" "$PRIMARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+            elif [[ "$current_interface" == "$SECONDARY_INTERFACE" ]]; then
+                reset_default_route "$SECONDARY_GATEWAY" "$SECONDARY_INTERFACE" "$SECONDARY_EGRESS_BANDWIDTH" "$SECONDARY_INGRESS_BANDWIDTH" "$PRIMARY_MONITOR" "$SECONDARY_MONITOR" "$ADDITIONAL_MONITOR"
+            fi
+        else
+            log "All monitors are unreachable. Possibly total internet outage. Re-initializing routing..."
+            initialize_routing
+        fi
+    fi
+
+    # Record the start time of this loop iteration
+    END_TIME=$(date +%s)
+    
+    # Calculate how long this iteration took
+    if [[ -n "$START_TIME" ]]; then
+        ELAPSED=$((END_TIME - START_TIME))
+        log "This check iteration took $ELAPSED seconds to complete."
+        
+        # Calculate how long to sleep to maintain the desired interval
+        if [[ $ELAPSED -lt $CHECK_INTERVAL ]]; then
+            SLEEP_TIME=$((CHECK_INTERVAL - ELAPSED))
+            log "Sleeping for $SLEEP_TIME seconds..."
+            sleep $SLEEP_TIME
+        else
+            log "Check took longer than interval. Not sleeping this cycle."
+        fi
+    else
+        # First run, just sleep the full interval
+        log "Sleeping for $CHECK_INTERVAL seconds..."
+        sleep $CHECK_INTERVAL
+    fi
+    
+    # Record the start time for the next iteration
+    START_TIME=$(date +%s)
+done
+
+

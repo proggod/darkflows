@@ -130,32 +130,35 @@ def copy_template_to_directory(source_dir: str, target_dir: str) -> None:
         print(f"Warning: Failed to set ownership of {target_dir}: {e}", file=sys.stderr)
         print("Continuing anyway, but this might cause permission issues")
 
-
 def init_database() -> None:
     """
     Initialize the database and tables if they don't exist.
     Checks table structure and recreates tables if they don't match expected structure.
     """
     try:
-        # Connect or create database
+        # Try to connect to the database
         try:
             conn = MySQLdb.connect(db=DB_NAME, **DB_CONFIG)
             print(f"Connected to existing database '{DB_NAME}'")
         except MySQLdb.OperationalError as e:
-            if e.args[0] == 1049:
+            # Database doesn't exist, create it
+            if e.args[0] == 1049:  # Database doesn't exist error code
                 conn = MySQLdb.connect(**DB_CONFIG)
                 cursor = conn.cursor()
                 cursor.execute(f"CREATE DATABASE {DB_NAME} DEFAULT CHARACTER SET 'utf8'")
                 conn.commit()
-                cursor.close(); conn.close()
+                print(f"Created database '{DB_NAME}'")
+                cursor.close()
+                conn.close()
                 conn = MySQLdb.connect(db=DB_NAME, **DB_CONFIG)
             else:
                 raise
+        
         cursor = conn.cursor()
-
+        
+        # Define expected table structures with all required columns and indexes
         expected_tables = {
-            DNS_QUERIES_TABLE:  # ... same as before ...
-                """
+            DNS_QUERIES_TABLE: """
                 CREATE TABLE {table} (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     ts DATETIME NOT NULL,
@@ -172,25 +175,22 @@ def init_database() -> None:
                     KEY idx_ts_client (ts, client_ip),
                     KEY idx_ts_vlan (ts, vlan_id)
                 ) ENGINE=InnoDB
-                """,
-            BLACKLIST_TABLE:  # ... same ...
-                """
+            """,
+            BLACKLIST_TABLE: """
                 CREATE TABLE {table} (
                     domain VARCHAR(255) NOT NULL,
                     vlan_id INT NOT NULL DEFAULT 0,
                     PRIMARY KEY (domain, vlan_id)
                 ) ENGINE=InnoDB
-                """,
-            WHITELIST_TABLE:
-                """
+            """,
+            WHITELIST_TABLE: """
                 CREATE TABLE {table} (
                     domain VARCHAR(255) NOT NULL,
                     vlan_id INT NOT NULL DEFAULT 0,
                     PRIMARY KEY (domain, vlan_id)
                 ) ENGINE=InnoDB
-                """,
-            BLOCKLISTS_TABLE:  # ... same ...
-                """
+            """,
+            BLOCKLISTS_TABLE: """
                 CREATE TABLE {table} (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(255) NOT NULL,
@@ -200,103 +200,101 @@ def init_database() -> None:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     UNIQUE KEY idx_name_vlan (name, vlan_id)
                 ) ENGINE=InnoDB
-                """
+            """
         }
-
+        
+        # Check and create/recreate each table
         for table_name, create_sql in expected_tables.items():
+            # Check if table exists
             cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
-            if cursor.fetchone():
-                # Table exists: inspect columns and indexes
+            table_exists = cursor.fetchone() is not None
+            
+            if table_exists:
+                # Check table structure
                 cursor.execute(f"DESCRIBE {table_name}")
                 columns = {row[0]: row for row in cursor.fetchall()}
+                
+                # Check for indexes
                 cursor.execute(f"SHOW INDEX FROM {table_name}")
-                indexes = list(cursor.fetchall())
-
+                indexes = {row[2]: row for row in cursor.fetchall()}
+                
+                # For dns_queries table, check for all required columns and indexes
                 if table_name == DNS_QUERIES_TABLE:
-                    # ... unchanged dns_queries logic ...
-                    pass
-
-                elif table_name in [BLACKLIST_TABLE, WHITELIST_TABLE]:
-                    # Ensure columns exist
-                    if 'domain' not in columns or 'vlan_id' not in columns:
-                        print(f"Table {table_name} missing columns; recreating...")
+                    required_columns = ['id', 'ts', 'client_ip', 'domain', 'query_type', 'status', 'vlan_id']
+                    required_indexes = ['PRIMARY', 'idx_ts', 'idx_domain', 'idx_client_ip', 'idx_vlan_id', 
+                                       'idx_ts_domain', 'idx_ts_client', 'idx_ts_vlan']
+                    
+                    missing_columns = [col for col in required_columns if col not in columns]
+                    missing_indexes = [idx for idx in required_indexes if idx not in indexes]
+                    
+                    if missing_columns or missing_indexes:
+                        print(f"Table {table_name} is missing required columns or indexes. Recreating...")
                         cursor.execute(f"DROP TABLE {table_name}")
                         cursor.execute(create_sql.format(table=table_name))
                         conn.commit()
-                        print(f"Recreated table {table_name}")
+                        print(f"Recreated table {table_name} with proper structure")
                     else:
-                        # Explicitly verify primary key columns
-                        cursor.execute(
-                            f"SHOW INDEX FROM {table_name} WHERE Key_name = 'PRIMARY'"
-                        )
-                        pk_rows = cursor.fetchall()
-                        pk_columns = set(row[4] for row in pk_rows)
-                        if pk_columns != {'domain', 'vlan_id'}:
-                            print(f"Table {table_name} has incorrect PK {pk_columns}; recreating...")
+                        print(f"Table {table_name} has correct structure")
+                
+                # For blacklist and whitelist tables, check for vlan_id column and primary key
+                elif table_name in [BLACKLIST_TABLE, WHITELIST_TABLE]:
+                    if 'vlan_id' not in columns or 'domain' not in columns:
+                        print(f"Table {table_name} is missing required columns. Recreating...")
+                        cursor.execute(f"DROP TABLE {table_name}")
+                        cursor.execute(create_sql.format(table=table_name))
+                        conn.commit()
+                        print(f"Recreated table {table_name} with proper structure")
+                    else:
+                        # Check if primary key includes both domain and vlan_id
+                        has_correct_pk = False
+                        for idx_name, idx_row in indexes.items():
+                            if idx_name == 'PRIMARY' and idx_row[4] == 1:  # Check if it's the first column in PK
+                                # Need to check if vlan_id is also part of the PK
+                                cursor.execute(f"SHOW INDEX FROM {table_name} WHERE Key_name = 'PRIMARY' AND Column_name = 'vlan_id'")
+                                if cursor.fetchone():
+                                    has_correct_pk = True
+                        
+                        if not has_correct_pk:
+                            print(f"Table {table_name} has incorrect primary key. Recreating...")
                             cursor.execute(f"DROP TABLE {table_name}")
                             cursor.execute(create_sql.format(table=table_name))
                             conn.commit()
-                            print(f"Recreated table {table_name} with correct PK")
+                            print(f"Recreated table {table_name} with proper structure")
                         else:
-                            print(f"Table {table_name} OK")
-
+                            print(f"Table {table_name} has correct structure")
+                
+                # For blocklists table, check for all required columns and unique index
                 elif table_name == BLOCKLISTS_TABLE:
-                    # ... unchanged blocklists logic ...
-                    pass
+                    required_columns = ['id', 'name', 'url', 'vlan_id', 'created_at', 'updated_at']
+                    missing_columns = [col for col in required_columns if col not in columns]
+                    
+                    # Check for unique index on name and vlan_id
+                    has_unique_index = False
+                    for idx_name, idx_row in indexes.items():
+                        if idx_name == 'idx_name_vlan':
+                            has_unique_index = True
+                            break
+                    
+                    if missing_columns or not has_unique_index:
+                        print(f"Table {table_name} is missing required columns or indexes. Recreating...")
+                        cursor.execute(f"DROP TABLE {table_name}")
+                        cursor.execute(create_sql.format(table=table_name))
+                        conn.commit()
+                        print(f"Recreated table {table_name} with proper structure")
+                    else:
+                        print(f"Table {table_name} has correct structure")
             else:
+                # Table doesn't exist, create it
                 print(f"Creating table {table_name}")
                 cursor.execute(create_sql.format(table=table_name))
                 conn.commit()
-
-        cursor.close(); conn.close()
+        
+        cursor.close()
+        conn.close()
         print("Database initialization completed successfully")
-
     except Exception as e:
         print(f"Error initializing database: {e}", file=sys.stderr)
         sys.exit(1)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def read_network_config() -> Dict[str, str]:
     """

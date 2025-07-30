@@ -25,6 +25,10 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+### v0.40
+- Various bug fixes
+
+
 ### v0.39
 - Made unbound respect whitelist
 - Made unbound dns-manager restart after downloading black/white lists

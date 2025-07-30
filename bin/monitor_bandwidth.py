@@ -7,6 +7,8 @@ import time
 import pexpect
 import json
 import re
+import subprocess
+import ipaddress
 
 def get_internal_interface():
     config_path = Path('/etc/darkflows/d_network.cfg')
@@ -21,22 +23,57 @@ def get_internal_interface():
     except FileNotFoundError:
         raise ValueError(f"Config file not found at {config_path}")
 
+def get_interface_network(interface):
+    """Get the network address and subnet for the given interface."""
+    try:
+        result = subprocess.run(
+            ['ip', 'addr', 'show', interface],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Find IPv4 address with subnet
+        for line in result.stdout.split('\n'):
+            if 'inet ' in line and not 'inet6' in line:
+                # Extract IP/subnet like "192.168.1.5/24"
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    ip_with_subnet = parts[1]
+                    network = ipaddress.ip_network(ip_with_subnet, strict=False)
+                    logging.info(f"Detected network: {network}")
+                    return network
+                    
+    except Exception as e:
+        logging.warning(f"Could not detect network for {interface}: {e}")
+        
+    return None
+
 # Configuration
 LOG_PATH = Path('/var/log/bandwidth_monitor.log')
 JSON_PATH = Path('/dev/shm/bandwidth.json')
-try:
-    INTERFACE = get_internal_interface()
-except ValueError as e:
-    print(f"Fatal error: {e}")
-    sys.exit(1)
 LOG_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
 SCREEN_CAPTURE_TIMEOUT = 5
 
+# Initialize logging early
 logging.basicConfig(
     handlers=[logging.handlers.RotatingFileHandler(LOG_PATH, maxBytes=1_000_000, backupCount=3)],
     format=LOG_FORMAT,
     level=logging.INFO
 )
+
+try:
+    INTERFACE = get_internal_interface()
+except ValueError as e:
+    print(f"Fatal error: {e}")
+    sys.exit(1)
+
+# Get the network range for the interface
+NETWORK = get_interface_network(INTERFACE)
+if NETWORK:
+    print(f"[Bandwidth Monitor] Monitoring network: {NETWORK}")
+else:
+    print("[Bandwidth Monitor] Warning: Could not detect network, will match all private IPs")
 
 class ProgressSpinner:
     def __init__(self):
@@ -63,6 +100,14 @@ spinner = ProgressSpinner()  # Initialize spinner here
 
 def strip_ansi(text: str) -> str:
     return re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', text)
+
+def is_private_ip(ip_str):
+    """Check if an IP address is in a private range."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_private
+    except:
+        return False
 
 def capture_full_screen(child):
     """Capture the complete iftop screen output."""
@@ -128,23 +173,38 @@ def parse_bandwidth(data: str) -> dict:
         
         if external_match and i + 1 < len(lines):
             internal_line = strip_ansi(lines[i + 1])
+            # Match any IP address format
             internal_match = re.search(
-                r'(192\.\d+\.\d+\.\d+)\s*<=\s*([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)',
+                r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*<=\s*([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)\s+([\d.]+[KMGT]?[bB]?)',
                 internal_line
             )
             
             if internal_match:
-                hosts[internal_match.group(1)] = {
-                    'last_2s_sent': internal_match.group(2),  # Now sent is from internal
-                    'last_10s_sent': internal_match.group(3),
-                    'last_40s_sent': internal_match.group(4),
-                    'cumulative_sent': internal_match.group(5),
-                    'last_2s_received': external_match.group(1),  # Now received is from external
-                    'last_10s_received': external_match.group(2),
-                    'last_40s_received': external_match.group(3),
-                    'cumulative_received': external_match.group(4),
-                    'last_updated': time.time()
-                }
+                ip_addr = internal_match.group(1)
+                
+                # Check if IP is in our network or is a private IP
+                include_ip = False
+                if NETWORK:
+                    try:
+                        include_ip = ipaddress.ip_address(ip_addr) in NETWORK
+                    except:
+                        pass
+                else:
+                    # Fallback: include all private IPs
+                    include_ip = is_private_ip(ip_addr)
+                
+                if include_ip:
+                    hosts[ip_addr] = {
+                        'last_2s_sent': internal_match.group(2),  # Now sent is from internal
+                        'last_10s_sent': internal_match.group(3),
+                        'last_40s_sent': internal_match.group(4),
+                        'cumulative_sent': internal_match.group(5),
+                        'last_2s_received': external_match.group(1),  # Now received is from external
+                        'last_10s_received': external_match.group(2),
+                        'last_40s_received': external_match.group(3),
+                        'cumulative_received': external_match.group(4),
+                        'last_updated': time.time()
+                    }
 
 #                hosts[internal_match.group(1)] = {
 #                    'last_2s_sent': external_match.group(1),

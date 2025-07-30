@@ -3,8 +3,8 @@
 # Source the network configuration file
 source /etc/darkflows/d_network.cfg || { echo "Failed to source network configuration"; exit 1; }
 
-# Set CAKE parameters (default to optimized gaming settings if not defined)
-COMMON_CAKE_PARAMS="${CAKE_PARAMS:-besteffort noatm overhead 18 rtt 55ms memlimit 16mb}"
+# Set CAKE parameters (default to empty string if not defined)
+COMMON_CAKE_PARAMS="${CAKE_PARAMS:-}"
 
 # Function to validate bandwidth value (case-insensitive)
 validate_bandwidth() {
@@ -87,7 +87,7 @@ change_cake_bandwidth() {
         INGRESS_BANDWIDTH="$SECONDARY_INGRESS_BANDWIDTH"
     fi
 
-    # Change bandwidth for egress traffic on the primary interface (UPLOAD)
+    # Change bandwidth for egress traffic on the primary interface
     echo "Changing CAKE bandwidth for egress traffic on $PRIMARY_INTERFACE to ${PRIMARY_EGRESS_BANDWIDTH}..."
     tc qdisc replace dev $PRIMARY_INTERFACE root cake bandwidth ${PRIMARY_EGRESS_BANDWIDTH} dual-srchost ack-filter $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $PRIMARY_INTERFACE"; exit 1; }
 
@@ -97,13 +97,13 @@ change_cake_bandwidth() {
         tc qdisc replace dev $SECONDARY_INTERFACE root cake bandwidth ${SECONDARY_EGRESS_BANDWIDTH} dual-srchost ack-filter $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $SECONDARY_INTERFACE"; exit 1; }
     fi
 
-    # Change bandwidth for ingress traffic on ifb0 (DOWNLOAD)
+    # Change bandwidth for ingress traffic on ifb0
     echo "Changing CAKE bandwidth for ingress traffic on ifb0 to ${INGRESS_BANDWIDTH}..."
-    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} dual-dsthost no-ack-filter $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
+    tc qdisc replace dev ifb0 root handle 1: cake bandwidth ${INGRESS_BANDWIDTH} dual-dsthost $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on ifb0"; exit 1; }
 
     # Change bandwidth for local traffic on the internal interface
     echo "Changing CAKE bandwidth for local traffic on $INTERNAL_INTERFACE to ${INTERNAL_EGRESS_BANDWIDTH}..."
-    tc qdisc replace dev $INTERNAL_INTERFACE root cake bandwidth ${INTERNAL_EGRESS_BANDWIDTH} flows no-ack-filter $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $INTERNAL_INTERFACE"; exit 1; }
+    tc qdisc replace dev $INTERNAL_INTERFACE root cake bandwidth ${INTERNAL_EGRESS_BANDWIDTH} $COMMON_CAKE_PARAMS || { echo "Failed to change CAKE bandwidth on $INTERNAL_INTERFACE"; exit 1; }
 }
 
 # Main script logic
@@ -120,4 +120,5 @@ tc -s qdisc show dev $INTERNAL_INTERFACE
 if [ -n "$SECONDARY_INTERFACE" ]; then
     tc -s qdisc show dev $SECONDARY_INTERFACE
 fi
+
 
