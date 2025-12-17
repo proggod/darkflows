@@ -25,15 +25,22 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
-### v0.40
-- Various bug fixes
-
-
 ### v0.39
-- Made unbound respect whitelist
-- Made unbound dns-manager restart after downloading black/white lists
-- Fixed failover script to be more robust
-- Fixed some cake related bugs in failover script
+- Updated NextJS for security reasons
+
+### v0.38
+- Added VLAN support to DNS clients
+- Added VLAN to active DHCP leases
+- Added VLAN to DNS hosts
+- Added VLAN support to DHCP reservations
+- Fixed bandwidth component issues
+- Fixed unbound template
+- Fixed default VLAN ID to 1 instead of 0 on DNS custom blocklists
+- Fixed DNS reservations logic
+- Fixed the sync dns hosts button
+- Fixed issue with unbound not starting
+- Fixed speedtest install to not prompt for key confirm
+- New Custom Based ISO installer asks only essential questions
 
 ### v0.37
 - Modified the blocklist fetch scripts
@@ -194,3 +201,9 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
 - Fixed Network Stats Card to ignore ifb0 interface
 - Fixed Network Stats Card to show correct interface name
 
+
+
+
+
+##TODO: 
+- Check active dhcp leases for ips that shouldn't be there
