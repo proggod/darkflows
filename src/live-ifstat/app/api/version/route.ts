@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const APP_VERSION = '0.37';
+const APP_VERSION = '0.40';
 
 export async function GET() {
   // Add cache control headers

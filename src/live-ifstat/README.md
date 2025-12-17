@@ -25,6 +25,11 @@ su - root ; apt install curl ; curl -sSL https://darkflows.com/downloads/install
     
 
 ## Changelog
+### v0.40
+- Security: Updated Next.js to 15.5.9 (fixes critical RCE, auth bypass, SSRF, DoS vulnerabilities)
+- Security: Updated all dependencies to resolve 18 security advisories
+- Removed stale pnpm-lock.yaml in favor of package-lock.json
+
 ### v0.39
 - Updated NextJS for security reasons
 
